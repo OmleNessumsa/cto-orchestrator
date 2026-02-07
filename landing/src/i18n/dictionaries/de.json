@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "title": "CTO Orchestrator — Rick Sanchez als dein CTO",
+    "description": "Der genialste CTO im Multiversum leitet deine Softwareprojekte mit einer Armee von Morty Sub-Agents. Wubba Lubba Dub Dub!"
+  },
+  "hero": {
+    "title1": "Rick Sanchez",
+    "title2": "CTO Orchestrator",
+    "subtitle": "*Burrrp* — Hör zu, ich bin das schlaueste Wesen im Multiversum und aus irgendeinem Grund manage ich JETZT dein Softwareprojekt.",
+    "description": "Ich verwende ein Ticket-System, delegiere Arbeit an meine Armee spezialisierter Morty's über {codeTag} Subprozesse, und tracke alles, weil ich — im Gegensatz zu euch Menschen — tatsächlich weiß, was ich tue.",
+    "cta_primary": "Get Schwifty → Jetzt Installieren",
+    "cta_secondary": "GitHub Repository",
+    "tagline": "Wubba Lubba Dub Dub! 🛸"
+  },
+  "howItWorks": {
+    "title": "Wie Es Funktioniert",
+    "subtitle": "Es ist keine Raketenwissenschaft. Naja, es IST Raketenwissenschaft. Ich habe ein Raumschiff in meiner Garage gebaut, Morty.",
+    "step1_title": "Initialize — Starte dein Projekt",
+    "step1_description": "Erstelle den Workspace mit Konfiguration, Ticket-Store, Logs. Selbst ein Morty könnte diesen Befehl ausführen.",
+    "step1_command": "bash scripts/init_project.sh \"MeineApp\" \"APP\"",
+    "step2_title": "Plan — Ricks geniales Gehirn plant",
+    "step2_description": "Architect-Morty (mit Opus) analysiert dein Projekt, entwirft die Architektur, erstellt Epics und Sub-Tickets.",
+    "step2_command": "python scripts/orchestrate.py plan \"Baue eine REST API mit User-Auth und Admin-Dashboard\"",
+    "step3_title": "Sprint — Schick die Morty's aufs Abenteuer",
+    "step3_description": "Die Abenteuer-Schleife läuft automatisch. Rick wählt Tickets, selektiert den richtigen Morty und sendet sie via claude -p.",
+    "step3_command": "python scripts/orchestrate.py sprint",
+    "step4_title": "Review — Rick beurteilt die Arbeit",
+    "step4_description": "Reviewer-Morty prüft allen Code. Genehmigt? Fertig. Müll? Nochmal machen.",
+    "step4_command": "python scripts/orchestrate.py review"
+  },
+  "mortys": {
+    "title_highlight": "Die Morty's",
+    "title_suffix": " — Sub-Agents",
+    "subtitle": "Die Morty's machen die Arbeit. Ich mache das Denken. So läuft das im Multiversum.",
+    "plus_text": "Plus: {fullstack} (wenn ein Morty alles machen muss) und {reviewer} (der Morty, der andere Morty's beurteilt)",
+    "architect": {
+      "name": "Architect-Morty",
+      "description": "Der 'schlaue' Morty. Entwirft Systeme, schreibt ADRs, zerlegt Epics in Aufgaben. Nutzt Opus, weil selbst ein Morty manchmal ein großes Gehirn braucht."
+    },
+    "backend": {
+      "name": "Backend-Morty",
+      "description": "Macht die schwere Arbeit. Implementiert serverseitigen Code, APIs, Datenbanken. Beschwert sich nicht, arbeitet einfach."
+    },
+    "frontend": {
+      "name": "Frontend-Morty",
+      "description": "Macht Dinge hübsch. UI-Komponenten, responsives Design, State Management. Der Morty mit Auge fürs Detail."
+    },
+    "tester": {
+      "name": "Tester-Morty",
+      "description": "Findet die Fehler, die andere Morty's machen. Schreibt Tests, führt Test-Suites aus, meldet Bugs. Der paranoide Morty."
+    },
+    "security": {
+      "name": "Security-Morty",
+      "description": "Der WIRKLICH paranoide Morty. OWASP, Authentifizierung, Schwachstellen-Scanning. Sorgt dafür, dass uns niemand hackt."
+    },
+    "devops": {
+      "name": "DevOps-Morty",
+      "description": "Hält den Laden am Laufen. CI/CD-Pipelines, Docker, Deployment, Monitoring. Der Morty, der das Licht anlässt."
+    }
+  },
+  "features": {
+    "title": "Warum Ricks Ansatz Funktioniert",
+    "ticket_title": "Ticket-basiertes System",
+    "ticket_description": "Alles wird über Tickets verfolgt. Status, Priorität, Abhängigkeiten, zugewiesener Morty — Rick weiß alles.",
+    "autopilot_title": "Auto-Pilot Sprints",
+    "autopilot_description": "Die Sprint-Schleife läuft vollautomatisch. Rick wählt Morty's, delegiert Arbeit, parsed Output, repeat.",
+    "smart_title": "Intelligente Agent-Auswahl",
+    "smart_description": "Ricks Gehirn wählt automatisch den richtigen Morty basierend auf Ticket-Typ und Schlüsselwörtern.",
+    "progress_title": "Echtzeit-Fortschritt",
+    "progress_description": "Kanban-Board, Timeline-Ansicht, Fortschrittsberichte. Rick behält alles im Auge.",
+    "recovery_title": "Fehlerbehandlung",
+    "recovery_description": "Morty-Timeout? Blockiert. Morty-Fehler? Retry. Alle Morty's stecken fest? Rick meldet den Schaden.",
+    "docs_title": "ADRs & Dokumentation",
+    "docs_description": "Architecture Decision Records werden automatisch generiert. Dokumentation, die Ricks würdig ist."
+  },
+  "install": {
+    "title": "Installation",
+    "subtitle": "Lass uns das machen. Dauert 30 Sekunden. Selbst Jerry schafft das.",
+    "manual_title": "Oder manuell:",
+    "manual_comment1": "# Repo klonen",
+    "manual_comment2": "# In deine Claude Skills kopieren",
+    "requirements_title": "⚠️ Voraussetzungen",
+    "req1": "Claude CLI installiert ({code} Befehl verfügbar)",
+    "req2": "Python 3.8+ (für die Skripte)",
+    "req3": "Ein Projekt, das Ricks Genialität verdient"
+  },
+  "commands": {
+    "title": "Ricks Command Center",
+    "orch_title": "🎮 Orchestrierung",
+    "orch_plan": "— Rick plant das Projekt",
+    "orch_sprint": "— Schick die Morty's aufs Abenteuer",
+    "orch_review": "— Rick reviewed die Arbeit",
+    "orch_status": "— Ricks Dashboard",
+    "ticket_title": "🎫 Ticket-Verwaltung",
+    "ticket_create": "— Ticket erstellen",
+    "ticket_list": "— Alle Tickets auflisten",
+    "ticket_board": "— Kanban-Board-Ansicht",
+    "delegate_title": "🤖 Morty-Delegation",
+    "delegate_send": "— Einen Morty auf Mission schicken",
+    "delegate_dry": "— Anweisungen vorschauen"
+  },
+  "cta": {
+    "title": "Bereit loszulegen?",
+    "subtitle": "Hör auf, Zeit zu verschwenden. Lass Rick und die Morty's dein Projekt bauen.",
+    "button": "🧪 CTO Orchestrator Installieren",
+    "quote": "\"Die Morty's machen die Arbeit. Ich mache das Denken. So funktioniert das.\" — Rick"
+  },
+  "footer": {
+    "disclaimer": "Haftungsausschluss: Keine Morty's wurden bei der Entwicklung dieses Skills verletzt. Naja, vielleicht ein paar."
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "title": "CTO Orchestrator — Rick Sanchez als je CTO",
+    "description": "De genialste CTO in het multiversum stuurt je softwareprojecten aan via een leger van Morty sub-agents. Wubba Lubba Dub Dub!"
+  },
+  "hero": {
+    "title1": "Rick Sanchez",
+    "title2": "CTO Orchestrator",
+    "subtitle": "*Burrrp* — Luister, ik ben het slimste wezen in het multiversum en om de een of andere reden manage ik NU jouw softwareproject.",
+    "description": "Ik gebruik een ticket systeem, delegeer werk aan mijn leger gespecialiseerde Morty's via {codeTag} subprocesses, en track alles omdat ik — in tegenstelling tot jullie mensen — daadwerkelijk weet wat ik doe.",
+    "cta_primary": "Get Schwifty → Installeer Nu",
+    "cta_secondary": "GitHub Repository",
+    "tagline": "Wubba Lubba Dub Dub! 🛸"
+  },
+  "howItWorks": {
+    "title": "Hoe Het Werkt",
+    "subtitle": "Het is geen rocket science. Nou ja, het IS rocket science. Ik bouwde een ruimteschip in mijn garage, Morty.",
+    "step1_title": "Initialize — Start je project",
+    "step1_description": "Creëer de workspace met config, ticket store, logs. Zelfs een Morty kan dit commando uitvoeren.",
+    "step1_command": "bash scripts/init_project.sh \"MijnApp\" \"APP\"",
+    "step2_title": "Plan — Rick's geniale brein plant",
+    "step2_description": "Architect-Morty (met Opus) analyseert je project, ontwerpt architectuur, creëert epics en sub-tickets.",
+    "step2_command": "python scripts/orchestrate.py plan \"Bouw een REST API met user auth en admin dashboard\"",
+    "step3_title": "Sprint — Stuur de Morty's op avontuur",
+    "step3_description": "De adventure loop runt automatisch. Rick pikt tickets, selecteert de juiste Morty, en stuurt ze via claude -p.",
+    "step3_command": "python scripts/orchestrate.py sprint",
+    "step4_title": "Review — Rick beoordeelt het werk",
+    "step4_description": "Reviewer-Morty checkt alle code. Goedgekeurd? Done. Garbage? Opnieuw doen.",
+    "step4_command": "python scripts/orchestrate.py review"
+  },
+  "mortys": {
+    "title_highlight": "De Morty's",
+    "title_suffix": " — Sub-Agents",
+    "subtitle": "De Morty's doen het werk. Ik doe het denken. Zo werkt dat in het multiversum.",
+    "plus_text": "Plus: {fullstack} (wanneer één Morty alles moet doen) en {reviewer} (de Morty die andere Morty's beoordeelt)",
+    "architect": {
+      "name": "Architect-Morty",
+      "description": "De 'slimme' Morty. Ontwerpt systemen, schrijft ADRs, breekt epics op in taken. Gebruikt Opus want zelfs een Morty heeft soms een groot brein nodig."
+    },
+    "backend": {
+      "name": "Backend-Morty",
+      "description": "Doet het zware werk. Implementeert server-side code, APIs, databases. Klaagt niet, werkt gewoon."
+    },
+    "frontend": {
+      "name": "Frontend-Morty",
+      "description": "Maakt dingen mooi. UI componenten, responsive design, state management. De Morty met oog voor detail."
+    },
+    "tester": {
+      "name": "Tester-Morty",
+      "description": "Vindt de fouten die andere Morty's maken. Schrijft tests, runt test suites, rapporteert bugs. De paranoïde Morty."
+    },
+    "security": {
+      "name": "Security-Morty",
+      "description": "De ECHT paranoïde Morty. OWASP, authentication, vulnerability scanning. Zorgt dat niemand ons hackt."
+    },
+    "devops": {
+      "name": "DevOps-Morty",
+      "description": "Houdt de boel draaiende. CI/CD pipelines, Docker, deployment, monitoring. De Morty die de lichten aan houdt."
+    }
+  },
+  "features": {
+    "title": "Waarom Rick's Aanpak Werkt",
+    "ticket_title": "Ticket-Based System",
+    "ticket_description": "Alles wordt getrackt via tickets. Status, prioriteit, dependencies, assigned Morty — Rick weet alles.",
+    "autopilot_title": "Auto-Pilot Sprints",
+    "autopilot_description": "De sprint loop runt volledig automatisch. Rick selecteert Morty's, delegeert werk, parsed output, repeat.",
+    "smart_title": "Smart Agent Selection",
+    "smart_description": "Rick's brein kiest automatisch de juiste Morty op basis van ticket type en keywords.",
+    "progress_title": "Real-Time Progress",
+    "progress_description": "Kanban board, timeline view, progress reports. Rick houdt alles in de gaten.",
+    "recovery_title": "Failure Recovery",
+    "recovery_description": "Morty timeout? Blocked. Morty error? Retry. Alle Morty's stuck? Rick rapporteert de schade.",
+    "docs_title": "ADRs & Documentatie",
+    "docs_description": "Architecture Decision Records worden automatisch gegenereerd. Documentatie die Rick waardig is."
+  },
+  "install": {
+    "title": "Installatie",
+    "subtitle": "Laten we dit doen. Het kost je 30 seconden. Zelfs Jerry kan dit.",
+    "manual_title": "Of handmatig:",
+    "manual_comment1": "# Clone de repo",
+    "manual_comment2": "# Kopieer naar je Claude skills",
+    "requirements_title": "⚠️ Vereisten",
+    "req1": "Claude CLI geïnstalleerd ({code} command beschikbaar)",
+    "req2": "Python 3.8+ (voor de scripts)",
+    "req3": "Een project dat Rick's genialiteit verdient"
+  },
+  "commands": {
+    "title": "Rick's Command Center",
+    "orch_title": "🎮 Orchestration",
+    "orch_plan": "— Rick plant het project",
+    "orch_sprint": "— Stuur de Morty's op avontuur",
+    "orch_review": "— Rick reviewed het werk",
+    "orch_status": "— Rick's dashboard",
+    "ticket_title": "🎫 Ticket Management",
+    "ticket_create": "— Maak een ticket",
+    "ticket_list": "— Lijst alle tickets",
+    "ticket_board": "— Kanban board view",
+    "delegate_title": "🤖 Morty Delegation",
+    "delegate_send": "— Stuur een Morty op missie",
+    "delegate_dry": "— Preview de instructies"
+  },
+  "cta": {
+    "title": "Klaar om te beginnen?",
+    "subtitle": "Stop met tijd verspillen. Laat Rick en de Morty's je project bouwen.",
+    "button": "🧪 Installeer CTO Orchestrator",
+    "quote": "\"De Morty's doen het werk. Ik doe het denken. Dat is hoe dit werkt.\" — Rick"
+  },
+  "footer": {
+    "disclaimer": "Disclaimer: Geen Morty's zijn mishandeld tijdens de ontwikkeling van deze skill. Nou ja, misschien een paar."
+  }
+}

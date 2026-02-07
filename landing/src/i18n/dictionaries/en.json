@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "title": "CTO Orchestrator — Rick Sanchez as your CTO",
+    "description": "The smartest CTO in the multiverse manages your software projects with an army of Morty sub-agents. Wubba Lubba Dub Dub!"
+  },
+  "hero": {
+    "title1": "Rick Sanchez",
+    "title2": "CTO Orchestrator",
+    "subtitle": "*Burrrp* — Listen, I'm the smartest being in the multiverse and for some reason I'm managing YOUR software project now.",
+    "description": "I use a ticket system, delegate work to my army of specialized Morty's via {codeTag} subprocesses, and I track everything because — unlike you people — I actually know what I'm doing.",
+    "cta_primary": "Get Schwifty → Install Now",
+    "cta_secondary": "GitHub Repository",
+    "tagline": "Wubba Lubba Dub Dub! 🛸"
+  },
+  "howItWorks": {
+    "title": "How It Works",
+    "subtitle": "It's not rocket science. Well, it IS rocket science. I built a spaceship in my garage, Morty.",
+    "step1_title": "Initialize — Start your project",
+    "step1_description": "Create the workspace with config, ticket store, logs. Even a Morty could run this command.",
+    "step1_command": "bash scripts/init_project.sh \"MyApp\" \"APP\"",
+    "step2_title": "Plan — Rick's genius brain plans",
+    "step2_description": "Architect-Morty (with Opus) analyzes your project, designs architecture, creates epics and sub-tickets.",
+    "step2_command": "python scripts/orchestrate.py plan \"Build a REST API with user auth and admin dashboard\"",
+    "step3_title": "Sprint — Send the Morty's on an adventure",
+    "step3_description": "The adventure loop runs automatically. Rick picks tickets, selects the right Morty, and sends them via claude -p.",
+    "step3_command": "python scripts/orchestrate.py sprint",
+    "step4_title": "Review — Rick judges the work",
+    "step4_description": "Reviewer-Morty checks all code. Approved? Done. Garbage? Do it again.",
+    "step4_command": "python scripts/orchestrate.py review"
+  },
+  "mortys": {
+    "title_highlight": "The Morty's",
+    "title_suffix": " — Sub-Agents",
+    "subtitle": "The Morty's do the work. I do the thinking. That's how it works in the multiverse.",
+    "plus_text": "Plus: {fullstack} (when one Morty has to do everything) and {reviewer} (the Morty that judges other Morty's)",
+    "architect": {
+      "name": "Architect-Morty",
+      "description": "The 'smart' Morty. Designs systems, writes ADRs, breaks epics into tasks. Uses Opus because even a Morty needs a big brain sometimes."
+    },
+    "backend": {
+      "name": "Backend-Morty",
+      "description": "Does the heavy lifting. Implements server-side code, APIs, databases. Doesn't complain, just works."
+    },
+    "frontend": {
+      "name": "Frontend-Morty",
+      "description": "Makes things pretty. UI components, responsive design, state management. The Morty with an eye for detail."
+    },
+    "tester": {
+      "name": "Tester-Morty",
+      "description": "Finds the mistakes other Morty's make. Writes tests, runs test suites, reports bugs. The paranoid Morty."
+    },
+    "security": {
+      "name": "Security-Morty",
+      "description": "The REALLY paranoid Morty. OWASP, authentication, vulnerability scanning. Makes sure nobody hacks us."
+    },
+    "devops": {
+      "name": "DevOps-Morty",
+      "description": "Keeps the lights on. CI/CD pipelines, Docker, deployment, monitoring. The Morty that keeps things running."
+    }
+  },
+  "features": {
+    "title": "Why Rick's Approach Works",
+    "ticket_title": "Ticket-Based System",
+    "ticket_description": "Everything is tracked via tickets. Status, priority, dependencies, assigned Morty — Rick knows everything.",
+    "autopilot_title": "Auto-Pilot Sprints",
+    "autopilot_description": "The sprint loop runs fully automatic. Rick selects Morty's, delegates work, parses output, repeat.",
+    "smart_title": "Smart Agent Selection",
+    "smart_description": "Rick's brain automatically picks the right Morty based on ticket type and keywords.",
+    "progress_title": "Real-Time Progress",
+    "progress_description": "Kanban board, timeline view, progress reports. Rick keeps an eye on everything.",
+    "recovery_title": "Failure Recovery",
+    "recovery_description": "Morty timeout? Blocked. Morty error? Retry. All Morty's stuck? Rick reports the damage.",
+    "docs_title": "ADRs & Documentation",
+    "docs_description": "Architecture Decision Records are generated automatically. Documentation worthy of Rick."
+  },
+  "install": {
+    "title": "Installation",
+    "subtitle": "Let's do this. Takes you 30 seconds. Even Jerry can handle this.",
+    "manual_title": "Or manually:",
+    "manual_comment1": "# Clone the repo",
+    "manual_comment2": "# Copy to your Claude skills",
+    "requirements_title": "⚠️ Requirements",
+    "req1": "Claude CLI installed ({code} command available)",
+    "req2": "Python 3.8+ (for the scripts)",
+    "req3": "A project worthy of Rick's genius"
+  },
+  "commands": {
+    "title": "Rick's Command Center",
+    "orch_title": "🎮 Orchestration",
+    "orch_plan": "— Rick plans the project",
+    "orch_sprint": "— Send the Morty's on an adventure",
+    "orch_review": "— Rick reviews the work",
+    "orch_status": "— Rick's dashboard",
+    "ticket_title": "🎫 Ticket Management",
+    "ticket_create": "— Create a ticket",
+    "ticket_list": "— List all tickets",
+    "ticket_board": "— Kanban board view",
+    "delegate_title": "🤖 Morty Delegation",
+    "delegate_send": "— Send a Morty on a mission",
+    "delegate_dry": "— Preview the instructions"
+  },
+  "cta": {
+    "title": "Ready to get started?",
+    "subtitle": "Stop wasting time. Let Rick and the Morty's build your project.",
+    "button": "🧪 Install CTO Orchestrator",
+    "quote": "\"The Morty's do the work. I do the thinking. That's how this works.\" — Rick"
+  },
+  "footer": {
+    "disclaimer": "Disclaimer: No Morty's were harmed during the development of this skill. Well, maybe a few."
+  }
+}
