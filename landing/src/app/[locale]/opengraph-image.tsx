@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
 export const alt = "CTO Orchestrator — Rick Sanchez als je CTO";
 export const size = {
   width: 1200,
