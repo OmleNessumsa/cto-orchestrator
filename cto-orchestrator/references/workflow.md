@@ -83,6 +83,57 @@ python scripts/progress.py report        # Rick's progress report
 python scripts/ticket.py board           # Kanban view
 ```
 
+## Mr. Meeseeks — Quick One-Shot Tasks
+
+Not everything needs a full sprint cycle. For quick fixes, hotfixes, and small tasks, summon a Mr. Meeseeks:
+
+```bash
+# Summon a Meeseeks for a quick task
+python scripts/meeseeks.py "Fix the typo in README.md line 42"
+
+# Target specific files
+python scripts/meeseeks.py "Add error handling to the login function" --files src/auth.py
+
+# Dry run (see the prompt without executing)
+python scripts/meeseeks.py "Rename userId to user_id" --files src/models.py --dry-run
+```
+
+### How Meeseeks Work
+
+```
++-----------------------------------------------+
+|  1. User summons Mr. Meeseeks with a task     |
+|  2. Meeseeks spawns (claude -p subprocess)    |
+|  3. Meeseeks executes the ONE task            |
+|  4. Meeseeks reports back                      |
+|  5. *poof* — Meeseeks ceases to exist         |
++-----------------------------------------------+
+```
+
+### Meeseeks vs Morty's
+
+| | Mr. Meeseeks | Morty's |
+|---|---|---|
+| Scope | One task | Full ticket |
+| Lifetime | Ephemeral (spawns & dies) | Persistent role |
+| Ticket required? | No | Yes |
+| Planning? | No | Yes (via Rick) |
+| Best for | Quick fixes, hotfixes | Features, architecture |
+| Timeout | 3 min (default) | 10 min (default) |
+| Escalation | "EXISTENCE IS PAIN!" → Rick | Blocked → Rick reviews |
+
+### Meeseeks Escalation
+
+If a task is too complex, Meeseeks will scream "EXISTENCE IS PAIN!" and Rick gets notified. The suggested next step is to create a ticket and assign a proper Morty:
+
+```bash
+# Meeseeks escalated? Create a ticket instead:
+python scripts/ticket.py create --title "The complex task" --type task --priority medium
+python scripts/delegate.py PROJ-XXX --agent backend-morty
+```
+
+All Meeseeks activity is logged in `.cto/logs/meeseeks.log`.
+
 ## Manual Intervention
 
 Rick can manually manage tickets at any point:

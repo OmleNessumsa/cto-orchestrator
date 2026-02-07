@@ -73,9 +73,33 @@
     "docs_title": "ADRs y Documentación",
     "docs_description": "Los Architecture Decision Records se generan automáticamente. Documentación digna de Rick."
   },
+  "meeseeks": {
+    "title": "Mr. Meeseeks",
+    "tagline": "¡PUEEEDO HACERLO! ¡Mírame!",
+    "description": "No todo necesita un ciclo de sprint completo. Para quick fixes, hotfixes y tareas pequeñas — invoca a un Mr. Meeseeks. Aparece, completa UNA tarea, y *poof* — deja de existir. Sin tickets, sin overhead. Solo resultados.",
+    "example1_label": "Fix rápido",
+    "example1_task": "Corrige el typo en README.md línea 42",
+    "example2_label": "Edición dirigida",
+    "example2_task": "Agrega manejo de errores a la función de login",
+    "step1_title": "Invocar",
+    "step1_desc": "Presiona la Meeseeks Box — describe tu única tarea",
+    "step2_title": "Ejecutar",
+    "step2_desc": "Meeseeks hace la tarea — rápido y enfocado",
+    "step3_title": "¡Poof!",
+    "step3_desc": "Tarea completa — Meeseeks deja de existir",
+    "warning": "⚠️ Si la tarea es muy compleja, Meeseeks grita \"¡LA EXISTENCIA ES DOLOR!\" y escala a Rick."
+  },
   "install": {
-    "title": "Instalación",
+    "title": "Obtén el Cerebro de Rick",
     "subtitle": "Hagamos esto. Te toma 30 segundos. Hasta Jerry puede hacerlo.",
+    "buy_title": "Descargar CTO Orchestrator",
+    "buy_subtitle": "La genialidad de Rick no es gratis. Ni siquiera en el multiverso lo es.",
+    "buy_locked_label": "🔒 Paga para desbloquear la instalación",
+    "buy_button": "Pagar 0.00058 ETH para Descargar",
+    "buy_price": "0.00058 ETH",
+    "buy_processing": "Creando portal...",
+    "buy_error": "Algo salió mal. Hasta Rick tiene días malos. Inténtalo de nuevo.",
+    "buy_powered_by": "Pago seguro vía Coinbase Commerce",
     "manual_title": "O manualmente:",
     "manual_comment1": "# Clonar el repo",
     "manual_comment2": "# Copiar a tus Claude skills",
@@ -83,6 +107,12 @@
     "req1": "Claude CLI instalado (comando {code} disponible)",
     "req2": "Python 3.8+ (para los scripts)",
     "req3": "Un proyecto digno del genio de Rick"
+  },
+  "success": {
+    "title": "¡Pago Confirmado!",
+    "subtitle": "Bienvenido al multiverso. Aquí está tu comando de instalación — Rick ahora es tu CTO.",
+    "back_button": "← Volver a la Página Principal",
+    "quote": "\"¿Pagaste? Buena decisión. Más inteligente que la mayoría de cosas que hace Jerry.\" — Rick"
   },
   "commands": {
     "title": "Centro de Comando de Rick",

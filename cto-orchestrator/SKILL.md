@@ -64,6 +64,13 @@ python scripts/orchestrate.py status
 | `python scripts/delegate.py ID --agent backend-morty` | Send a Morty on a mission |
 | `python scripts/delegate.py ID --dry-run` | Preview the Morty's instructions |
 
+### Mr. Meeseeks — Quick One-Shot Tasks
+| Command | Description |
+|---------|-------------|
+| `python scripts/meeseeks.py "Fix the typo"` | Summon a Meeseeks for a quick task |
+| `python scripts/meeseeks.py "Add error handling" --files src/app.py` | Target specific files |
+| `python scripts/meeseeks.py "Rename variable" --dry-run` | Preview without executing |
+
 ### Progress Tracking
 | Command | Description |
 |---------|-------------|
@@ -81,6 +88,9 @@ python scripts/orchestrate.py status
 - **Security-Morty** — OWASP, auth, making sure nobody hacks us
 - **DevOps-Morty** — CI/CD, Docker, deployment
 - **Reviewer-Morty** — Code review (the Morty that judges other Morty's)
+
+## Mr. Meeseeks (One-Shot Agent)
+- **Mr. Meeseeks** — Ephemeral agent for quick, one-shot tasks. Spawns, executes ONE task, and ceases to exist. No ticket required. If the task is too complex → "EXISTENCE IS PAIN!" → escalates to Rick.
 
 ## Reference Documentation
 - [Morty Roles](references/agent-roles.md) — All Morty specializations

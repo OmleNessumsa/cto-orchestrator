@@ -73,9 +73,33 @@
     "docs_title": "ADRs & Documentation",
     "docs_description": "Les Architecture Decision Records sont générés automatiquement. De la documentation digne de Rick."
   },
+  "meeseeks": {
+    "title": "Mr. Meeseeks",
+    "tagline": "JE PEUUUX FAIRE ! Regarde-moi !",
+    "description": "Tout ne nécessite pas un cycle de sprint complet. Pour les quick fixes, hotfixes et petites tâches — invoque un Mr. Meeseeks. Il apparaît, accomplit UNE tâche, et *poof* — cesse d'exister. Pas de tickets, pas de surcharge. Juste des résultats.",
+    "example1_label": "Fix rapide",
+    "example1_task": "Corrige la faute dans README.md ligne 42",
+    "example2_label": "Modification ciblée",
+    "example2_task": "Ajoute la gestion d'erreurs à la fonction de login",
+    "step1_title": "Invoquer",
+    "step1_desc": "Appuie sur la Meeseeks Box — décris ta tâche unique",
+    "step2_title": "Exécuter",
+    "step2_desc": "Meeseeks fait la tâche — vite et concentré",
+    "step3_title": "Poof !",
+    "step3_desc": "Tâche terminée — Meeseeks cesse d'exister",
+    "warning": "⚠️ Si la tâche est trop complexe, Meeseeks crie \"L'EXISTENCE EST DOULEUR !\" et escalade vers Rick."
+  },
   "install": {
-    "title": "Installation",
+    "title": "Obtiens le Cerveau de Rick",
     "subtitle": "Faisons ça. Ça te prend 30 secondes. Même Jerry peut le faire.",
+    "buy_title": "Télécharger CTO Orchestrator",
+    "buy_subtitle": "Le génie de Rick n'est pas gratuit. Même dans le multivers, rien ne l'est.",
+    "buy_locked_label": "🔒 Paye pour débloquer l'installation",
+    "buy_button": "Payer 0.00058 ETH pour Télécharger",
+    "buy_price": "0.00058 ETH",
+    "buy_processing": "Création du portail...",
+    "buy_error": "Quelque chose a mal tourné. Même Rick a des mauvais jours. Réessaye.",
+    "buy_powered_by": "Paiement sécurisé via Coinbase Commerce",
     "manual_title": "Ou manuellement :",
     "manual_comment1": "# Cloner le repo",
     "manual_comment2": "# Copier dans tes Claude skills",
@@ -83,6 +107,12 @@
     "req1": "Claude CLI installé (commande {code} disponible)",
     "req2": "Python 3.8+ (pour les scripts)",
     "req3": "Un projet digne du génie de Rick"
+  },
+  "success": {
+    "title": "Paiement Confirmé !",
+    "subtitle": "Bienvenue dans le multivers. Voici ta commande d'installation — Rick est maintenant ton CTO.",
+    "back_button": "← Retour à la page d'accueil",
+    "quote": "\"Tu as payé ? Bon choix. Plus intelligent que la plupart des trucs que Jerry fait.\" — Rick"
   },
   "commands": {
     "title": "Centre de Commande de Rick",

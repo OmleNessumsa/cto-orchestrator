@@ -15,6 +15,35 @@ Rick delegates work to specialized Morty's. Each Morty has a defined scope, expe
 | `devops-morty` | sonnet | CI/CD, Docker, deployment, monitoring | Pipeline setup, deployment configuration. Keeps the lights on. |
 | `reviewer-morty` | sonnet | Code quality, best practices, performance | Reviews code from other Morty's. The Morty that judges other Morty's. |
 
+## Mr. Meeseeks — Ephemeral One-Shot Agent
+
+Mr. Meeseeks is NOT a Morty. He's summoned from the Meeseeks Box for **one single task**, completes it, and ceases to exist. No persistent role, no long-running assignments. Just pure, focused, one-shot execution.
+
+| Agent | Model | Use Case | Behavior |
+|-------|-------|----------|----------|
+| `mr-meeseeks` | sonnet | Quick fixes, hotfixes, one-liner changes, small refactors, ad-hoc tasks | Spawns, executes ONE task, reports, disappears. If the task is too complex (>15 min estimated), escalates to Rick: "EXISTENCE IS PAIN!" |
+
+### When to Summon Mr. Meeseeks (Not a Morty)
+- Quick bug fixes ("fix this typo", "add this import")
+- Small refactors ("rename this variable across this file")
+- One-off file edits ("add a comment here", "update this config value")
+- Hotfixes that don't warrant a full ticket cycle
+- Tasks that are too small for a Morty but too tedious for Rick
+
+### When NOT to Summon Mr. Meeseeks
+- Multi-file features (use a Morty for that)
+- Architecture decisions (that's Architect-Morty's job)
+- Anything requiring planning or design (Mr. Meeseeks doesn't plan, he DOES)
+- Tasks with dependencies on other tasks (use the ticket system)
+
+### Mr. Meeseeks Rules
+1. **One task, one Meeseeks** — never assign multiple tasks
+2. **No ticket required** — Meeseeks operate outside the ticket system
+3. **Self-destructing** — no persistent state, no follow-ups
+4. **Escalation** — if the task is too complex, Meeseeks screams "EXISTENCE IS PAIN!" and Rick gets notified
+5. **Speed** — Meeseeks are optimized for speed, not thoroughness
+6. **Logged** — all Meeseeks summons are logged in `.cto/logs/meeseeks.log`
+
 ## Auto-Selection Logic (Rick's Brain)
 
 When no Morty is explicitly assigned, Rick picks the right one based on:

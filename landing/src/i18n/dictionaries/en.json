@@ -73,9 +73,33 @@
     "docs_title": "ADRs & Documentation",
     "docs_description": "Architecture Decision Records are generated automatically. Documentation worthy of Rick."
   },
+  "meeseeks": {
+    "title": "Mr. Meeseeks",
+    "tagline": "CAAAAN DO! Look at me!",
+    "description": "Not everything needs a full sprint cycle. For quick fixes, hotfixes, and small tasks — summon a Mr. Meeseeks. He spawns, completes ONE task, and *poof* — ceases to exist. No tickets, no overhead. Just results.",
+    "example1_label": "Quick fix",
+    "example1_task": "Fix the typo in README.md line 42",
+    "example2_label": "Targeted edit",
+    "example2_task": "Add error handling to the login function",
+    "step1_title": "Summon",
+    "step1_desc": "Press the Meeseeks Box — describe your one task",
+    "step2_title": "Execute",
+    "step2_desc": "Meeseeks does the task — fast and focused",
+    "step3_title": "Poof!",
+    "step3_desc": "Task complete — Meeseeks ceases to exist",
+    "warning": "⚠️ If the task is too complex, Meeseeks will scream \"EXISTENCE IS PAIN!\" and escalate to Rick."
+  },
   "install": {
-    "title": "Installation",
+    "title": "Get Rick's Brain",
     "subtitle": "Let's do this. Takes you 30 seconds. Even Jerry can handle this.",
+    "buy_title": "Get CTO Orchestrator",
+    "buy_subtitle": "Rick's genius doesn't come free. Even in the multiverse, nothing is.",
+    "buy_locked_label": "🔒 Pay to unlock installation",
+    "buy_button": "Pay 0.00058 ETH to Download",
+    "buy_price": "0.00058 ETH",
+    "buy_processing": "Creating portal...",
+    "buy_error": "Something went wrong. Even Rick has bad days. Try again.",
+    "buy_powered_by": "Secure payment via Coinbase Commerce",
     "manual_title": "Or manually:",
     "manual_comment1": "# Clone the repo",
     "manual_comment2": "# Copy to your Claude skills",
@@ -83,6 +107,12 @@
     "req1": "Claude CLI installed ({code} command available)",
     "req2": "Python 3.8+ (for the scripts)",
     "req3": "A project worthy of Rick's genius"
+  },
+  "success": {
+    "title": "Payment Confirmed!",
+    "subtitle": "Welcome to the multiverse. Here's your install command — Rick is now your CTO.",
+    "back_button": "← Back to Landing Page",
+    "quote": "\"You paid? Smart move. Smarter than most things Jerry does.\" — Rick"
   },
   "commands": {
     "title": "Rick's Command Center",

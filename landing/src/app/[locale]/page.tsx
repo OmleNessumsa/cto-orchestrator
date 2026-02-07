@@ -2,7 +2,7 @@ import Image from "next/image";
 import { type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/getDictionary";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import CopyButton from "@/components/CopyButton";
+import PaymentGate from "@/components/PaymentGate";
 import StarField from "@/components/StarField";
 
 /* ─── tiny reusable sub-components (server-safe) ─── */
@@ -316,6 +316,77 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Mr. Meeseeks Section */}
+      <section className="py-20 px-4 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="meeseeks-card rounded-2xl p-8 md:p-12 relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 text-[120px] opacity-10 leading-none select-none pointer-events-none">
+              🟦
+            </div>
+
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <span className="text-5xl">🟦</span>
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold">
+                    <span className="text-[#5bcefa]">
+                      {t.meeseeks.title}
+                    </span>
+                  </h2>
+                  <p className="text-[#5bcefa]/60 font-mono text-sm mt-1">
+                    {t.meeseeks.tagline}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-lg mb-8 max-w-2xl">
+                {t.meeseeks.description}
+              </p>
+
+              {/* Usage examples */}
+              <div className="space-y-4 mb-8">
+                <div className="code-block rounded-lg p-4">
+                  <p className="text-gray-500 text-xs mb-1">{t.meeseeks.example1_label}</p>
+                  <code className="text-[#5bcefa] text-sm">
+                    python scripts/meeseeks.py &quot;{t.meeseeks.example1_task}&quot;
+                  </code>
+                </div>
+                <div className="code-block rounded-lg p-4">
+                  <p className="text-gray-500 text-xs mb-1">{t.meeseeks.example2_label}</p>
+                  <code className="text-[#5bcefa] text-sm">
+                    python scripts/meeseeks.py &quot;{t.meeseeks.example2_task}&quot; --files src/auth.py
+                  </code>
+                </div>
+              </div>
+
+              {/* How it works */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="bg-[#5bcefa]/5 border border-[#5bcefa]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">📦</div>
+                  <h4 className="font-bold text-[#5bcefa] text-sm">{t.meeseeks.step1_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.meeseeks.step1_desc}</p>
+                </div>
+                <div className="bg-[#5bcefa]/5 border border-[#5bcefa]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <h4 className="font-bold text-[#5bcefa] text-sm">{t.meeseeks.step2_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.meeseeks.step2_desc}</p>
+                </div>
+                <div className="bg-[#5bcefa]/5 border border-[#5bcefa]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">💨</div>
+                  <h4 className="font-bold text-[#5bcefa] text-sm">{t.meeseeks.step3_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.meeseeks.step3_desc}</p>
+                </div>
+              </div>
+
+              <p className="mt-6 text-gray-500 text-sm italic">
+                {t.meeseeks.warning}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 px-4 relative">
         <div className="max-w-6xl mx-auto">
@@ -337,7 +408,7 @@ export default async function Home({
         </div>
       </section>
 
-      {/* Installation Section */}
+      {/* Installation / Payment Section */}
       <section
         id="install"
         className="py-20 px-4 bg-[var(--space-purple)]/50 relative"
@@ -348,35 +419,20 @@ export default async function Home({
               {t.install.title}
             </span>
           </h2>
-          <p className="text-gray-400 mb-8 text-lg">{t.install.subtitle}</p>
+          <p className="text-gray-400 mb-8 text-lg">{t.install.buy_subtitle}</p>
 
-          <div className="code-block rounded-xl p-6 mb-8">
-            <div className="flex items-center justify-between gap-4">
-              <code className="text-[var(--portal-green)] text-sm md:text-base break-all text-left">
-                {installCommand}
-              </code>
-              <CopyButton text={installCommand} />
-            </div>
-          </div>
-
-          <div className="text-left max-w-2xl mx-auto">
-            <h3 className="text-xl font-bold text-white mb-4">
-              {t.install.manual_title}
-            </h3>
-            <div className="code-block rounded-xl p-6 space-y-2 font-mono text-sm">
-              <p className="text-gray-500">{t.install.manual_comment1}</p>
-              <p className="text-[var(--portal-green)]">
-                git clone https://github.com/OmleNessumsa/cto-orchestrator.git
-              </p>
-              <p className="text-[var(--portal-green)]">cd cto-orchestrator</p>
-              <p className="text-gray-500 mt-4">
-                {t.install.manual_comment2}
-              </p>
-              <p className="text-[var(--portal-green)]">
-                cp -r cto-orchestrator ~/.claude/skills/
-              </p>
-            </div>
-          </div>
+          <PaymentGate
+            t={{
+              buy_title: t.install.buy_title,
+              buy_subtitle: t.install.buy_locked_label,
+              buy_button: t.install.buy_button,
+              buy_price: t.install.buy_price,
+              buy_processing: t.install.buy_processing,
+              buy_error: t.install.buy_error,
+              buy_powered_by: t.install.buy_powered_by,
+            }}
+            installCommand={installCommand}
+          />
 
           <div className="mt-12 p-6 border border-[var(--morty-yellow)]/30 rounded-xl bg-[var(--morty-yellow)]/5">
             <h3 className="text-[var(--morty-yellow)] font-bold mb-2">

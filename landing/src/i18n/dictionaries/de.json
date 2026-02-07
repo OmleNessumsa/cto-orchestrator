@@ -73,9 +73,33 @@
     "docs_title": "ADRs & Dokumentation",
     "docs_description": "Architecture Decision Records werden automatisch generiert. Dokumentation, die Ricks würdig ist."
   },
+  "meeseeks": {
+    "title": "Mr. Meeseeks",
+    "tagline": "KAAANN MACHEN! Schau mich an!",
+    "description": "Nicht alles braucht einen vollständigen Sprint-Zyklus. Für Quick Fixes, Hotfixes und kleine Aufgaben — rufe einen Mr. Meeseeks. Er spawnt, erledigt EINE Aufgabe, und *poof* — hört auf zu existieren. Keine Tickets, kein Overhead. Nur Ergebnisse.",
+    "example1_label": "Schneller Fix",
+    "example1_task": "Fix den Tippfehler in README.md Zeile 42",
+    "example2_label": "Gezielte Änderung",
+    "example2_task": "Füge Error Handling zur Login-Funktion hinzu",
+    "step1_title": "Beschwören",
+    "step1_desc": "Drück die Meeseeks Box — beschreibe deine eine Aufgabe",
+    "step2_title": "Ausführen",
+    "step2_desc": "Meeseeks erledigt die Aufgabe — schnell und fokussiert",
+    "step3_title": "Poof!",
+    "step3_desc": "Aufgabe erledigt — Meeseeks hört auf zu existieren",
+    "warning": "⚠️ Wenn die Aufgabe zu komplex ist, schreit Meeseeks \"EXISTENZ IST SCHMERZ!\" und eskaliert zu Rick."
+  },
   "install": {
-    "title": "Installation",
+    "title": "Hol dir Ricks Gehirn",
     "subtitle": "Lass uns das machen. Dauert 30 Sekunden. Selbst Jerry schafft das.",
+    "buy_title": "CTO Orchestrator Herunterladen",
+    "buy_subtitle": "Ricks Genialität gibt es nicht umsonst. Selbst im Multiversum ist nichts gratis.",
+    "buy_locked_label": "🔒 Zahle um die Installation freizuschalten",
+    "buy_button": "0.00058 ETH zahlen zum Download",
+    "buy_price": "0.00058 ETH",
+    "buy_processing": "Portal wird erstellt...",
+    "buy_error": "Etwas ist schiefgelaufen. Selbst Rick hat schlechte Tage. Versuch es nochmal.",
+    "buy_powered_by": "Sichere Zahlung über Coinbase Commerce",
     "manual_title": "Oder manuell:",
     "manual_comment1": "# Repo klonen",
     "manual_comment2": "# In deine Claude Skills kopieren",
@@ -83,6 +107,12 @@
     "req1": "Claude CLI installiert ({code} Befehl verfügbar)",
     "req2": "Python 3.8+ (für die Skripte)",
     "req3": "Ein Projekt, das Ricks Genialität verdient"
+  },
+  "success": {
+    "title": "Zahlung Bestätigt!",
+    "subtitle": "Willkommen im Multiversum. Hier ist dein Install-Befehl — Rick ist jetzt dein CTO.",
+    "back_button": "← Zurück zur Startseite",
+    "quote": "\"Du hast bezahlt? Kluge Entscheidung. Klüger als die meisten Sachen die Jerry macht.\" — Rick"
   },
   "commands": {
     "title": "Ricks Command Center",

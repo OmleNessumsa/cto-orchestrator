@@ -73,9 +73,33 @@
     "docs_title": "ADRs & Documentatie",
     "docs_description": "Architecture Decision Records worden automatisch gegenereerd. Documentatie die Rick waardig is."
   },
+  "meeseeks": {
+    "title": "Mr. Meeseeks",
+    "tagline": "KAAAAN DO! Kijk naar mij!",
+    "description": "Niet alles heeft een volledige sprint nodig. Voor quick fixes, hotfixes en kleine taken — roep een Mr. Meeseeks op. Hij spawnt, doet EEN taak, en *poof* — houdt op te bestaan. Geen tickets, geen overhead. Alleen resultaat.",
+    "example1_label": "Snelle fix",
+    "example1_task": "Fix de typo in README.md regel 42",
+    "example2_label": "Gerichte aanpassing",
+    "example2_task": "Voeg error handling toe aan de login functie",
+    "step1_title": "Oproepen",
+    "step1_desc": "Druk op de Meeseeks Box — beschrijf je ene taak",
+    "step2_title": "Uitvoeren",
+    "step2_desc": "Meeseeks doet de taak — snel en gefocust",
+    "step3_title": "Poof!",
+    "step3_desc": "Taak klaar — Meeseeks houdt op te bestaan",
+    "warning": "⚠️ Als de taak te complex is, schreeuwt Meeseeks \"BESTAAN IS PIJN!\" en escaleert naar Rick."
+  },
   "install": {
-    "title": "Installatie",
+    "title": "Krijg Rick's Brein",
     "subtitle": "Laten we dit doen. Het kost je 30 seconden. Zelfs Jerry kan dit.",
+    "buy_title": "CTO Orchestrator Downloaden",
+    "buy_subtitle": "Rick's genialiteit is niet gratis. Zelfs in het multiversum is niets dat.",
+    "buy_locked_label": "🔒 Betaal om installatie te ontgrendelen",
+    "buy_button": "Betaal 0.00058 ETH om te Downloaden",
+    "buy_price": "0.00058 ETH",
+    "buy_processing": "Portal aanmaken...",
+    "buy_error": "Er ging iets mis. Zelfs Rick heeft slechte dagen. Probeer opnieuw.",
+    "buy_powered_by": "Veilige betaling via Coinbase Commerce",
     "manual_title": "Of handmatig:",
     "manual_comment1": "# Clone de repo",
     "manual_comment2": "# Kopieer naar je Claude skills",
@@ -83,6 +107,12 @@
     "req1": "Claude CLI geïnstalleerd ({code} command beschikbaar)",
     "req2": "Python 3.8+ (voor de scripts)",
     "req3": "Een project dat Rick's genialiteit verdient"
+  },
+  "success": {
+    "title": "Betaling Bevestigd!",
+    "subtitle": "Welkom in het multiversum. Hier is je install commando — Rick is nu je CTO.",
+    "back_button": "← Terug naar Landing Page",
+    "quote": "\"Je hebt betaald? Slimme zet. Slimmer dan de meeste dingen die Jerry doet.\" — Rick"
   },
   "commands": {
     "title": "Rick's Command Center",
