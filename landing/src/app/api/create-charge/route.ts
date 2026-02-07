@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
  */
 
 const COINBASE_API = "https://api.commerce.coinbase.com";
-const PRICE_ETH = "0.00058";
+const PRICE_ETH = "0.001";
 
 export async function POST(request: Request) {
   const apiKey = process.env.COINBASE_COMMERCE_API_KEY;
