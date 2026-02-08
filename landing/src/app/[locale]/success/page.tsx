@@ -43,17 +43,14 @@ export default async function SuccessPage({
           </div>
         </div>
 
-        {/* Manual install */}
-        <div className="text-left code-block rounded-xl p-6 mb-8 space-y-2 font-mono text-sm">
-          <p className="text-gray-500">{t.install.manual_comment1}</p>
-          <p className="text-[var(--portal-green)]">
-            git clone https://github.com/OmleNessumsa/cto-orchestrator.git
-          </p>
-          <p className="text-[var(--portal-green)]">cd cto-orchestrator</p>
-          <p className="text-gray-500 mt-4">{t.install.manual_comment2}</p>
-          <p className="text-[var(--portal-green)]">
-            cp -r cto-orchestrator ~/.claude/skills/
-          </p>
+        {/* Post-install tip */}
+        <div className="text-left code-block rounded-xl p-6 mb-8 space-y-3">
+          <p className="text-gray-400 text-sm">{t.success.tip_title}</p>
+          <div className="space-y-2 font-mono text-sm">
+            <p className="text-[var(--portal-green)]">&gt; {t.success.tip_rick}</p>
+            <p className="text-[#5bcefa]">&gt; {t.success.tip_meeseeks}</p>
+          </div>
+          <p className="text-gray-500 text-xs mt-2">{t.success.tip_description}</p>
         </div>
 
         {/* Requirements */}

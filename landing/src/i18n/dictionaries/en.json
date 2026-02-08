@@ -9,12 +9,13 @@
     "subtitle": "*Burrrp* — Listen, I'm the smartest being in the multiverse and for some reason I'm managing YOUR software project now.",
     "description": "I use a ticket system, delegate work to my army of specialized Morty's via {codeTag} subprocesses, and I track everything because — unlike you people — I actually know what I'm doing.",
     "cta_primary": "Get Schwifty → Install Now",
-    "cta_secondary": "GitHub Repository",
+    "cta_secondary": "How It Works ↓",
     "tagline": "Wubba Lubba Dub Dub! 🛸"
   },
   "howItWorks": {
     "title": "How It Works",
     "subtitle": "It's not rocket science. Well, it IS rocket science. I built a spaceship in my garage, Morty.",
+    "usage_tip": "💡 Just mention \"Rick\" or \"Hey Rick\" in your prompt — the skill activates automatically. No commands needed to get started.",
     "step1_title": "Initialize — Start your project",
     "step1_description": "Create the workspace with config, ticket store, logs. Even a Morty could run this command.",
     "step1_command": "bash scripts/init_project.sh \"MyApp\" \"APP\"",
@@ -87,6 +88,7 @@
     "step2_desc": "Meeseeks does the task — fast and focused",
     "step3_title": "Poof!",
     "step3_desc": "Task complete — Meeseeks ceases to exist",
+    "mention_tip": "💡 Just say \"Meeseeks, fix this\" or \"Hey Meeseeks\" in your prompt — he'll spawn instantly.",
     "warning": "⚠️ If the task is too complex, Meeseeks will scream \"EXISTENCE IS PAIN!\" and escalate to Rick."
   },
   "install": {
@@ -112,6 +114,10 @@
     "title": "Payment Confirmed!",
     "subtitle": "Welcome to the multiverse. Here's your install command — Rick is now your CTO.",
     "back_button": "← Back to Landing Page",
+    "tip_title": "💡 Pro tip — After installing, just mention Rick or Meeseeks:",
+    "tip_rick": "Hey Rick, plan a REST API with user auth",
+    "tip_meeseeks": "Meeseeks, fix the typo in README.md line 42",
+    "tip_description": "Rick activates when you mention his name. Mr. Meeseeks activates for quick one-shot tasks. No commands needed.",
     "quote": "\"You paid? Smart move. Smarter than most things Jerry does.\" — Rick"
   },
   "commands": {
@@ -136,6 +142,9 @@
     "quote": "\"The Morty's do the work. I do the thinking. That's how this works.\" — Rick"
   },
   "footer": {
+    "how_it_works": "How It Works",
+    "install": "Install",
+    "support": "Support",
     "disclaimer": "Disclaimer: No Morty's were harmed during the development of this skill. Well, maybe a few."
   }
 }

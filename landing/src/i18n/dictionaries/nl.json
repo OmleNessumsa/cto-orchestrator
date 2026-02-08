@@ -9,12 +9,13 @@
     "subtitle": "*Burrrp* — Luister, ik ben het slimste wezen in het multiversum en om de een of andere reden manage ik NU jouw softwareproject.",
     "description": "Ik gebruik een ticket systeem, delegeer werk aan mijn leger gespecialiseerde Morty's via {codeTag} subprocesses, en track alles omdat ik — in tegenstelling tot jullie mensen — daadwerkelijk weet wat ik doe.",
     "cta_primary": "Get Schwifty → Installeer Nu",
-    "cta_secondary": "GitHub Repository",
+    "cta_secondary": "Hoe Het Werkt ↓",
     "tagline": "Wubba Lubba Dub Dub! 🛸"
   },
   "howItWorks": {
     "title": "Hoe Het Werkt",
     "subtitle": "Het is geen rocket science. Nou ja, het IS rocket science. Ik bouwde een ruimteschip in mijn garage, Morty.",
+    "usage_tip": "💡 Noem gewoon \"Rick\" of \"Hey Rick\" in je prompt — de skill activeert automatisch. Geen commando's nodig om te starten.",
     "step1_title": "Initialize — Start je project",
     "step1_description": "Creëer de workspace met config, ticket store, logs. Zelfs een Morty kan dit commando uitvoeren.",
     "step1_command": "bash scripts/init_project.sh \"MijnApp\" \"APP\"",
@@ -87,6 +88,7 @@
     "step2_desc": "Meeseeks doet de taak — snel en gefocust",
     "step3_title": "Poof!",
     "step3_desc": "Taak klaar — Meeseeks houdt op te bestaan",
+    "mention_tip": "💡 Zeg gewoon \"Meeseeks, fix dit\" of \"Hey Meeseeks\" in je prompt — hij spawnt direct.",
     "warning": "⚠️ Als de taak te complex is, schreeuwt Meeseeks \"BESTAAN IS PIJN!\" en escaleert naar Rick."
   },
   "install": {
@@ -112,6 +114,10 @@
     "title": "Betaling Bevestigd!",
     "subtitle": "Welkom in het multiversum. Hier is je install commando — Rick is nu je CTO.",
     "back_button": "← Terug naar Landing Page",
+    "tip_title": "💡 Pro tip — Na installatie, noem gewoon Rick of Meeseeks:",
+    "tip_rick": "Hey Rick, plan een REST API met user auth",
+    "tip_meeseeks": "Meeseeks, fix de typo in README.md regel 42",
+    "tip_description": "Rick activeert wanneer je zijn naam noemt. Mr. Meeseeks activeert voor snelle one-shot taken. Geen commando's nodig.",
     "quote": "\"Je hebt betaald? Slimme zet. Slimmer dan de meeste dingen die Jerry doet.\" — Rick"
   },
   "commands": {
@@ -136,6 +142,9 @@
     "quote": "\"De Morty's doen het werk. Ik doe het denken. Dat is hoe dit werkt.\" — Rick"
   },
   "footer": {
+    "how_it_works": "Hoe Het Werkt",
+    "install": "Installeren",
+    "support": "Support",
     "disclaimer": "Disclaimer: Geen Morty's zijn mishandeld tijdens de ontwikkeling van deze skill. Nou ja, misschien een paar."
   }
 }

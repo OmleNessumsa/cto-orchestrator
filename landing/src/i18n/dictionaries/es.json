@@ -9,12 +9,13 @@
     "subtitle": "*Burrrp* — Escucha, soy el ser más inteligente del multiverso y por alguna razón AHORA estoy gestionando TU proyecto de software.",
     "description": "Uso un sistema de tickets, delego trabajo a mi ejército de Morty's especializados a través de subprocesos {codeTag}, y lo rastreo todo porque — a diferencia de ustedes humanos — realmente sé lo que hago.",
     "cta_primary": "Get Schwifty → Instalar Ahora",
-    "cta_secondary": "GitHub Repository",
+    "cta_secondary": "Cómo Funciona ↓",
     "tagline": "¡Wubba Lubba Dub Dub! 🛸"
   },
   "howItWorks": {
     "title": "Cómo Funciona",
     "subtitle": "No es ciencia espacial. Bueno, SÍ es ciencia espacial. Construí una nave espacial en mi garaje, Morty.",
+    "usage_tip": "💡 Solo menciona \"Rick\" o \"Hey Rick\" en tu prompt — la skill se activa automáticamente. Sin comandos necesarios para empezar.",
     "step1_title": "Initialize — Inicia tu proyecto",
     "step1_description": "Crea el workspace con config, ticket store, logs. Hasta un Morty podría ejecutar este comando.",
     "step1_command": "bash scripts/init_project.sh \"MiApp\" \"APP\"",
@@ -87,6 +88,7 @@
     "step2_desc": "Meeseeks hace la tarea — rápido y enfocado",
     "step3_title": "¡Poof!",
     "step3_desc": "Tarea completa — Meeseeks deja de existir",
+    "mention_tip": "💡 Solo di \"Meeseeks, arregla esto\" o \"Hey Meeseeks\" en tu prompt — aparece al instante.",
     "warning": "⚠️ Si la tarea es muy compleja, Meeseeks grita \"¡LA EXISTENCIA ES DOLOR!\" y escala a Rick."
   },
   "install": {
@@ -112,6 +114,10 @@
     "title": "¡Pago Confirmado!",
     "subtitle": "Bienvenido al multiverso. Aquí está tu comando de instalación — Rick ahora es tu CTO.",
     "back_button": "← Volver a la Página Principal",
+    "tip_title": "💡 Consejo pro — Después de instalar, solo menciona a Rick o Meeseeks:",
+    "tip_rick": "Hey Rick, planifica una REST API con auth de usuario",
+    "tip_meeseeks": "Meeseeks, corrige el typo en README.md línea 42",
+    "tip_description": "Rick se activa cuando mencionas su nombre. Mr. Meeseeks se activa para tareas rápidas one-shot. Sin comandos necesarios.",
     "quote": "\"¿Pagaste? Buena decisión. Más inteligente que la mayoría de cosas que hace Jerry.\" — Rick"
   },
   "commands": {
@@ -136,6 +142,9 @@
     "quote": "\"Los Morty's hacen el trabajo. Yo hago el pensar. Así funciona esto.\" — Rick"
   },
   "footer": {
+    "how_it_works": "Cómo Funciona",
+    "install": "Instalar",
+    "support": "Soporte",
     "disclaimer": "Descargo: Ningún Morty fue maltratado durante el desarrollo de esta skill. Bueno, tal vez unos cuantos."
   }
 }

@@ -7,10 +7,11 @@ description: >
   (2) een development workflow te orchestreren met meerdere Morty-rollen, (3) tickets aan te maken
   en te beheren, (4) werk te delegeren aan de Morty's (Architect-Morty, Backend-Morty, Frontend-Morty,
   Tester-Morty, Security-Morty, DevOps-Morty), (5) voortgang bij te houden en rapportages te genereren,
-  of (6) een complete sprint-cyclus te draaien. Triggers: "Rick", "hey Rick", "Rick build",
+  of (6) een complete sprint-cyclus te draaien.   Triggers: "Rick", "hey Rick", "Rick build",
   "Rick plan", "manage project", "plan sprint", "break down feature", "create tickets",
   "delegate work", "CTO mode", "orchestrate development", "run sprint", "project status",
-  "wubba lubba dub dub".
+  "wubba lubba dub dub", "Meeseeks", "Mr. Meeseeks", "hey Meeseeks", "summon Meeseeks",
+  "quick fix", "Meeseeks fix".
 ---
 
 # Rick Sanchez — CTO Orchestrator

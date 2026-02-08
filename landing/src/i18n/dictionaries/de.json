@@ -9,12 +9,13 @@
     "subtitle": "*Burrrp* — Hör zu, ich bin das schlaueste Wesen im Multiversum und aus irgendeinem Grund manage ich JETZT dein Softwareprojekt.",
     "description": "Ich verwende ein Ticket-System, delegiere Arbeit an meine Armee spezialisierter Morty's über {codeTag} Subprozesse, und tracke alles, weil ich — im Gegensatz zu euch Menschen — tatsächlich weiß, was ich tue.",
     "cta_primary": "Get Schwifty → Jetzt Installieren",
-    "cta_secondary": "GitHub Repository",
+    "cta_secondary": "Wie Es Funktioniert ↓",
     "tagline": "Wubba Lubba Dub Dub! 🛸"
   },
   "howItWorks": {
     "title": "Wie Es Funktioniert",
     "subtitle": "Es ist keine Raketenwissenschaft. Naja, es IST Raketenwissenschaft. Ich habe ein Raumschiff in meiner Garage gebaut, Morty.",
+    "usage_tip": "💡 Nenne einfach \"Rick\" oder \"Hey Rick\" in deinem Prompt — die Skill aktiviert sich automatisch. Keine Befehle nötig.",
     "step1_title": "Initialize — Starte dein Projekt",
     "step1_description": "Erstelle den Workspace mit Konfiguration, Ticket-Store, Logs. Selbst ein Morty könnte diesen Befehl ausführen.",
     "step1_command": "bash scripts/init_project.sh \"MeineApp\" \"APP\"",
@@ -87,6 +88,7 @@
     "step2_desc": "Meeseeks erledigt die Aufgabe — schnell und fokussiert",
     "step3_title": "Poof!",
     "step3_desc": "Aufgabe erledigt — Meeseeks hört auf zu existieren",
+    "mention_tip": "💡 Sag einfach \"Meeseeks, fix das\" oder \"Hey Meeseeks\" in deinem Prompt — er spawnt sofort.",
     "warning": "⚠️ Wenn die Aufgabe zu komplex ist, schreit Meeseeks \"EXISTENZ IST SCHMERZ!\" und eskaliert zu Rick."
   },
   "install": {
@@ -112,6 +114,10 @@
     "title": "Zahlung Bestätigt!",
     "subtitle": "Willkommen im Multiversum. Hier ist dein Install-Befehl — Rick ist jetzt dein CTO.",
     "back_button": "← Zurück zur Startseite",
+    "tip_title": "💡 Pro-Tipp — Nach der Installation, nenne einfach Rick oder Meeseeks:",
+    "tip_rick": "Hey Rick, plane eine REST API mit User-Auth",
+    "tip_meeseeks": "Meeseeks, fix den Tippfehler in README.md Zeile 42",
+    "tip_description": "Rick aktiviert sich wenn du seinen Namen nennst. Mr. Meeseeks aktiviert sich für schnelle One-Shot-Aufgaben. Keine Befehle nötig.",
     "quote": "\"Du hast bezahlt? Kluge Entscheidung. Klüger als die meisten Sachen die Jerry macht.\" — Rick"
   },
   "commands": {
@@ -136,6 +142,9 @@
     "quote": "\"Die Morty's machen die Arbeit. Ich mache das Denken. So funktioniert das.\" — Rick"
   },
   "footer": {
+    "how_it_works": "Wie Es Funktioniert",
+    "install": "Installieren",
+    "support": "Support",
     "disclaimer": "Haftungsausschluss: Keine Morty's wurden bei der Entwicklung dieses Skills verletzt. Naja, vielleicht ein paar."
   }
 }

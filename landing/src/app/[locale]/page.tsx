@@ -207,9 +207,7 @@ export default async function Home({
               {t.hero.cta_primary}
             </a>
             <a
-              href="https://github.com/OmleNessumsa/cto-orchestrator"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#how-it-works"
               className="px-8 py-4 border border-[var(--portal-green)] text-[var(--portal-green)] font-bold rounded-full hover:bg-[var(--portal-green)]/10 transition-all"
             >
               {t.hero.cta_secondary}
@@ -240,14 +238,20 @@ export default async function Home({
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 px-4 relative">
+      <section id="how-it-works" className="py-20 px-4 relative">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-4">
             <span className="gradient-text">{t.howItWorks.title}</span>
           </h2>
-          <p className="text-gray-400 text-center mb-16 text-lg">
+          <p className="text-gray-400 text-center mb-8 text-lg">
             {t.howItWorks.subtitle}
           </p>
+
+          <div className="mb-12 p-4 rounded-xl bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 text-center">
+            <p className="text-[var(--portal-green)] text-sm font-medium">
+              {t.howItWorks.usage_tip}
+            </p>
+          </div>
 
           <div className="space-y-12">
             <WorkflowStep
@@ -321,13 +325,27 @@ export default async function Home({
         <div className="max-w-4xl mx-auto">
           <div className="meeseeks-card rounded-2xl p-8 md:p-12 relative overflow-hidden">
             {/* Background decoration */}
-            <div className="absolute top-0 right-0 text-[120px] opacity-10 leading-none select-none pointer-events-none">
-              🟦
+            <div className="absolute -top-4 -right-4 w-48 h-48 opacity-10 select-none pointer-events-none">
+              <Image
+                src="/mr-meeseeks.png"
+                alt=""
+                width={192}
+                height={192}
+                className="object-contain"
+              />
             </div>
 
             <div className="relative z-10">
               <div className="flex items-center gap-4 mb-6">
-                <span className="text-5xl">🟦</span>
+                <div className="w-16 h-16 flex-shrink-0 relative">
+                  <Image
+                    src="/mr-meeseeks.png"
+                    alt="Mr. Meeseeks"
+                    width={64}
+                    height={64}
+                    className="object-contain drop-shadow-[0_0_12px_rgba(91,206,250,0.5)]"
+                  />
+                </div>
                 <div>
                   <h2 className="text-3xl md:text-4xl font-bold">
                     <span className="text-[#5bcefa]">
@@ -379,7 +397,13 @@ export default async function Home({
                 </div>
               </div>
 
-              <p className="mt-6 text-gray-500 text-sm italic">
+              <div className="mt-6 p-3 rounded-lg bg-[#5bcefa]/5 border border-[#5bcefa]/20">
+                <p className="text-[#5bcefa] text-sm font-medium">
+                  {t.meeseeks.mention_tip}
+                </p>
+              </div>
+
+              <p className="mt-4 text-gray-500 text-sm italic">
                 {t.meeseeks.warning}
               </p>
             </div>
@@ -590,22 +614,22 @@ export default async function Home({
             </div>
             <div className="flex gap-6 text-gray-400">
               <a
-                href="https://github.com/OmleNessumsa/cto-orchestrator"
+                href="#how-it-works"
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
-                GitHub
+                {t.footer.how_it_works}
+              </a>
+              <a
+                href="#install"
+                className="hover:text-[var(--portal-green)] transition-colors"
+              >
+                {t.footer.install}
               </a>
               <a
                 href="https://github.com/OmleNessumsa/cto-orchestrator/issues"
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
-                Issues
-              </a>
-              <a
-                href="https://github.com/OmleNessumsa/cto-orchestrator/blob/main/LICENSE"
-                className="hover:text-[var(--portal-green)] transition-colors"
-              >
-                License
+                {t.footer.support}
               </a>
             </div>
             <div className="text-gray-500 text-sm">
