@@ -626,7 +626,9 @@ export default async function Home({
                 {t.footer.install}
               </a>
               <a
-                href="https://github.com/OmleNessumsa/cto-orchestrator/issues"
+                href="https://x.com/CtoSanchez40525"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
                 {t.footer.support}
