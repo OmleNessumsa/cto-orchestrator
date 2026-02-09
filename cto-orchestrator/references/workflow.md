@@ -4,6 +4,8 @@
 
 Rick's Orchestrator follows a genius-level workflow: **Init → Plan → Sprint (Adventure) → Review → Done**. It's not rocket science. Well, it IS rocket science. I built a spaceship in my garage, Morty.
 
+Now with **Team Collaboration** — Morty's can work together on complex tasks with parallel execution!
+
 ## Phase 1: Initialize
 
 ```bash
@@ -63,6 +65,28 @@ The adventure loop runs automatically:
 - Morty timeout → ticket marked `blocked`, suggest splitting
 - Morty error → retry once with adjusted prompt, then `blocked`
 - All Morty's stuck → sprint stops, Rick reports the damage
+
+### Team Collaboration (New!)
+
+For complex tickets (L, XL complexity), Rick can spawn a team of Morty's to work together:
+
+```bash
+# Create a ticket with team mode
+python scripts/ticket.py create \
+  --title "Build user dashboard with auth" \
+  --type feature \
+  --complexity XL \
+  --team-mode collaborative \
+  --team-template fullstack-team
+```
+
+The sprint will automatically:
+1. Detect team-eligible tickets
+2. Spawn the appropriate team
+3. Run agents in parallel (based on coordination mode)
+4. Collect and merge results
+
+See `references/team-templates.md` for available templates.
 
 ## Phase 4: Review
 
@@ -172,4 +196,142 @@ ADRs are stored in `.cto/decisions/` as markdown files. The architect-morty crea
 
 ## Consequences
 [What follows from Rick's genius decision]
+```
+
+## Team Collaboration Workflow
+
+For complex tasks, Rick assembles teams of Morty's that work together.
+
+### Team Sprint Flow
+
+```
++---------------------------------------------------+
+|  1. Rick detects team-worthy ticket (L/XL)        |
+|  2. Spawns team from template                     |
+|  3. Creates shared context file                   |
+|  4. Runs agents based on coordination mode:       |
+|     - parallel: all at once                       |
+|     - sequential: one by one                      |
+|     - mixed: lead first, then others parallel    |
+|  5. Agents communicate via message queue          |
+|  6. Results merged into ticket                    |
+|  7. Team marked complete                          |
++---------------------------------------------------+
+```
+
+### Team Templates
+
+| Template | Roles | Use Case |
+|----------|-------|----------|
+| `fullstack-team` | architect + backend + frontend | Feature development |
+| `api-team` | architect + backend + tester | API work |
+| `security-team` | architect + security + unity + tester | Security features |
+| `devops-team` | devops + backend | Infrastructure |
+
+### Team Commands
+
+```bash
+# Create team manually
+python scripts/team.py create --ticket PROJ-001 --template fullstack-team
+
+# Check team status
+python scripts/team.py status TEAM-001
+
+# View team messages
+python scripts/team.py messages TEAM-001
+
+# View shared context
+python scripts/team.py context TEAM-001
+```
+
+### Disabling Teams
+
+To run in solo mode (original behavior):
+
+```bash
+python scripts/orchestrate.py sprint --no-teams
+```
+
+## Unity Security Integration
+
+Unity is Rick's security specialist — a wrapper around the Shannon pentest framework.
+
+### Unity Workflow
+
+```
++---------------------------------------------------+
+|  1. Start scan (manual or via security-team)      |
+|  2. Unity checks if Temporal/Shannon available    |
+|  3. If yes: runs full Shannon pentest workflow    |
+|     If no: falls back to static analysis          |
+|  4. Tracks progress via workflow ID               |
+|  5. Generates report (JSON + Markdown)            |
++---------------------------------------------------+
+```
+
+### Unity Commands
+
+```bash
+# Check dependencies
+python scripts/unity.py check
+
+# Start a scan
+python scripts/unity.py scan --repo ./myapp
+python scripts/unity.py scan --url https://staging.example.com
+
+# Check progress
+python scripts/unity.py status <workflow-id>
+
+# Get report
+python scripts/unity.py report <workflow-id>
+```
+
+### Unity in Security Team
+
+When using the `security-team` template, Unity works alongside:
+- `architect-morty`: Security architecture review
+- `security-morty`: Static code analysis
+- `unity`: Dynamic penetration testing
+- `tester-morty`: Security test automation
+
+### Setting Up Unity
+
+```bash
+# Install Shannon framework
+bash scripts/unity_setup.sh
+
+# Start Temporal (optional, for full pentest mode)
+cd vendors/shannon && docker-compose up -d
+
+# Verify
+python scripts/unity.py check
+```
+
+## Directory Structure
+
+After team and Unity features, the `.cto/` directory includes:
+
+```
+.cto/
+├── config.json
+├── tickets/
+│   └── PROJ-001.json
+├── logs/
+│   └── 2024-01-15.jsonl
+├── decisions/
+│   └── ADR-001.md
+├── teams/                  # NEW - Team collaboration
+│   ├── active/
+│   │   └── TEAM-001.json
+│   ├── messages/
+│   │   └── TEAM-001/
+│   │       └── msg-001.json
+│   └── context/
+│       └── TEAM-001-shared.json
+└── unity/                  # NEW - Unity security
+    ├── workflows/
+    │   └── unity-abc123.json
+    └── reports/
+        ├── unity-abc123-report.json
+        └── unity-abc123-report.md
 ```

@@ -15,6 +15,85 @@ Rick delegates work to specialized Morty's. Each Morty has a defined scope, expe
 | `devops-morty` | sonnet | CI/CD, Docker, deployment, monitoring | Pipeline setup, deployment configuration. Keeps the lights on. |
 | `reviewer-morty` | sonnet | Code quality, best practices, performance | Reviews code from other Morty's. The Morty that judges other Morty's. |
 
+## Unity — Security Specialist (Shannon Integration)
+
+Unity is NOT a Morty. She's Rick's security specialist — a wrapper around the Shannon pentest framework. Think of her as the security professional who actually knows what she's doing, unlike security-morty who just checks boxes.
+
+| Agent | Model | Expertise | Capabilities |
+|-------|-------|-----------|--------------|
+| `unity` | opus | Penetration testing, exploitation, security research | Real pentesting via Shannon framework, PoC generation, vulnerability verification |
+
+### Unity vs Security-Morty
+
+| | Unity | Security-Morty |
+|---|---|---|
+| **Approach** | Active pentesting | Passive code review |
+| **Tools** | Shannon, nmap, Playwright, nuclei | Code analysis only |
+| **Output** | PoCs, exploitation reports | Security recommendations |
+| **Best for** | Production security audits | Development-time reviews |
+| **Dependencies** | Temporal, Docker | None |
+
+### When to Use Unity
+
+- **Security audits** before deployment
+- **Penetration testing** of live systems
+- **Vulnerability verification** with PoCs
+- **Compliance testing** (OWASP, etc.)
+- **Part of security-team** for comprehensive coverage
+
+### When to Use Security-Morty Instead
+
+- **During development** (no live system)
+- **Quick security reviews** (no need for full pentest)
+- **When Temporal/Docker not available** (Unity falls back to static mode anyway)
+
+### Unity Commands
+
+```bash
+# Check Unity dependencies
+python scripts/unity.py check
+
+# Start a security scan
+python scripts/unity.py scan --repo ./myapp
+python scripts/unity.py scan --url https://staging.example.com
+
+# Check scan progress
+python scripts/unity.py status <workflow-id>
+
+# Get the full report
+python scripts/unity.py report <workflow-id>
+
+# List all scans
+python scripts/unity.py list
+```
+
+### Unity in Teams
+
+Unity works in the `security-team` template alongside:
+- `architect-morty` — Reviews security architecture
+- `security-morty` — Static code analysis
+- `unity` — Dynamic testing (pentesting)
+- `tester-morty` — Automates security tests
+
+### Setup
+
+Unity requires the Shannon framework:
+
+```bash
+# Install Shannon and dependencies
+bash scripts/unity_setup.sh
+
+# Start Temporal (for full pentest mode)
+cd vendors/shannon && docker-compose up -d
+
+# Verify setup
+python scripts/unity.py check
+```
+
+### Fallback Mode
+
+If Temporal/Shannon isn't available, Unity operates in "static analysis mode" — delegating to security-morty for code-based security analysis. This provides security insights without live exploitation verification.
+
 ## Mr. Meeseeks — Ephemeral One-Shot Agent
 
 Mr. Meeseeks is NOT a Morty. He's summoned from the Meeseeks Box for **one single task**, completes it, and ceases to exist. No persistent role, no long-running assignments. Just pure, focused, one-shot execution.

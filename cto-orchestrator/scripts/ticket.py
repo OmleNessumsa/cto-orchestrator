@@ -115,9 +115,27 @@ def morty_display(agent: Optional[str]) -> str:
 # ── Commands ────────────────────────────────────────────────────────────────
 
 
+TEAM_TEMPLATES = ["fullstack-team", "api-team", "security-team", "devops-team"]
+
+
 def cmd_create(args):
     root = find_cto_root()
     tid = next_ticket_id(root)
+
+    # Handle team mode
+    team_mode = getattr(args, 'team_mode', None) or "solo"
+    team_template = getattr(args, 'team_template', None)
+
+    # Validate team template
+    if team_template and team_template not in TEAM_TEMPLATES:
+        print(f"Warning: Unknown team template '{team_template}'. Using solo mode.")
+        team_mode = "solo"
+        team_template = None
+
+    # Auto-suggest team mode for complex tickets
+    if team_mode == "solo" and args.complexity in ("L", "XL"):
+        print(f"  Hint: This is a {args.complexity} ticket. Consider using --team-mode collaborative")
+
     ticket = {
         "id": tid,
         "title": args.title,
@@ -130,6 +148,11 @@ def cmd_create(args):
         "dependencies": [d.strip() for d in args.depends.split(",")] if args.depends else [],
         "acceptance_criteria": [c.strip() for c in args.criteria.split("|")] if args.criteria else [],
         "estimated_complexity": args.complexity or "M",
+        # Team collaboration fields
+        "team_mode": team_mode,
+        "team_template": team_template,
+        "team_id": None,  # Set when team is spawned
+        # Timestamps
         "created_at": now_iso(),
         "updated_at": now_iso(),
         "completed_at": None,
@@ -138,7 +161,9 @@ def cmd_create(args):
         "files_touched": [],
     }
     save_ticket(root, ticket)
-    print(f"*Burrrp* Created {tid}: {args.title}. Now get to work, Morty.")
+
+    team_msg = f" (team: {team_template})" if team_mode == "collaborative" else ""
+    print(f"*Burrrp* Created {tid}: {args.title}{team_msg}. Now get to work, Morty.")
     return tid
 
 
@@ -302,13 +327,19 @@ def build_parser():
     # create
     c = sub.add_parser("create", help="Create a new ticket")
     c.add_argument("--title", required=True)
-    c.add_argument("--type", required=True, choices=["feature", "bug", "task", "spike", "epic"])
+    c.add_argument("--type", required=True, choices=["feature", "bug", "task", "spike", "epic", "security"])
     c.add_argument("--priority", default="medium", choices=["critical", "high", "medium", "low"])
     c.add_argument("--description", default="")
     c.add_argument("--parent", default=None, help="Parent ticket ID for sub-tickets")
     c.add_argument("--depends", default=None, help="Comma-separated dependency ticket IDs")
     c.add_argument("--criteria", default=None, help="Pipe-separated acceptance criteria")
     c.add_argument("--complexity", default="M", choices=["XS", "S", "M", "L", "XL"])
+    # Team collaboration options
+    c.add_argument("--team-mode", default="solo", choices=["solo", "collaborative"],
+                   help="Work mode: solo (single agent) or collaborative (team)")
+    c.add_argument("--team-template", default=None,
+                   choices=["fullstack-team", "api-team", "security-team", "devops-team"],
+                   help="Team template for collaborative mode")
 
     # list
     ls = sub.add_parser("list", help="List tickets")

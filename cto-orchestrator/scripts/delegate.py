@@ -3,6 +3,8 @@
 
 Wubba lubba dub dub! Delegates tickets to specialized Morty sub-agents
 via `claude -p` subprocesses. Rick's in charge, Morty's do the work.
+
+Now with Team Collaboration support — Morty's can work together!
 """
 
 import argparse
@@ -13,6 +15,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 
 def find_cto_root(start=None) -> Path:
@@ -124,6 +127,7 @@ def get_project_structure(root: Path) -> str:
 AGENT_MODELS = {
     "architect-morty": "opus",
     "security-morty": "opus",
+    "unity": "opus",  # Unity security agent (Shannon wrapper)
     "backend-morty": "sonnet",
     "frontend-morty": "sonnet",
     "fullstack-morty": "sonnet",
@@ -131,6 +135,239 @@ AGENT_MODELS = {
     "devops-morty": "sonnet",
     "reviewer-morty": "sonnet",
 }
+
+
+# ── Team Context Functions ───────────────────────────────────────────────────
+
+def load_team_context(root: Path, team_id: str) -> Optional[dict]:
+    """Load shared context for a team session."""
+    ctx_fp = root / ".cto" / "teams" / "context" / f"{team_id}-shared.json"
+    if not ctx_fp.exists():
+        return None
+    return load_json(ctx_fp)
+
+
+def load_team_session(root: Path, team_id: str) -> Optional[dict]:
+    """Load a team session."""
+    team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+    if not team_fp.exists():
+        return None
+    return load_json(team_fp)
+
+
+def get_team_messages(root: Path, team_id: str, for_role: str) -> list[dict]:
+    """Get messages relevant to a specific role."""
+    msg_dir = root / ".cto" / "teams" / "messages" / team_id
+    if not msg_dir.exists():
+        return []
+
+    messages = []
+    for fp in sorted(msg_dir.glob("msg-*.json")):
+        msg = load_json(fp)
+        # Include if message is to this role, broadcast, or from this role
+        if msg["to"] == "@*" or msg["to"] == for_role or msg["from"] == for_role:
+            messages.append(msg)
+    return messages
+
+
+def build_team_context(root: Path, team_id: str, agent_role: str) -> str:
+    """Build context section for team collaboration.
+
+    This provides the agent with:
+    - Team composition and member statuses
+    - Shared decisions and interfaces
+    - Recent messages from other team members
+    - File reservations to avoid conflicts
+    """
+    team = load_team_session(root, team_id)
+    if not team:
+        return ""
+
+    ctx = load_team_context(root, team_id)
+    messages = get_team_messages(root, team_id, agent_role)
+
+    sections = []
+
+    # Team overview
+    sections.append(f"""### Team Collaboration: {team_id}
+
+You are part of a team working on ticket {team['parent_ticket']}.
+Coordination mode: {team['coordination']['mode']}
+Team lead: {team['coordination']['lead']}
+
+**Your Role**: {agent_role}
+""")
+
+    # Member statuses
+    member_lines = []
+    for m in team["members"]:
+        status_icon = {"pending": "⏳", "working": "🔨", "completed": "✅", "blocked": "🚫"}.get(m["status"], "?")
+        focus = f" — {m['focus']}" if m.get("focus") else ""
+        is_you = " (YOU)" if m["role"] == agent_role else ""
+        member_lines.append(f"  - {status_icon} @{m['role']}{is_you}: {m['status']}{focus}")
+    sections.append("**Team Members**:\n" + "\n".join(member_lines))
+
+    # Shared decisions
+    if ctx and ctx.get("decisions"):
+        decision_lines = []
+        for d in ctx["decisions"][-5:]:  # Last 5 decisions
+            decision_lines.append(f"  - [{d['author']}]: {d['decision']}")
+        sections.append("**Team Decisions**:\n" + "\n".join(decision_lines))
+
+    # Shared interfaces
+    if ctx and ctx.get("interfaces"):
+        interface_lines = []
+        for i in ctx["interfaces"][-3:]:  # Last 3 interfaces
+            interface_lines.append(f"  - [{i['author']}]: {json.dumps(i['interface'])[:100]}")
+        sections.append("**Defined Interfaces**:\n" + "\n".join(interface_lines))
+
+    # Recent messages
+    if messages:
+        msg_lines = []
+        for msg in messages[-5:]:  # Last 5 messages
+            icon = {"info": "ℹ️", "question": "❓", "decision": "📋", "blocked": "🚫"}.get(msg["type"], "💬")
+            msg_lines.append(f"  - {icon} @{msg['from']} → @{msg['to']}: {msg['message'][:80]}")
+        sections.append("**Recent Messages**:\n" + "\n".join(msg_lines))
+
+    # File reservations (to avoid conflicts)
+    reserved = team.get("files_reserved", {})
+    if reserved:
+        your_files = reserved.get(agent_role, [])
+        other_files = {r: f for r, f in reserved.items() if r != agent_role}
+
+        if your_files:
+            sections.append(f"**Your Reserved Files** (safe to modify):\n  - " + "\n  - ".join(your_files))
+
+        if other_files:
+            conflict_lines = []
+            for role, files in other_files.items():
+                conflict_lines.append(f"  - @{role}: {', '.join(files)}")
+            sections.append("**Files Reserved by Others** (DO NOT MODIFY):\n" + "\n".join(conflict_lines))
+
+    # Communication instructions
+    sections.append("""
+### Team Communication
+
+To communicate with your team, include a section in your output:
+
+```
+### Team Updates
+**Messages to team**:
+- @backend-morty: [your message here]
+- @*: [broadcast to all team members]
+
+**Decisions made**:
+- [decision description]
+
+**Blocked on**:
+- Waiting for @architect-morty to [reason]
+```
+
+This helps Rick coordinate the Morty army effectively.
+""")
+
+    return "\n\n".join(sections)
+
+
+def parse_team_agent_output(output: str) -> dict:
+    """Parse team-related output from agent response.
+
+    Extracts:
+    - Messages to other team members
+    - Decisions made
+    - Blocked dependencies
+    """
+    result = {
+        "messages": [],
+        "decisions": [],
+        "blocked_on": [],
+    }
+
+    # Find Team Updates section
+    team_match = re.search(r"###\s*Team Updates\s*\n(.*?)(?:\n###|\Z)", output, re.DOTALL | re.IGNORECASE)
+    if not team_match:
+        return result
+
+    team_section = team_match.group(1)
+
+    # Parse messages
+    messages_match = re.search(r"\*\*Messages to team\*\*:\s*\n(.*?)(?:\n\*\*|\Z)", team_section, re.DOTALL)
+    if messages_match:
+        for line in messages_match.group(1).strip().split("\n"):
+            line = line.strip().lstrip("- ")
+            # Parse @recipient: message
+            msg_match = re.match(r"@(\S+):\s*(.+)", line)
+            if msg_match:
+                result["messages"].append({
+                    "to": msg_match.group(1),
+                    "message": msg_match.group(2).strip(),
+                })
+
+    # Parse decisions
+    decisions_match = re.search(r"\*\*Decisions made\*\*:\s*\n(.*?)(?:\n\*\*|\Z)", team_section, re.DOTALL)
+    if decisions_match:
+        for line in decisions_match.group(1).strip().split("\n"):
+            line = line.strip().lstrip("- ")
+            if line:
+                result["decisions"].append(line)
+
+    # Parse blocked dependencies
+    blocked_match = re.search(r"\*\*Blocked on\*\*:\s*\n(.*?)(?:\n\*\*|\Z)", team_section, re.DOTALL)
+    if blocked_match:
+        for line in blocked_match.group(1).strip().split("\n"):
+            line = line.strip().lstrip("- ")
+            if line:
+                result["blocked_on"].append(line)
+
+    return result
+
+
+def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
+    """Process and save team-related output.
+
+    Saves messages to the team message queue and decisions to shared context.
+    """
+    parsed = parse_team_agent_output(output)
+
+    # Send messages
+    if parsed["messages"]:
+        msg_dir = root / ".cto" / "teams" / "messages" / team_id
+        msg_dir.mkdir(parents=True, exist_ok=True)
+        existing = list(msg_dir.glob("msg-*.json"))
+        msg_num = len(existing) + 1
+
+        for msg in parsed["messages"]:
+            msg_data = {
+                "id": f"msg-{msg_num:03d}",
+                "team_id": team_id,
+                "from": agent_role,
+                "to": msg["to"],
+                "message": msg["message"],
+                "type": "info",
+                "timestamp": now_iso(),
+                "read_by": [],
+            }
+            save_json(msg_dir / f"msg-{msg_num:03d}.json", msg_data)
+            msg_num += 1
+
+    # Save decisions to context
+    if parsed["decisions"]:
+        ctx_fp = root / ".cto" / "teams" / "context" / f"{team_id}-shared.json"
+        if ctx_fp.exists():
+            ctx = load_json(ctx_fp)
+        else:
+            ctx = {"team_id": team_id, "decisions": [], "interfaces": [], "notes": []}
+
+        for decision in parsed["decisions"]:
+            ctx["decisions"].append({
+                "decision": decision,
+                "author": agent_role,
+                "timestamp": now_iso(),
+            })
+        ctx["updated_at"] = now_iso()
+        save_json(ctx_fp, ctx)
+
+    return parsed
 
 
 def auto_select_agent(ticket: dict) -> str:
@@ -268,14 +505,26 @@ Now get to work and report back to Rick when you're done.""",
 }
 
 
-def build_prompt(root: Path, ticket: dict, agent_role: str) -> str:
-    """Assemble the full prompt for the sub-agent."""
+def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None) -> str:
+    """Assemble the full prompt for the sub-agent.
+
+    Args:
+        root: Project root path
+        ticket: Ticket dict
+        agent_role: Role of the agent
+        team_id: Optional team session ID for team collaboration context
+    """
     role_prompt = AGENT_PROMPTS.get(agent_role, AGENT_PROMPTS["fullstack-morty"])
     criteria = ticket.get("acceptance_criteria") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "(none specified)"
     adrs = load_adrs(root)
     related = get_related_tickets(root, ticket)
     structure = get_project_structure(root)
+
+    # Build team context if in a team session
+    team_context = ""
+    if team_id:
+        team_context = build_team_context(root, team_id, agent_role)
 
     prompt = f"""{role_prompt}
 
@@ -299,7 +548,17 @@ def build_prompt(root: Path, ticket: dict, agent_role: str) -> str:
 
 ### Related Tickets
 {related}
+"""
 
+    # Add team context if available
+    if team_context:
+        prompt += f"""
+## Team Collaboration
+
+{team_context}
+"""
+
+    prompt += """
 ### IMPORTANT — Rick Is Watching
 - Execute ALL tasks directly. Do NOT ask for permission or confirmation — Rick hates that.
 - Create and modify files as needed. Do NOT just describe what should be done — that's Jerry behavior.
@@ -406,10 +665,12 @@ def cmd_delegate(args):
     ticket = load_ticket(root, args.ticket_id)
     agent = args.agent or auto_select_agent(ticket)
     model = args.model or AGENT_MODELS.get(agent, "sonnet")
+    team_id = args.team_id if hasattr(args, 'team_id') else None
 
-    print(f"*Burrrp* Alright, sending {agent} on a mission — ticket {ticket['id']} (model: {model})")
+    team_msg = f" (team: {team_id})" if team_id else ""
+    print(f"*Burrrp* Alright, sending {agent} on a mission — ticket {ticket['id']} (model: {model}){team_msg}")
 
-    prompt = build_prompt(root, ticket, agent)
+    prompt = build_prompt(root, ticket, agent, team_id=team_id)
 
     if args.dry_run:
         print("\n" + "=" * 60)
@@ -424,6 +685,8 @@ def cmd_delegate(args):
     ticket["status"] = "in_progress"
     ticket["assigned_agent"] = agent
     ticket["updated_at"] = now_iso()
+    if team_id:
+        ticket["team_id"] = team_id
     save_ticket(root, ticket)
 
     append_log(root, {
@@ -431,9 +694,23 @@ def cmd_delegate(args):
         "ticket_id": ticket["id"],
         "agent": agent,
         "action": "started",
-        "message": f"Delegated to @{agent} (model: {model})",
+        "message": f"Delegated to @{agent} (model: {model}){team_msg}",
         "files_changed": [],
     })
+
+    # Update team member status if in a team
+    if team_id:
+        team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+        if team_fp.exists():
+            team = load_json(team_fp)
+            for member in team["members"]:
+                if member["role"] == agent:
+                    member["status"] = "working"
+                    member["started_at"] = now_iso()
+            if team["status"] == "pending":
+                team["status"] = "active"
+                team["started_at"] = now_iso()
+            save_json(team_fp, team)
 
     # Execute
     try:
@@ -445,6 +722,20 @@ def cmd_delegate(args):
         ticket["review_notes"] = f"AGENT FAILURE: {error_msg}"
         ticket["updated_at"] = now_iso()
         save_ticket(root, ticket)
+
+        # Update team member status
+        if team_id:
+            team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+            if team_fp.exists():
+                team = load_json(team_fp)
+                for member in team["members"]:
+                    if member["role"] == agent:
+                        member["status"] = "blocked"
+                        member["completed_at"] = now_iso()
+                        member["output_summary"] = f"FAILED: {error_msg[:100]}"
+                team["status"] = "blocked"
+                save_json(team_fp, team)
+
         append_log(root, {
             "timestamp": now_iso(),
             "ticket_id": ticket["id"],
@@ -457,6 +748,33 @@ def cmd_delegate(args):
 
     # Parse output
     parsed = parse_agent_output(output)
+
+    # Process team output if in a team
+    if team_id:
+        team_parsed = process_team_output(root, team_id, agent, output)
+
+        # Update team member status
+        team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+        if team_fp.exists():
+            team = load_json(team_fp)
+            for member in team["members"]:
+                if member["role"] == agent:
+                    if team_parsed.get("blocked_on"):
+                        member["status"] = "blocked"
+                    else:
+                        member["status"] = "completed"
+                    member["completed_at"] = now_iso()
+                    member["output_summary"] = parsed["description"][:200]
+
+            # Check if all members completed
+            all_done = all(m["status"] == "completed" for m in team["members"])
+            any_blocked = any(m["status"] == "blocked" for m in team["members"])
+            if all_done:
+                team["status"] = "completed"
+                team["completed_at"] = now_iso()
+            elif any_blocked:
+                team["status"] = "blocked"
+            save_json(team_fp, team)
 
     # Update ticket
     agent_status = parsed["status"]
@@ -495,10 +813,11 @@ def build_parser():
     p.add_argument("ticket_id", help="Ticket ID to delegate")
     p.add_argument("--agent", default=None,
                    choices=["architect-morty", "backend-morty", "frontend-morty", "fullstack-morty",
-                            "tester-morty", "security-morty", "devops-morty", "reviewer-morty"])
+                            "tester-morty", "security-morty", "devops-morty", "reviewer-morty", "unity"])
     p.add_argument("--model", default=None, choices=["opus", "sonnet", "haiku"])
     p.add_argument("--dry-run", action="store_true", help="Show prompt without executing")
     p.add_argument("--timeout", type=int, default=600, help="Timeout in seconds (default: 600)")
+    p.add_argument("--team-id", default=None, help="Team session ID for team collaboration")
     return p
 
 

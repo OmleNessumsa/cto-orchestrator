@@ -5,14 +5,17 @@ I'm Rick Sanchez, the smartest CTO in the multiverse. *burp*
 I delegate work to my army of Morty's because I'm too important
 to write code myself. Get schwifty.
 
+Now with Team Collaboration — Morty's can work in parallel teams!
+
 Commands:
   plan   — Rick plans the project (genius-level architecture)
-  sprint — Send the Morty's to do the actual work
+  sprint — Send the Morty's to do the actual work (now with team support!)
   review — Rick reviews what the Morty's cooked up
   status — Rick's project dashboard
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import re
@@ -20,6 +23,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 
 # ── Shared helpers (same as other scripts) ──────────────────────────────────
@@ -98,13 +102,15 @@ def run_ticket_cmd(root: Path, *args) -> str:
     return result.stdout + result.stderr
 
 
-def run_delegate(root: Path, ticket_id: str, agent: str = None, dry_run: bool = False, timeout: int = 600) -> str:
+def run_delegate(root: Path, ticket_id: str, agent: str = None, dry_run: bool = False, timeout: int = 600, team_id: str = None) -> str:
     cmd = [sys.executable, str(scripts_dir() / "delegate.py"), ticket_id]
     if agent:
         cmd.extend(["--agent", agent])
     if dry_run:
         cmd.append("--dry-run")
     cmd.extend(["--timeout", str(timeout)])
+    if team_id:
+        cmd.extend(["--team-id", team_id])
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(root), timeout=timeout + 60)
     return result.stdout + result.stderr
 
@@ -113,6 +119,225 @@ def run_progress_cmd(root: Path, *args) -> str:
     cmd = [sys.executable, str(scripts_dir() / "progress.py")] + list(args)
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(root))
     return result.stdout + result.stderr
+
+
+def run_team_cmd(root: Path, *args) -> str:
+    cmd = [sys.executable, str(scripts_dir() / "team.py")] + list(args)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(root))
+    return result.stdout + result.stderr
+
+
+# ── Team Templates ───────────────────────────────────────────────────────────
+
+TEAM_TEMPLATES = {
+    "fullstack-team": {
+        "description": "Full-stack feature development team",
+        "roles": ["architect-morty", "backend-morty", "frontend-morty"],
+    },
+    "api-team": {
+        "description": "API development and testing team",
+        "roles": ["architect-morty", "backend-morty", "tester-morty"],
+    },
+    "security-team": {
+        "description": "Security audit and hardening team",
+        "roles": ["architect-morty", "security-morty", "unity", "tester-morty"],
+    },
+    "devops-team": {
+        "description": "Infrastructure and deployment team",
+        "roles": ["devops-morty", "backend-morty"],
+    },
+}
+
+COMPLEXITY_TEAM_THRESHOLD = {"L": True, "XL": True}  # These need teams
+
+
+def detect_team_need(ticket: dict) -> Optional[str]:
+    """Detect if a ticket needs a team and which template to use.
+
+    Returns the template name if a team is needed, None otherwise.
+    """
+    # Check if ticket explicitly requests a team
+    team_mode = ticket.get("team_mode")
+    team_template = ticket.get("team_template")
+    if team_mode == "collaborative" and team_template:
+        return team_template
+
+    # Auto-detect based on complexity
+    complexity = ticket.get("estimated_complexity", "M")
+    if complexity not in COMPLEXITY_TEAM_THRESHOLD:
+        return None  # Solo work for S, M, XS
+
+    # Determine template based on ticket content
+    ttype = ticket.get("type", "")
+    title = (ticket.get("title") or "").lower()
+    desc = (ticket.get("description") or "").lower()
+    combined = f"{title} {desc}"
+
+    # Security-related → security-team
+    if any(kw in combined for kw in ["security", "auth", "vulnerability", "pentest", "owasp"]):
+        return "security-team"
+
+    # Infrastructure/deployment → devops-team
+    if any(kw in combined for kw in ["ci/cd", "docker", "kubernetes", "deploy", "infra", "pipeline"]):
+        return "devops-team"
+
+    # API-focused → api-team
+    if any(kw in combined for kw in ["api", "endpoint", "rest", "graphql"]) and "ui" not in combined:
+        return "api-team"
+
+    # Default for complex features → fullstack-team
+    return "fullstack-team"
+
+
+def load_team(root: Path, team_id: str) -> Optional[dict]:
+    """Load a team session."""
+    fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+    if not fp.exists():
+        return None
+    return load_json(fp)
+
+
+def all_teams(root: Path) -> list[dict]:
+    """Load all team sessions."""
+    td = root / ".cto" / "teams" / "active"
+    if not td.exists():
+        return []
+    teams = []
+    for fp in sorted(td.glob("*.json")):
+        teams.append(load_json(fp))
+    return teams
+
+
+def spawn_team(root: Path, ticket: dict, template_name: str) -> dict:
+    """Spawn a team for a ticket.
+
+    Creates a team session and generates sub-assignments for each member.
+    """
+    # Create team via team.py
+    output = run_team_cmd(root, "create", "--ticket", ticket["id"], "--template", template_name)
+    print(f"  {output}")
+
+    # Find the created team
+    teams = all_teams(root)
+    for team in reversed(teams):
+        if team["parent_ticket"] == ticket["id"]:
+            return team
+
+    raise RuntimeError(f"Failed to create team for {ticket['id']}")
+
+
+def delegate_team_member(root: Path, team_id: str, agent_role: str, ticket_id: str, timeout: int = 600) -> dict:
+    """Delegate work to a single team member.
+
+    This function is designed to be called in parallel via ProcessPoolExecutor.
+
+    Returns a dict with the result.
+    """
+    try:
+        output = run_delegate(root, ticket_id, agent=agent_role, team_id=team_id, timeout=timeout)
+        return {
+            "agent": agent_role,
+            "status": "completed",
+            "output": output[-500:],
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "agent": agent_role,
+            "status": "timeout",
+            "output": f"Timed out after {timeout}s",
+        }
+    except Exception as e:
+        return {
+            "agent": agent_role,
+            "status": "error",
+            "output": str(e)[:500],
+        }
+
+
+def run_team_sprint(root: Path, team: dict, ticket: dict, timeout: int = 600) -> dict:
+    """Run a team sprint with parallel execution.
+
+    Coordinates multiple Morty's working on the same ticket using
+    concurrent.futures for parallel execution.
+    """
+    team_id = team["id"]
+    ticket_id = ticket["id"]
+    mode = team["coordination"]["mode"]
+    lead = team["coordination"]["lead"]
+
+    results = {}
+
+    if mode == "sequential":
+        # Run agents one by one, lead first
+        ordered_members = sorted(
+            team["members"],
+            key=lambda m: (0 if m["role"] == lead else 1, m["role"])
+        )
+        for member in ordered_members:
+            if member["status"] in ("completed", "blocked"):
+                continue
+            print(f"    Running @{member['role']} (sequential)...")
+            result = delegate_team_member(root, team_id, member["role"], ticket_id, timeout)
+            results[member["role"]] = result
+            if result["status"] != "completed":
+                print(f"    @{member['role']} failed, stopping sequential execution")
+                break
+
+    elif mode == "parallel":
+        # Run all agents in parallel
+        pending_members = [m for m in team["members"] if m["status"] not in ("completed", "blocked")]
+        print(f"    Running {len(pending_members)} agents in parallel...")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pending_members)) as executor:
+            futures = {
+                executor.submit(delegate_team_member, root, team_id, m["role"], ticket_id, timeout): m["role"]
+                for m in pending_members
+            }
+            for future in concurrent.futures.as_completed(futures):
+                agent = futures[future]
+                try:
+                    result = future.result()
+                    results[agent] = result
+                    print(f"    @{agent}: {result['status']}")
+                except Exception as e:
+                    results[agent] = {"agent": agent, "status": "error", "output": str(e)}
+                    print(f"    @{agent}: error - {e}")
+
+    else:  # mixed mode
+        # Run lead first, then others in parallel
+        lead_member = next((m for m in team["members"] if m["role"] == lead), None)
+        other_members = [m for m in team["members"] if m["role"] != lead and m["status"] not in ("completed", "blocked")]
+
+        # Run lead first
+        if lead_member and lead_member["status"] not in ("completed", "blocked"):
+            print(f"    Running lead @{lead} first...")
+            result = delegate_team_member(root, team_id, lead, ticket_id, timeout)
+            results[lead] = result
+            print(f"    @{lead}: {result['status']}")
+
+            if result["status"] != "completed":
+                print(f"    Lead failed, skipping other agents")
+                return results
+
+        # Run others in parallel
+        if other_members:
+            print(f"    Running {len(other_members)} agents in parallel...")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(other_members)) as executor:
+                futures = {
+                    executor.submit(delegate_team_member, root, team_id, m["role"], ticket_id, timeout): m["role"]
+                    for m in other_members
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    agent = futures[future]
+                    try:
+                        result = future.result()
+                        results[agent] = result
+                        print(f"    @{agent}: {result['status']}")
+                    except Exception as e:
+                        results[agent] = {"agent": agent, "status": "error", "output": str(e)}
+                        print(f"    @{agent}: error - {e}")
+
+    return results
 
 
 def claude_prompt(prompt: str, model: str = "sonnet") -> str:
@@ -316,14 +541,16 @@ def cmd_sprint(args):
     cfg = load_config(root)
     max_iterations = args.max_iterations
     iteration = 0
+    use_teams = not args.no_teams  # Enable teams by default
 
-    print(f"Wubba lubba dub dub! Sending the Morty's to work. (max {max_iterations} adventures)")
+    team_msg = " (team mode enabled)" if use_teams else " (solo mode)"
+    print(f"Wubba lubba dub dub! Sending the Morty's to work. (max {max_iterations} adventures){team_msg}")
     append_log(root, {
         "timestamp": now_iso(),
         "ticket_id": None,
         "agent": "rick",
         "action": "started",
-        "message": f"Sprint started (max {max_iterations} iterations)",
+        "message": f"Sprint started (max {max_iterations} iterations, teams={'on' if use_teams else 'off'})",
         "files_changed": [],
     })
 
@@ -343,6 +570,11 @@ def cmd_sprint(args):
         done = status_counts.get("done", 0)
         print(f"  Progress: {done}/{total} done ({(done/total*100) if total else 0:.0f}%)")
         print(f"  Statuses: {json.dumps(status_counts)}")
+
+        # Show active teams
+        active_teams = [t for t in all_teams(root) if t["status"] == "active"]
+        if active_teams:
+            print(f"  Active teams: {len(active_teams)}")
 
         # Check if all done
         non_epic = [t for t in tickets if t["type"] != "epic"]
@@ -404,18 +636,64 @@ def cmd_sprint(args):
         print(f"\n  Get in there, Morty! {ticket['id']}: {ticket['title']}")
         print(f"    Priority: {ticket['priority']}, Complexity: {ticket.get('estimated_complexity', '?')}")
 
-        try:
-            output = run_delegate(root, ticket["id"], timeout=600)
-            print(f"  Delegate output (last 300 chars): ...{output[-300:]}")
-        except subprocess.TimeoutExpired:
-            print(f"  Delegation timed out for {ticket['id']}")
-            t = load_ticket(root, ticket["id"])
-            t["status"] = "blocked"
-            t["review_notes"] = "TIMEOUT: Agent timed out. Consider splitting this ticket."
-            t["updated_at"] = now_iso()
-            save_ticket(root, t)
-        except Exception as e:
-            print(f"  Delegation error: {e}")
+        # Check if this ticket needs a team
+        team_template = None
+        if use_teams:
+            # Check explicit team settings first
+            if ticket.get("team_mode") == "collaborative":
+                team_template = ticket.get("team_template")
+            # Then auto-detect based on complexity
+            if not team_template:
+                team_template = detect_team_need(ticket)
+
+        if team_template:
+            # Team collaboration mode
+            print(f"    🤝 Team mode activated! Template: {team_template}")
+            try:
+                team = spawn_team(root, ticket, team_template)
+                print(f"    Team spawned: {team['id']} with {len(team['members'])} members")
+
+                # Run team sprint
+                results = run_team_sprint(root, team, ticket, timeout=600)
+
+                # Check results
+                completed = sum(1 for r in results.values() if r["status"] == "completed")
+                total_members = len(team["members"])
+                print(f"    Team results: {completed}/{total_members} completed")
+
+                # Log team activity
+                append_log(root, {
+                    "timestamp": now_iso(),
+                    "ticket_id": ticket["id"],
+                    "agent": "rick",
+                    "action": "team_sprint",
+                    "message": f"Team {team['id']} completed: {completed}/{total_members} agents succeeded",
+                    "files_changed": [],
+                })
+
+            except Exception as e:
+                print(f"    Team sprint failed: {e}")
+                # Fallback to solo mode
+                print(f"    Falling back to solo delegation...")
+                try:
+                    output = run_delegate(root, ticket["id"], timeout=600)
+                    print(f"  Delegate output (last 300 chars): ...{output[-300:]}")
+                except Exception as e2:
+                    print(f"  Solo delegation also failed: {e2}")
+        else:
+            # Solo mode (original behavior)
+            try:
+                output = run_delegate(root, ticket["id"], timeout=600)
+                print(f"  Delegate output (last 300 chars): ...{output[-300:]}")
+            except subprocess.TimeoutExpired:
+                print(f"  Delegation timed out for {ticket['id']}")
+                t = load_ticket(root, ticket["id"])
+                t["status"] = "blocked"
+                t["review_notes"] = "TIMEOUT: Agent timed out. Consider splitting this ticket."
+                t["updated_at"] = now_iso()
+                save_ticket(root, t)
+            except Exception as e:
+                print(f"  Delegation error: {e}")
 
         # Check if ticket ended up in_review — auto-approve for sprint flow
         t = load_ticket(root, ticket["id"])
@@ -620,6 +898,7 @@ def build_parser():
     sp = sub.add_parser("sprint", help="Run a sprint cycle")
     sp.add_argument("--auto", action="store_true", default=True, help="Fully automatic (default)")
     sp.add_argument("--max-iterations", type=int, default=50, help="Max iterations (default: 50)")
+    sp.add_argument("--no-teams", action="store_true", help="Disable team collaboration (solo mode only)")
 
     # review
     sub.add_parser("review", help="Review all completed tickets")
