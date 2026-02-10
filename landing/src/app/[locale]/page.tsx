@@ -411,6 +411,127 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Team Collaboration Section */}
+      <section className="py-20 px-4 bg-[var(--space-blue)]/30 relative">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-4">
+            <span className="text-[var(--portal-green)]">🤝 {t.teams.title}</span>
+          </h2>
+          <p className="text-gray-400 text-center mb-4 text-lg max-w-2xl mx-auto">
+            {t.teams.subtitle}
+          </p>
+          <p className="text-gray-500 text-center mb-12 max-w-2xl mx-auto">
+            {t.teams.description}
+          </p>
+
+          {/* Team Templates */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+            <div className="morty-card rounded-xl p-5 text-center">
+              <div className="text-3xl mb-2">🏗️</div>
+              <h4 className="font-bold text-[var(--portal-green)] mb-1">{t.teams.template1_name}</h4>
+              <p className="text-gray-400 text-sm">{t.teams.template1_desc}</p>
+            </div>
+            <div className="morty-card rounded-xl p-5 text-center">
+              <div className="text-3xl mb-2">⚙️</div>
+              <h4 className="font-bold text-[var(--portal-green)] mb-1">{t.teams.template2_name}</h4>
+              <p className="text-gray-400 text-sm">{t.teams.template2_desc}</p>
+            </div>
+            <div className="morty-card rounded-xl p-5 text-center">
+              <div className="text-3xl mb-2">🔐</div>
+              <h4 className="font-bold text-[var(--portal-green)] mb-1">{t.teams.template3_name}</h4>
+              <p className="text-gray-400 text-sm">{t.teams.template3_desc}</p>
+            </div>
+            <div className="morty-card rounded-xl p-5 text-center">
+              <div className="text-3xl mb-2">🚀</div>
+              <h4 className="font-bold text-[var(--portal-green)] mb-1">{t.teams.template4_name}</h4>
+              <p className="text-gray-400 text-sm">{t.teams.template4_desc}</p>
+            </div>
+          </div>
+
+          {/* Team Features */}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 rounded-xl p-5 text-center">
+              <div className="text-2xl mb-2">⚡</div>
+              <h4 className="font-bold text-[var(--portal-green)] text-sm">{t.teams.feature1_title}</h4>
+              <p className="text-gray-400 text-xs mt-1">{t.teams.feature1_desc}</p>
+            </div>
+            <div className="bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 rounded-xl p-5 text-center">
+              <div className="text-2xl mb-2">🧠</div>
+              <h4 className="font-bold text-[var(--portal-green)] text-sm">{t.teams.feature2_title}</h4>
+              <p className="text-gray-400 text-xs mt-1">{t.teams.feature2_desc}</p>
+            </div>
+            <div className="bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 rounded-xl p-5 text-center">
+              <div className="text-2xl mb-2">💬</div>
+              <h4 className="font-bold text-[var(--portal-green)] text-sm">{t.teams.feature3_title}</h4>
+              <p className="text-gray-400 text-xs mt-1">{t.teams.feature3_desc}</p>
+            </div>
+          </div>
+
+          {/* Example command */}
+          <div className="code-block rounded-lg p-4 max-w-3xl mx-auto">
+            <code className="text-[var(--portal-green)] text-sm break-all">
+              {t.teams.example_command}
+            </code>
+          </div>
+        </div>
+      </section>
+
+      {/* Unity Section */}
+      <section className="py-20 px-4 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="morty-card rounded-2xl p-8 md:p-12 relative overflow-hidden border-2 border-[var(--portal-green)]/30">
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-full bg-[var(--portal-green)]/20 flex items-center justify-center text-4xl">
+                  🛡️
+                </div>
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold">
+                    <span className="text-[var(--portal-green)]">{t.unity.title}</span>
+                  </h2>
+                  <p className="text-[var(--portal-green)]/60 font-mono text-sm mt-1">
+                    {t.unity.tagline}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-lg mb-4 max-w-2xl">
+                {t.unity.description}
+              </p>
+              <p className="text-gray-500 mb-8 max-w-2xl">
+                {t.unity.vs_morty}
+              </p>
+
+              {/* Unity Features */}
+              <div className="grid md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🎯</div>
+                  <h4 className="font-bold text-[var(--portal-green)] text-sm">{t.unity.feature1_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.unity.feature1_desc}</p>
+                </div>
+                <div className="bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">📋</div>
+                  <h4 className="font-bold text-[var(--portal-green)] text-sm">{t.unity.feature2_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.unity.feature2_desc}</p>
+                </div>
+                <div className="bg-[var(--portal-green)]/5 border border-[var(--portal-green)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🔄</div>
+                  <h4 className="font-bold text-[var(--portal-green)] text-sm">{t.unity.feature3_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.unity.feature3_desc}</p>
+                </div>
+              </div>
+
+              {/* Example command */}
+              <div className="code-block rounded-lg p-4">
+                <code className="text-[var(--portal-green)] text-sm">
+                  {t.unity.example_command}
+                </code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 px-4 relative">
         <div className="max-w-6xl mx-auto">
