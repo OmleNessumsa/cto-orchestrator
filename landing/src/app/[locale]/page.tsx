@@ -4,6 +4,7 @@ import { getDictionary } from "@/i18n/getDictionary";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import PaymentGate from "@/components/PaymentGate";
 import StarField from "@/components/StarField";
+import TrackedLink from "@/components/TrackedLink";
 
 /* ─── tiny reusable sub-components (server-safe) ─── */
 
@@ -200,18 +201,22 @@ export default async function Home({
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <a
+            <TrackedLink
               href="#install"
+              trackingName="install_now"
+              trackingSection="hero"
               className="px-8 py-4 bg-[var(--portal-green)] text-black font-bold rounded-full hover:bg-[var(--portal-green-dim)] transition-all hover:scale-105 portal-glow"
             >
               {t.hero.cta_primary}
-            </a>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href="#how-it-works"
+              trackingName="how_it_works"
+              trackingSection="hero"
               className="px-8 py-4 border border-[var(--portal-green)] text-[var(--portal-green)] font-bold rounded-full hover:bg-[var(--portal-green)]/10 transition-all"
             >
               {t.hero.cta_secondary}
-            </a>
+            </TrackedLink>
           </div>
 
           <div className="text-[var(--morty-yellow)] text-lg font-bold">
@@ -710,12 +715,14 @@ export default async function Home({
               {t.cta.title}
             </h2>
             <p className="text-xl text-gray-300 mb-8">{t.cta.subtitle}</p>
-            <a
+            <TrackedLink
               href="#install"
+              trackingName="install_cta"
+              trackingSection="bottom_cta"
               className="inline-block px-10 py-4 bg-[var(--portal-green)] text-black font-bold text-lg rounded-full hover:bg-[var(--portal-green-dim)] transition-all hover:scale-105 portal-glow"
             >
               {t.cta.button}
-            </a>
+            </TrackedLink>
             <p className="mt-6 text-[var(--morty-yellow)] text-sm">
               {t.cta.quote}
             </p>
@@ -734,26 +741,31 @@ export default async function Home({
               </span>
             </div>
             <div className="flex gap-6 text-gray-400">
-              <a
+              <TrackedLink
                 href="#how-it-works"
+                trackingName="how_it_works"
+                trackingSection="footer"
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
                 {t.footer.how_it_works}
-              </a>
-              <a
+              </TrackedLink>
+              <TrackedLink
                 href="#install"
+                trackingName="install"
+                trackingSection="footer"
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
                 {t.footer.install}
-              </a>
-              <a
+              </TrackedLink>
+              <TrackedLink
                 href="https://x.com/CtoSanchez40525"
-                target="_blank"
-                rel="noopener noreferrer"
+                trackingName="support_twitter"
+                trackingSection="footer"
+                external
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
                 {t.footer.support}
-              </a>
+              </TrackedLink>
             </div>
             <div className="text-gray-500 text-sm">
               Built by Rick Sanchez (C-137) &bull; Dimension C-137
