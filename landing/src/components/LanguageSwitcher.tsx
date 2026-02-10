@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
+import { GA_EVENTS } from "./GoogleAnalytics";
 
 export default function LanguageSwitcher({
   currentLocale,
@@ -24,6 +25,9 @@ export default function LanguageSwitcher({
   }, []);
 
   function switchLocale(newLocale: Locale) {
+    // Track language switch
+    GA_EVENTS.languageSwitch(currentLocale, newLocale);
+
     // Replace the current locale in the path
     const segments = pathname.split("/");
     segments[1] = newLocale;

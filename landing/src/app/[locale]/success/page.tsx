@@ -2,6 +2,7 @@ import { type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/getDictionary";
 import CopyButton from "@/components/CopyButton";
 import StarField from "@/components/StarField";
+import PurchaseTracker from "@/components/PurchaseTracker";
 import Link from "next/link";
 
 export default async function SuccessPage({
@@ -18,6 +19,7 @@ export default async function SuccessPage({
   return (
     <div className="min-h-screen bg-[var(--background)] relative flex items-center justify-center px-4">
       <StarField />
+      <PurchaseTracker />
 
       <div className="max-w-2xl mx-auto text-center relative z-10">
         {/* Success animation */}

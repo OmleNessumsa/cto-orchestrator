@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GA_EVENTS } from "./GoogleAnalytics";
 
 interface PaymentGateProps {
   /** Translated strings */
@@ -24,6 +25,9 @@ export default function PaymentGate({ t, installCommand }: PaymentGateProps) {
     setLoading(true);
     setError(null);
 
+    // Track payment initiation
+    GA_EVENTS.paymentInitiated();
+
     try {
       const res = await fetch("/api/create-charge", {
         method: "POST",
@@ -42,7 +46,9 @@ export default function PaymentGate({ t, installCommand }: PaymentGateProps) {
       } else {
         throw new Error("No checkout URL received");
       }
-    } catch {
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      GA_EVENTS.paymentFailed(errorMsg);
       setError(t.buy_error);
       setLoading(false);
     }
