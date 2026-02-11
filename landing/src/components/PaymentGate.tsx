@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GA_EVENTS } from "./GoogleAnalytics";
+import PayPalButton from "./PayPalButton";
 
 interface PaymentGateProps {
   /** Translated strings */
@@ -139,6 +140,19 @@ export default function PaymentGate({ t, installCommand }: PaymentGateProps) {
       <p className="mt-6 text-gray-500 text-xs">
         {t.buy_powered_by}
       </p>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-8">
+        <div className="flex-1 h-px bg-gray-700"></div>
+        <span className="text-gray-500 text-sm">or</span>
+        <div className="flex-1 h-px bg-gray-700"></div>
+      </div>
+
+      {/* PayPal option */}
+      <div className="text-center">
+        <p className="text-gray-400 text-sm mb-4">No crypto? No problem!</p>
+        <PayPalButton />
+      </div>
     </div>
   );
 }
