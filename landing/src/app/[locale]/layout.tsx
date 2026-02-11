@@ -27,12 +27,10 @@ export async function generateMetadata({
   const { locale } = await params;
   const dict = await getDictionary(locale as Locale);
 
+  const siteUrl = "https://ricksanchez.tech";
+
   return {
-    metadataBase: new URL(
-      process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000"
-    ),
+    metadataBase: new URL(siteUrl),
     title: dict.meta.title,
     description: dict.meta.description,
     keywords: [
@@ -50,11 +48,20 @@ export async function generateMetadata({
       title: dict.meta.title,
       description: dict.meta.description,
       type: "website",
+      images: [
+        {
+          url: `${siteUrl}/hero-portal.png`,
+          width: 1200,
+          height: 630,
+          alt: "Rick Sanchez CTO Orchestrator - Rick and Morty's emerging from a portal",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: dict.meta.title,
       description: dict.meta.description,
+      images: [`${siteUrl}/hero-portal.png`],
     },
   };
 }

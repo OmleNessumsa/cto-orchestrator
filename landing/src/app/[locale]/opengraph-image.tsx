@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "CTO Orchestrator — Rick Sanchez als je CTO";
+export const alt = "Rick Sanchez CTO Orchestrator — De genialste CTO in het multiversum";
 export const size = {
   width: 1200,
   height: 630,
@@ -8,109 +8,102 @@ export const size = {
 export const contentType = "image/png";
 
 export default async function Image() {
+  // Fetch the hero image
+  const heroImageUrl = "https://ricksanchez.tech/hero-portal.png";
+
   return new ImageResponse(
     (
       <div
         style={{
-          background: "linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%)",
+          background: "linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0a0a0f 100%)",
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
           fontFamily: "system-ui",
           position: "relative",
+          padding: "40px 60px",
         }}
       >
-        {/* Stars effect */}
+        {/* Left side - Text content */}
         <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
             display: "flex",
-            flexWrap: "wrap",
+            flexDirection: "column",
+            justifyContent: "center",
+            maxWidth: "55%",
           }}
         >
-          {[...Array(30)].map((_, i) => (
-            <div
-              key={i}
-              style={{
-                position: "absolute",
-                width: 4,
-                height: 4,
-                borderRadius: "50%",
-                background: "white",
-                opacity: 0.3 + Math.random() * 0.4,
-                left: `${(i * 37) % 100}%`,
-                top: `${(i * 23) % 100}%`,
-              }}
-            />
-          ))}
+          {/* Title */}
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: "bold",
+              color: "#39ff14",
+              textShadow: "0 0 30px rgba(57, 255, 20, 0.5)",
+              marginBottom: 8,
+              lineHeight: 1.1,
+            }}
+          >
+            Rick Sanchez
+          </div>
+
+          <div
+            style={{
+              fontSize: 42,
+              fontWeight: "bold",
+              color: "white",
+              marginBottom: 24,
+            }}
+          >
+            CTO Orchestrator
+          </div>
+
+          {/* Subtitle */}
+          <div
+            style={{
+              fontSize: 24,
+              color: "#a8d8ea",
+              lineHeight: 1.4,
+              marginBottom: 24,
+            }}
+          >
+            De genialste CTO in het multiversum stuurt je project aan via een leger van Morty sub-agents
+          </div>
+
+          {/* Tagline */}
+          <div
+            style={{
+              fontSize: 20,
+              color: "#f0e14a",
+              fontWeight: "bold",
+            }}
+          >
+            Wubba Lubba Dub Dub! 🛸
+          </div>
         </div>
 
-        {/* Portal icon */}
+        {/* Right side - Hero image */}
         <div
           style={{
-            fontSize: 120,
-            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "45%",
+            height: "100%",
           }}
         >
-          🧪
-        </div>
-
-        {/* Title */}
-        <div
-          style={{
-            fontSize: 72,
-            fontWeight: "bold",
-            color: "#39ff14",
-            textShadow: "0 0 30px rgba(57, 255, 20, 0.5)",
-            marginBottom: 10,
-          }}
-        >
-          Rick Sanchez
-        </div>
-
-        <div
-          style={{
-            fontSize: 48,
-            fontWeight: "bold",
-            color: "white",
-            marginBottom: 30,
-          }}
-        >
-          CTO Orchestrator
-        </div>
-
-        {/* Subtitle */}
-        <div
-          style={{
-            fontSize: 28,
-            color: "#a8d8ea",
-            maxWidth: 800,
-            textAlign: "center",
-            lineHeight: 1.4,
-          }}
-        >
-          De genialste CTO in het multiversum stuurt je project aan
-          via een leger van Morty sub-agents
-        </div>
-
-        {/* Bottom tagline */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 40,
-            fontSize: 24,
-            color: "#f0e14a",
-            fontWeight: "bold",
-          }}
-        >
-          Wubba Lubba Dub Dub! 🛸
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={heroImageUrl}
+            alt="Rick and Morty"
+            style={{
+              maxHeight: "100%",
+              maxWidth: "100%",
+              objectFit: "contain",
+            }}
+          />
         </div>
       </div>
     ),
