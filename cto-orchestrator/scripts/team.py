@@ -18,6 +18,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Import roro event emitter
+try:
+    from roro_events import emit
+except ImportError:
+    # Fallback if module not found
+    def emit(*args, **kwargs):
+        pass
+
 
 def find_cto_root(start: Optional[str] = None) -> Path:
     """Walk up from *start* (default: cwd) until we find a .cto/ directory."""
@@ -218,6 +226,16 @@ def create_team_session(
     ctx_fp = context_dir(root) / f"{team_id}-shared.json"
     save_json(ctx_fp, shared_context)
 
+    # Emit cto.team.created event
+    emit("cto.team.created", {
+        "team_id": team_id,
+        "parent_ticket": parent_ticket,
+        "template": template_name,
+        "members": [{"role": m["role"], "focus": m.get("focus", "")} for m in members],
+        "coordination_mode": coordination["mode"],
+        "lead": coordination["lead"],
+    }, role="rick", team_id=team_id)
+
     return team
 
 
@@ -250,8 +268,10 @@ def all_teams(root: Path) -> list[dict]:
 def update_member_status(root: Path, team_id: str, role: str, status: str, output_summary: Optional[str] = None):
     """Update a team member's status."""
     team = load_team(root, team_id)
+    old_member_status = None
     for member in team["members"]:
         if member["role"] == role:
+            old_member_status = member["status"]
             member["status"] = status
             if status == "working" and member["started_at"] is None:
                 member["started_at"] = now_iso()
@@ -262,6 +282,7 @@ def update_member_status(root: Path, team_id: str, role: str, status: str, outpu
             break
 
     # Update team status based on member statuses
+    old_team_status = team["status"]
     statuses = [m["status"] for m in team["members"]]
     if all(s == "completed" for s in statuses):
         team["status"] = "completed"
@@ -274,6 +295,26 @@ def update_member_status(root: Path, team_id: str, role: str, status: str, outpu
             team["started_at"] = now_iso()
 
     save_team(root, team)
+
+    # Emit cto.team.member.status.changed event
+    if old_member_status and old_member_status != status:
+        emit("cto.team.member.status.changed", {
+            "team_id": team_id,
+            "role": role,
+            "old_status": old_member_status,
+            "new_status": status,
+            "output_summary": output_summary[:100] if output_summary else None,
+        }, role=role, team_id=team_id)
+
+    # Emit cto.team.team.status.changed event
+    if old_team_status != team["status"]:
+        emit("cto.team.team.status.changed", {
+            "team_id": team_id,
+            "old_status": old_team_status,
+            "new_status": team["status"],
+            "parent_ticket": team.get("parent_ticket"),
+        }, role="rick", team_id=team_id)
+
     return team
 
 
@@ -304,6 +345,13 @@ def add_decision(root: Path, team_id: str, decision: str, author: str):
     })
     save_shared_context(root, team_id, ctx)
 
+    # Emit cto.team.decision.recorded event
+    emit("cto.team.decision.recorded", {
+        "team_id": team_id,
+        "decision": decision[:200],
+        "author": author,
+    }, role=author, team_id=team_id)
+
 
 def add_interface(root: Path, team_id: str, interface: dict, author: str):
     """Add an interface definition to shared context."""
@@ -314,6 +362,13 @@ def add_interface(root: Path, team_id: str, interface: dict, author: str):
         "timestamp": now_iso(),
     })
     save_shared_context(root, team_id, ctx)
+
+    # Emit cto.team.interface.defined event
+    emit("cto.team.interface.defined", {
+        "team_id": team_id,
+        "interface": interface,
+        "author": author,
+    }, role=author, team_id=team_id)
 
 
 def add_note(root: Path, team_id: str, note: str, author: str):
@@ -372,6 +427,17 @@ def send_message(
 
     fp = messages_dir(root) / team_id / f"{msg_id}.json"
     save_json(fp, msg)
+
+    # Emit cto.team.message.sent event
+    emit("cto.team.message.sent", {
+        "team_id": team_id,
+        "message_id": msg_id,
+        "from": from_role,
+        "to": to_role,
+        "message_type": message_type,
+        "message": message[:200],
+    }, role=from_role, team_id=team_id)
+
     return msg
 
 

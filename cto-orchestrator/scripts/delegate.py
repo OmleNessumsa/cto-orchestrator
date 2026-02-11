@@ -17,6 +17,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Import roro event emitter
+try:
+    from roro_events import emit, get_agent_id
+except ImportError:
+    # Fallback if module not found
+    def emit(*args, **kwargs):
+        pass
+    def get_agent_id(role, team_id=None):
+        return f"cto:{role}"
+
 
 def find_cto_root(start=None) -> Path:
     current = Path(start or os.getcwd()).resolve()
@@ -698,6 +708,15 @@ def cmd_delegate(args):
         "files_changed": [],
     })
 
+    # Emit cto.morty.delegation.started event
+    emit("cto.morty.delegation.started", {
+        "ticket_id": ticket["id"],
+        "title": ticket.get("title"),
+        "agent": agent,
+        "model": model,
+        "team_id": team_id,
+    }, role=agent, team_id=team_id)
+
     # Update team member status if in a team
     if team_id:
         team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
@@ -744,6 +763,24 @@ def cmd_delegate(args):
             "message": f"Agent failed: {error_msg[:200]}",
             "files_changed": [],
         })
+
+        # Emit cto.morty.delegation.failed or cto.morty.delegation.timeout event
+        if "timed out" in error_msg.lower():
+            emit("cto.morty.delegation.timeout", {
+                "ticket_id": ticket["id"],
+                "title": ticket.get("title"),
+                "agent": agent,
+                "timeout": args.timeout,
+                "team_id": team_id,
+            }, role=agent, team_id=team_id)
+        else:
+            emit("cto.morty.delegation.failed", {
+                "ticket_id": ticket["id"],
+                "title": ticket.get("title"),
+                "agent": agent,
+                "error": error_msg[:200],
+                "team_id": team_id,
+            }, role=agent, team_id=team_id)
         return
 
     # Parse output
@@ -800,6 +837,17 @@ def cmd_delegate(args):
         "message": parsed["description"][:200],
         "files_changed": parsed["files_changed"],
     })
+
+    # Emit cto.morty.delegation.completed event
+    emit("cto.morty.delegation.completed", {
+        "ticket_id": ticket["id"],
+        "title": ticket.get("title"),
+        "agent": agent,
+        "status": agent_status,
+        "files_changed": parsed["files_changed"],
+        "description": parsed["description"][:200],
+        "team_id": team_id,
+    }, role=agent, team_id=team_id)
 
     print(f"\n{agent} actually got something done. Status: {agent_status}")
     print(f"Files changed: {', '.join(parsed['files_changed']) or '(none detected)'}")

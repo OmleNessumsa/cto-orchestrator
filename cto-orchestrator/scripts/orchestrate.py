@@ -25,6 +25,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Import roro event emitter
+try:
+    from roro_events import emit
+except ImportError:
+    # Fallback if module not found
+    def emit(*args, **kwargs):
+        pass
+
 
 # ── Shared helpers (same as other scripts) ──────────────────────────────────
 
@@ -507,6 +515,14 @@ Output the JSON array now:"""
         "files_changed": [],
     })
 
+    # Emit cto.project.plan.created event
+    emit("cto.project.plan.created", {
+        "project_name": cfg.get("project_name"),
+        "description": description[:200],
+        "ticket_count": len(created_ids),
+        "ticket_ids": created_ids,
+    }, role="rick")
+
     print(f"\nBoom! Plan done. {len(created_ids)} tickets created. Even I'm impressed, and I'm never impressed.")
     print("Run `python orchestrate.py sprint` to send the Morty's to work.")
 
@@ -554,11 +570,26 @@ def cmd_sprint(args):
         "files_changed": [],
     })
 
+    # Emit cto.sprint.started event
+    emit("cto.sprint.started", {
+        "sprint_number": cfg.get("current_sprint", 1),
+        "max_iterations": max_iterations,
+        "team_mode": use_teams,
+        "project_name": cfg.get("project_name"),
+    }, role="rick")
+
     while iteration < max_iterations:
         iteration += 1
         print(f"\n{'═' * 60}")
         print(f"  Adventure #{iteration}/{max_iterations}")
         print(f"{'═' * 60}")
+
+        # Emit cto.sprint.iteration.started event
+        emit("cto.sprint.iteration.started", {
+            "sprint_number": cfg.get("current_sprint", 1),
+            "iteration": iteration,
+            "max_iterations": max_iterations,
+        }, role="rick")
 
         # Show current status
         tickets = all_tickets(root)
@@ -652,6 +683,16 @@ def cmd_sprint(args):
             try:
                 team = spawn_team(root, ticket, team_template)
                 print(f"    Team spawned: {team['id']} with {len(team['members'])} members")
+
+                # Emit cto.team.spawned event
+                emit("cto.team.spawned", {
+                    "team_id": team["id"],
+                    "ticket_id": ticket["id"],
+                    "template": team_template,
+                    "members": [m["role"] for m in team["members"]],
+                    "coordination_mode": team["coordination"]["mode"],
+                    "lead": team["coordination"]["lead"],
+                }, role="rick")
 
                 # Run team sprint
                 results = run_team_sprint(root, team, ticket, timeout=600)
@@ -749,6 +790,16 @@ def cmd_sprint(args):
         "files_changed": [],
     })
 
+    # Emit cto.sprint.completed event
+    emit("cto.sprint.completed", {
+        "sprint_number": cfg.get("current_sprint", 1),
+        "iterations": iteration,
+        "tickets_done": done,
+        "tickets_total": total,
+        "completion_percentage": pct,
+        "status_counts": status_counts,
+    }, role="rick")
+
 
 def update_epic_status(root: Path, epic_id: str):
     """Update epic status based on sub-ticket completion."""
@@ -762,6 +813,7 @@ def update_epic_status(root: Path, epic_id: str):
     if not children:
         return
 
+    old_status = epic["status"]
     all_done = all(c["status"] == "done" for c in children)
     any_in_progress = any(c["status"] in ("in_progress", "in_review", "testing") for c in children)
 
@@ -772,6 +824,18 @@ def update_epic_status(root: Path, epic_id: str):
         epic["status"] = "in_progress"
     epic["updated_at"] = now_iso()
     save_ticket(root, epic)
+
+    # Emit cto.project.epic.status.changed event if status changed
+    if epic["status"] != old_status:
+        done_count = sum(1 for c in children if c["status"] == "done")
+        emit("cto.project.epic.status.changed", {
+            "epic_id": epic_id,
+            "title": epic.get("title"),
+            "old_status": old_status,
+            "new_status": epic["status"],
+            "children_done": done_count,
+            "children_total": len(children),
+        }, role="rick")
 
 
 # ── Review command ──────────────────────────────────────────────────────────

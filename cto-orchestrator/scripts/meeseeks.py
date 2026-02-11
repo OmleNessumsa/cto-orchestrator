@@ -16,6 +16,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Import roro event emitter
+try:
+    from roro_events import emit
+except ImportError:
+    # Fallback if module not found
+    def emit(*args, **kwargs):
+        pass
+
 
 def find_cto_root(start=None) -> Path:
     current = Path(start or os.getcwd()).resolve()
@@ -208,6 +216,13 @@ def cmd_summon(args):
     except Exception:
         pass  # Logging is optional — Meeseeks work even without .cto/
 
+    # Emit cto.meeseeks.summoned event
+    emit("cto.meeseeks.summoned", {
+        "task": task[:200],
+        "target_files": target_files,
+        "model": model,
+    }, role="meeseeks")
+
     # Summon the Meeseeks
     try:
         output = summon_meeseeks(prompt, model=model, timeout=args.timeout)
@@ -222,6 +237,13 @@ def cmd_summon(args):
             })
         except Exception:
             pass
+
+        # Emit cto.meeseeks.failed event
+        emit("cto.meeseeks.failed", {
+            "task": task[:200],
+            "error": error_msg[:200],
+            "target_files": target_files,
+        }, role="meeseeks")
         return
 
     # Parse the Meeseeks report
@@ -235,6 +257,13 @@ def cmd_summon(args):
         print("└─────────────────────────────────────────┘")
         print("\nConsider creating a ticket and delegating to a Morty:")
         print(f'  python scripts/ticket.py create --title "{task[:80]}" --type task --priority medium')
+
+        # Emit cto.meeseeks.escalated event
+        emit("cto.meeseeks.escalated", {
+            "task": task[:200],
+            "reason": "Task too complex for a Meeseeks",
+            "target_files": target_files,
+        }, role="meeseeks")
     else:
         print("\n┌─────────────────────────────────────────┐")
         print("│  🟦 Mr. Meeseeks task complete!         │")
@@ -244,6 +273,15 @@ def cmd_summon(args):
         print(f"Files changed: {', '.join(parsed['files_changed']) or '(none detected)'}")
         print(f"What happened: {parsed['description'][:300]}")
         print(f"Complexity: {parsed['complexity']}")
+
+        # Emit cto.meeseeks.completed event
+        emit("cto.meeseeks.completed", {
+            "task": task[:200],
+            "status": parsed["status"],
+            "files_changed": parsed["files_changed"],
+            "description": parsed["description"][:200],
+            "complexity": parsed["complexity"],
+        }, role="meeseeks")
 
     # Log completion
     try:

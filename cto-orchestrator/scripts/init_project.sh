@@ -29,7 +29,13 @@ cat > "$CTO_DIR/config.json" <<EOF
   "created_at": "$TIMESTAMP",
   "agents_used": [],
   "current_sprint": 1,
-  "default_model": "sonnet"
+  "default_model": "sonnet",
+  "roro": {
+    "enabled": true,
+    "endpoint": "http://localhost:3067/hooks/agent-event",
+    "timeout": 2.0,
+    "verbose": false
+  }
 }
 EOF
 

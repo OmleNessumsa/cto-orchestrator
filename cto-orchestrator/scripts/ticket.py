@@ -14,6 +14,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Import roro event emitter
+try:
+    from roro_events import emit
+except ImportError:
+    # Fallback if module not found
+    def emit(*args, **kwargs):
+        pass
+
 
 def find_cto_root(start: Optional[str] = None) -> Path:
     """Walk up from *start* (default: cwd) until we find a .cto/ directory."""
@@ -162,6 +170,18 @@ def cmd_create(args):
     }
     save_ticket(root, ticket)
 
+    # Emit cto.ticket.created event
+    emit("cto.ticket.created", {
+        "ticket_id": tid,
+        "title": args.title,
+        "type": args.type,
+        "priority": args.priority,
+        "complexity": args.complexity or "M",
+        "team_mode": team_mode,
+        "team_template": team_template,
+        "parent_ticket": args.parent,
+    }, role="rick")
+
     team_msg = f" (team: {team_template})" if team_mode == "collaborative" else ""
     print(f"*Burrrp* Created {tid}: {args.title}{team_msg}. Now get to work, Morty.")
     return tid
@@ -207,6 +227,22 @@ def cmd_update(args):
             changed.append(field)
     ticket["updated_at"] = now_iso()
     save_ticket(root, ticket)
+
+    # Emit events for specific field changes
+    if "status" in changed:
+        emit("cto.ticket.status.changed", {
+            "ticket_id": args.ticket_id,
+            "new_status": ticket["status"],
+            "title": ticket.get("title"),
+        }, role="rick")
+
+    if "assigned_agent" in changed:
+        emit("cto.ticket.assigned", {
+            "ticket_id": args.ticket_id,
+            "assigned_agent": ticket.get("assigned_agent"),
+            "title": ticket.get("title"),
+        }, role="rick")
+
     print(f"Fine, updated {args.ticket_id}: {', '.join(changed)}. Happy now, Morty?")
 
 
@@ -305,6 +341,16 @@ def cmd_close(args):
         ticket["agent_output"] = args.output
     ticket["updated_at"] = now_iso()
     save_ticket(root, ticket)
+
+    # Emit cto.ticket.completed event
+    emit("cto.ticket.completed", {
+        "ticket_id": args.ticket_id,
+        "title": ticket.get("title"),
+        "type": ticket.get("type"),
+        "assigned_agent": ticket.get("assigned_agent"),
+        "files_touched": ticket.get("files_touched", []),
+    }, role="rick")
+
     print(f"About time. Closed {args.ticket_id}. Wubba lubba dub dub!")
 
 
@@ -315,6 +361,15 @@ def cmd_blocked(args):
     ticket["review_notes"] = f"BLOCKED: {args.reason}"
     ticket["updated_at"] = now_iso()
     save_ticket(root, ticket)
+
+    # Emit cto.ticket.blocked event
+    emit("cto.ticket.blocked", {
+        "ticket_id": args.ticket_id,
+        "title": ticket.get("title"),
+        "reason": args.reason,
+        "assigned_agent": ticket.get("assigned_agent"),
+    }, role="rick")
+
     print(f"Great, another roadblock. Blocked {args.ticket_id}: {args.reason}")
 
 
