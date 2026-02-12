@@ -947,6 +947,22 @@ def cmd_status(args):
                 note = t.get("review_notes") or "unknown"
                 print(f"    {t['id']}: {t['title'][:40]} — {note[:40]}")
 
+    # Show team status if any active teams
+    teams_dir = root / ".cto" / "teams" / "active"
+    if teams_dir.exists():
+        active_teams = list(teams_dir.glob("*.json"))
+        if active_teams:
+            print("\n  Active Teams:")
+            for team_fp in active_teams[:3]:  # Show first 3
+                team = load_json(team_fp)
+                if team.get("status") in ("pending", "active"):
+                    members_done = sum(1 for m in team.get("members", []) if m.get("status") == "completed")
+                    total_members = len(team.get("members", []))
+                    print(f"    {team['id']}: {team.get('parent_ticket', '?')} — {members_done}/{total_members} members done")
+
+    # Hint about visual dashboard
+    print("\n  💡 Tip: Run `python scripts/visual.py sprint` for full visual dashboard")
+
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
 

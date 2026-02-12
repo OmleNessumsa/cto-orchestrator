@@ -81,6 +81,33 @@ python scripts/orchestrate.py status
 | `python scripts/progress.py timeline` | Chronological timeline |
 | `python scripts/progress.py report` | Formal progress report |
 
+### Session Management (NEW!)
+| Command | Description |
+|---------|-------------|
+| `python scripts/session.py status` | Show current session status |
+| `python scripts/session.py log "summary" [--focus X] [--marker Y]` | Log session entry |
+| `python scripts/session.py resume` | Get "where were we" context |
+| `python scripts/session.py read [--tail N]` | Read SESSION_LOG.md |
+| `python scripts/session.py clear --force` | Clear session state |
+
+### Visual Rendering (NEW!)
+| Command | Description |
+|---------|-------------|
+| `python scripts/visual.py team TEAM-ID` | Render team collaboration board |
+| `python scripts/visual.py sprint [--sprint N]` | Render sprint dashboard |
+| `python scripts/visual.py portal AGENT` | Show portal spawn animation |
+| `python scripts/visual.py banner` | Show Rick banner |
+| `python scripts/visual.py meeseeks "task" [--complete]` | Meeseeks visualization |
+
+### Persona Management (NEW!)
+| Command | Description |
+|---------|-------------|
+| `python scripts/persona.py check` | Check persona drift status |
+| `python scripts/persona.py refresh` | Manually trigger persona refresh |
+| `python scripts/persona.py voice CONTEXT` | Get context-appropriate voice line |
+| `python scripts/persona.py anchor` | Get persona anchor block |
+| `python scripts/persona.py catchphrase` | Get random catchphrase |
+
 ### Team Collaboration (NEW!)
 | Command | Description |
 |---------|-------------|
@@ -93,7 +120,7 @@ python scripts/orchestrate.py status
 | `python scripts/team.py templates` | List team templates |
 | `python scripts/ticket.py create --team-mode collaborative --team-template fullstack-team` | Create team ticket |
 
-### Unity Security Agent (NEW!)
+### Unity Security Agent
 | Command | Description |
 |---------|-------------|
 | `python scripts/unity.py check` | Check Unity dependencies |
@@ -103,6 +130,14 @@ python scripts/orchestrate.py status
 | `python scripts/unity.py report WORKFLOW-ID` | Get full report |
 | `python scripts/unity.py list` | List all scans |
 | `bash scripts/unity_setup.sh` | Install Shannon framework |
+
+### Greenlight iOS Compliance (NEW!)
+| Command | Description |
+|---------|-------------|
+| `python scripts/unity.py greenlight-scan --app ./MyApp.xcodeproj` | Run iOS compliance scan |
+| `python scripts/unity.py greenlight-scan --app ./build/App.ipa --categories payment,privacy` | Scan specific categories |
+| `python scripts/unity.py greenlight-report SCAN-ID` | Get compliance report |
+| `python scripts/unity.py greenlight-categories` | List compliance categories |
 
 ## The Morty's (Sub-Agents)
 - **Architect-Morty** — System design, ADRs (uses opus because even a Morty needs a big brain for this)
@@ -133,3 +168,27 @@ For complex tasks (L/XL complexity), Rick can assemble teams:
 - [Ticket Schema](references/ticket-schema.md) — Ticket data model and statuses
 - [Workflow](references/workflow.md) — End-to-end project workflow + team workflows
 - [Morty Prompts](references/prompts.md) — System prompts for each Morty
+
+## New Features (v2.0)
+
+### Context Persistence — Rick Never Forgets
+Rick now maintains persistent session state to prevent "persona drift" during long conversations:
+- **SESSION_LOG.md** — Auto-generated log of all sessions, decisions, and context
+- **SESSION_STATE.json** — Tracks persona intensity and context markers
+- **Resume functionality** — Pick up exactly where you left off with `session.py resume`
+- **Persona anchor system** — Automatic Rick voice refreshes to maintain character
+
+### Visual Morty Deployment Center
+ASCII art visualizations for the Morty army:
+- Team collaboration boards with member status
+- Sprint dashboards with Kanban columns
+- Portal animations when spawning Morty's
+- Meeseeks summoning effects
+
+### Greenlight iOS Compliance
+Pre-submission App Store guideline validation:
+- **Payment & IAP** (3.1.x) — StoreKit, external payments, restore functionality
+- **Privacy Manifests** (5.1.x) — PrivacyInfo.xcprivacy, tracking declarations
+- **Sign-In Flows** (4.8) — Sign in with Apple, account deletion
+- **App Completeness** (2.x) — Metadata, icons, placeholders
+- **Binary Validation** (2.4.x, 2.5.x) — Entitlements, capabilities

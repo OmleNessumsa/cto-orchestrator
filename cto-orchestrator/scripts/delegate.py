@@ -678,6 +678,15 @@ def cmd_delegate(args):
     team_id = args.team_id if hasattr(args, 'team_id') else None
 
     team_msg = f" (team: {team_id})" if team_id else ""
+
+    # Show portal animation if visual module available
+    try:
+        from visual import animate_portal
+        if not args.dry_run:
+            animate_portal(agent, animate=False)  # Use static version for speed
+    except ImportError:
+        pass
+
     print(f"*Burrrp* Alright, sending {agent} on a mission — ticket {ticket['id']} (model: {model}){team_msg}")
 
     prompt = build_prompt(root, ticket, agent, team_id=team_id)
@@ -854,6 +863,18 @@ def cmd_delegate(args):
     print(f"Description: {parsed['description'][:300]}")
     if parsed["open_questions"] and parsed["open_questions"].lower() != "none":
         print(f"Open questions: {parsed['open_questions']}")
+
+    # Update session log
+    try:
+        from session import update_session
+        update_session(
+            root,
+            summary=f"Delegated {ticket['id']} to {agent}: {parsed['description'][:100]}",
+            focus=f"Working on {ticket['id']}",
+            context_marker=f"Completed: {ticket['title'][:50]}" if agent_status == "completed" else None,
+        )
+    except ImportError:
+        pass  # Session module not required
 
 
 def build_parser():

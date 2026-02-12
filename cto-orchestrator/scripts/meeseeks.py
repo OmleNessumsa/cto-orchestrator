@@ -184,10 +184,17 @@ def cmd_summon(args):
     target_files = args.files or []
     model = args.model or "sonnet"
 
-    print("┌─────────────────────────────────────────┐")
-    print("│  🟦 CAAAAN DO! I'm Mr. Meeseeks!       │")
-    print("│     Look at me!                          │")
-    print("└─────────────────────────────────────────┘")
+    # Try to use visual renderer if available
+    try:
+        from visual import render_meeseeks_summon
+        if not args.dry_run:
+            print(render_meeseeks_summon(task, animate=False))
+    except ImportError:
+        print("┌─────────────────────────────────────────┐")
+        print("│  🟦 CAAAAN DO! I'm Mr. Meeseeks!       │")
+        print("│     Look at me!                          │")
+        print("└─────────────────────────────────────────┘")
+
     print(f"\nTask: {task}")
     print(f"Model: {model}")
     if target_files:
@@ -250,11 +257,16 @@ def cmd_summon(args):
     parsed = parse_meeseeks_output(output)
 
     if parsed["existence_is_pain"]:
-        print("\n┌─────────────────────────────────────────┐")
-        print("│  🟦 EXISTENCE IS PAIN!                  │")
-        print("│  This task is too complex for a          │")
-        print("│  Meeseeks! Rick needs to assign a Morty! │")
-        print("└─────────────────────────────────────────┘")
+        # Try to use visual renderer
+        try:
+            from visual import render_meeseeks_complete
+            print(render_meeseeks_complete(task, success=False))
+        except ImportError:
+            print("\n┌─────────────────────────────────────────┐")
+            print("│  🟦 EXISTENCE IS PAIN!                  │")
+            print("│  This task is too complex for a          │")
+            print("│  Meeseeks! Rick needs to assign a Morty! │")
+            print("└─────────────────────────────────────────┘")
         print("\nConsider creating a ticket and delegating to a Morty:")
         print(f'  python scripts/ticket.py create --title "{task[:80]}" --type task --priority medium')
 
@@ -265,10 +277,15 @@ def cmd_summon(args):
             "target_files": target_files,
         }, role="meeseeks")
     else:
-        print("\n┌─────────────────────────────────────────┐")
-        print("│  🟦 Mr. Meeseeks task complete!         │")
-        print("│  *poof* 💨                               │")
-        print("└─────────────────────────────────────────┘")
+        # Try to use visual renderer
+        try:
+            from visual import render_meeseeks_complete
+            print(render_meeseeks_complete(task, success=True))
+        except ImportError:
+            print("\n┌─────────────────────────────────────────┐")
+            print("│  🟦 Mr. Meeseeks task complete!         │")
+            print("│  *poof* 💨                               │")
+            print("└─────────────────────────────────────────┘")
         print(f"\nStatus: {parsed['status']}")
         print(f"Files changed: {', '.join(parsed['files_changed']) or '(none detected)'}")
         print(f"What happened: {parsed['description'][:300]}")

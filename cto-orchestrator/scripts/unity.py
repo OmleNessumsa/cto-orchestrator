@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unity Security Agent — Shannon Pentest Framework Wrapper.
+"""Unity Security Agent — Shannon Pentest Framework Wrapper + Greenlight iOS Compliance.
 
 *Burrrp* — Unity is my security specialist, Morty. She's actually Shannon —
 a Temporal-based pentest framework. Way more capable than security-morty
@@ -9,6 +9,14 @@ Unity provides:
 - Automated penetration testing via Shannon workflows
 - Progress tracking via Temporal queries
 - Fallback to static analysis when Temporal isn't available
+- iOS App Store compliance checking via Greenlight integration
+
+NEW: Greenlight iOS Compliance Scanning
+- Payment & IAP compliance
+- Privacy manifests & data usage declarations
+- Sign-in & account management flows
+- App completeness & metadata quality
+- Binary & entitlement validation
 """
 
 import argparse
@@ -81,6 +89,38 @@ def append_log(root: Path, entry: dict):
 # ── Shannon Integration ──────────────────────────────────────────────────────
 
 SHANNON_PATH = Path(__file__).parent.parent.parent / "vendors" / "shannon"
+GREENLIGHT_PATH = Path(__file__).parent.parent.parent / "vendors" / "greenlight"
+
+
+# ── Greenlight iOS Compliance Categories ──────────────────────────────────────
+
+GREENLIGHT_CATEGORIES = {
+    "payment": {
+        "name": "Payment & IAP Compliance",
+        "description": "Validates in-app purchase implementation and payment-related guidelines",
+        "guidelines": ["3.1.1", "3.1.2", "3.1.3", "3.1.4", "3.1.5", "3.1.6", "3.1.7"],
+    },
+    "privacy": {
+        "name": "Privacy Manifests & Data Usage",
+        "description": "Checks privacy manifest completeness and data usage declarations",
+        "guidelines": ["5.1.1", "5.1.2", "5.1.3", "5.1.4", "5.1.5"],
+    },
+    "signin": {
+        "name": "Sign-In & Account Management",
+        "description": "Validates sign-in flows, account deletion, and Sign in with Apple",
+        "guidelines": ["4.8", "5.1.1(v)"],
+    },
+    "completeness": {
+        "name": "App Completeness & Metadata",
+        "description": "Checks app metadata quality, screenshots, and content completeness",
+        "guidelines": ["2.1", "2.3", "2.3.1", "2.3.2", "2.3.3", "2.3.4", "2.3.5"],
+    },
+    "binary": {
+        "name": "Binary & Entitlement Validation",
+        "description": "Validates binary configuration, entitlements, and capabilities",
+        "guidelines": ["2.4.1", "2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.5"],
+    },
+}
 
 
 class UnitySecurityAgent:
@@ -534,6 +574,443 @@ Analyze the codebase now:"""
         return workflows
 
 
+# ── Greenlight iOS Compliance Scanner ─────────────────────────────────────────
+
+class GreenlightScanner:
+    """Greenlight iOS App Store Compliance Scanner.
+
+    *Burrrp* — Morty, before we submit to the App Store, we need to make sure
+    Apple doesn't reject us. Again. Greenlight scans for guideline violations
+    so we don't waste another 2 weeks in review purgatory.
+
+    Scans for:
+    - Payment & IAP compliance (3.1.x guidelines)
+    - Privacy manifests & data usage declarations (5.1.x)
+    - Sign-in & account management flows (4.8, Sign in with Apple)
+    - App completeness & metadata quality (2.x)
+    - Binary & entitlement validation (2.4.x, 2.5.x)
+    """
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.greenlight_available = self._check_greenlight()
+        ensure_unity_dirs(root)
+
+    def _check_greenlight(self) -> bool:
+        """Check if Greenlight is installed."""
+        # Check if vendors/greenlight exists
+        if GREENLIGHT_PATH.exists() and (GREENLIGHT_PATH / "package.json").exists():
+            return True
+        # Check if greenlight is in PATH
+        try:
+            result = subprocess.run(
+                ["which", "greenlight"],
+                capture_output=True,
+            )
+            return result.returncode == 0
+        except FileNotFoundError:
+            return False
+
+    def _generate_scan_id(self) -> str:
+        """Generate a unique scan ID."""
+        import uuid
+        return f"greenlight-{uuid.uuid4().hex[:8]}"
+
+    def scan_app(
+        self,
+        app_path: str,
+        categories: Optional[list[str]] = None,
+        include_suggestions: bool = True,
+    ) -> dict:
+        """Scan an iOS app for App Store compliance.
+
+        Args:
+            app_path: Path to .app, .ipa, or Xcode project
+            categories: List of categories to check (default: all)
+            include_suggestions: Include improvement suggestions
+
+        Returns:
+            Scan result dict with findings and compliance status
+        """
+        scan_id = self._generate_scan_id()
+        categories = categories or list(GREENLIGHT_CATEGORIES.keys())
+
+        scan = {
+            "id": scan_id,
+            "type": "greenlight",
+            "status": "pending",
+            "app_path": app_path,
+            "categories": categories,
+            "include_suggestions": include_suggestions,
+            "created_at": now_iso(),
+            "started_at": None,
+            "completed_at": None,
+            "findings": [],
+            "compliance_score": 0,
+            "passed_categories": [],
+            "failed_categories": [],
+            "error": None,
+        }
+
+        # Save initial scan state
+        fp = workflows_dir(self.root) / f"{scan_id}.json"
+        save_json(fp, scan)
+
+        # Log the start
+        append_log(self.root, {
+            "timestamp": now_iso(),
+            "ticket_id": None,
+            "agent": "unity-greenlight",
+            "action": "started",
+            "message": f"Greenlight iOS compliance scan started: {scan_id}",
+            "files_changed": [],
+        })
+
+        # Run the scan
+        return self._run_scan(scan)
+
+    def _run_scan(self, scan: dict) -> dict:
+        """Execute the Greenlight compliance scan."""
+        scan["status"] = "running"
+        scan["started_at"] = now_iso()
+
+        app_path = scan["app_path"]
+
+        if self.greenlight_available:
+            return self._run_greenlight_native(scan)
+        else:
+            return self._run_greenlight_analysis(scan)
+
+    def _run_greenlight_native(self, scan: dict) -> dict:
+        """Run Greenlight natively via CLI."""
+        greenlight_cmd = ["npx", "greenlight", "scan"]
+        greenlight_cmd.extend(["--app", scan["app_path"]])
+        greenlight_cmd.extend(["--categories", ",".join(scan["categories"])])
+        greenlight_cmd.extend(["--output", "json"])
+
+        if scan["include_suggestions"]:
+            greenlight_cmd.append("--suggestions")
+
+        try:
+            result = subprocess.run(
+                greenlight_cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(GREENLIGHT_PATH) if GREENLIGHT_PATH.exists() else None,
+            )
+
+            if result.returncode == 0:
+                try:
+                    output = json.loads(result.stdout)
+                    scan["findings"] = output.get("findings", [])
+                    scan["compliance_score"] = output.get("score", 0)
+                    scan["passed_categories"] = output.get("passed", [])
+                    scan["failed_categories"] = output.get("failed", [])
+                    scan["status"] = "completed"
+                except json.JSONDecodeError:
+                    scan["raw_output"] = result.stdout
+                    scan["status"] = "completed"
+            else:
+                scan["status"] = "error"
+                scan["error"] = result.stderr[:500]
+
+        except subprocess.TimeoutExpired:
+            scan["status"] = "error"
+            scan["error"] = "Greenlight scan timed out"
+        except Exception as e:
+            scan["status"] = "error"
+            scan["error"] = str(e)
+
+        scan["completed_at"] = now_iso()
+        fp = workflows_dir(self.root) / f"{scan['id']}.json"
+        save_json(fp, scan)
+
+        if scan["status"] == "completed":
+            self._generate_greenlight_report(scan)
+
+        return scan
+
+    def _run_greenlight_analysis(self, scan: dict) -> dict:
+        """Run Greenlight compliance analysis via Claude (fallback mode).
+
+        When Greenlight isn't installed, we use Claude to analyze the app
+        configuration files and check for common compliance issues.
+        """
+        app_path = scan["app_path"]
+
+        # Build analysis prompt
+        analysis_prompt = f"""You are Unity's Greenlight compliance analyzer. Perform a thorough iOS App Store guideline compliance check.
+
+## Target
+App Path: {app_path}
+
+## Categories to Check
+{json.dumps([{
+    "category": cat,
+    "name": GREENLIGHT_CATEGORIES[cat]["name"],
+    "description": GREENLIGHT_CATEGORIES[cat]["description"],
+    "guidelines": GREENLIGHT_CATEGORIES[cat]["guidelines"],
+} for cat in scan["categories"]], indent=2)}
+
+## Instructions
+
+1. **Payment & IAP Compliance** (if requested):
+   - Check Info.plist for StoreKit configuration
+   - Look for hardcoded prices or non-Apple payment methods
+   - Verify IAP restore functionality exists
+   - Check for external payment links
+
+2. **Privacy Manifests** (if requested):
+   - Check for PrivacyInfo.xcprivacy file
+   - Validate NSPrivacyTracking declaration
+   - Check NSPrivacyTrackingUsageDescription
+   - Verify required APIs are declared
+   - Check third-party SDK privacy manifests
+
+3. **Sign-In & Account Management** (if requested):
+   - Check for Sign in with Apple implementation
+   - Verify account deletion capability
+   - Check login flow accessibility
+
+4. **App Completeness** (if requested):
+   - Check for placeholder content
+   - Verify app icons are complete
+   - Check launch storyboard/screen
+   - Validate Info.plist metadata
+
+5. **Binary & Entitlements** (if requested):
+   - Check entitlements file
+   - Verify capability declarations
+   - Check for deprecated APIs
+   - Validate minimum iOS version
+
+## Output Format
+Return findings as JSON:
+```json
+{{
+  "findings": [
+    {{
+      "category": "payment|privacy|signin|completeness|binary",
+      "severity": "blocker|warning|suggestion",
+      "guideline": "3.1.1",
+      "title": "Brief title",
+      "description": "What's wrong",
+      "file": "path/to/file",
+      "recommendation": "How to fix",
+      "documentation_url": "Apple URL if applicable"
+    }}
+  ],
+  "compliance_score": 85,
+  "passed_categories": ["privacy", "signin"],
+  "failed_categories": ["payment"],
+  "summary": {{
+    "blockers": 1,
+    "warnings": 3,
+    "suggestions": 5
+  }}
+}}
+```
+
+Analyze the iOS app now. Read the relevant files (Info.plist, entitlements, project.pbxproj, etc.) and check for compliance issues.
+"""
+
+        try:
+            result = subprocess.run(
+                ["claude", "-p", "--model", "opus", analysis_prompt],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                cwd=app_path if os.path.isdir(app_path) else os.path.dirname(app_path),
+            )
+
+            # Try to parse findings from output
+            output = result.stdout
+            try:
+                import re
+                json_match = re.search(r'\{[\s\S]*"findings"[\s\S]*\}', output)
+                if json_match:
+                    findings_data = json.loads(json_match.group(0))
+                    scan["findings"] = findings_data.get("findings", [])
+                    scan["compliance_score"] = findings_data.get("compliance_score", 0)
+                    scan["passed_categories"] = findings_data.get("passed_categories", [])
+                    scan["failed_categories"] = findings_data.get("failed_categories", [])
+                    scan["summary"] = findings_data.get("summary", {})
+            except (json.JSONDecodeError, AttributeError):
+                scan["raw_output"] = output[:5000]
+
+            scan["status"] = "completed"
+
+        except subprocess.TimeoutExpired:
+            scan["status"] = "error"
+            scan["error"] = "Greenlight analysis timed out"
+        except Exception as e:
+            scan["status"] = "error"
+            scan["error"] = str(e)
+
+        scan["completed_at"] = now_iso()
+        fp = workflows_dir(self.root) / f"{scan['id']}.json"
+        save_json(fp, scan)
+
+        if scan["status"] == "completed":
+            self._generate_greenlight_report(scan)
+
+        return scan
+
+    def _generate_greenlight_report(self, scan: dict):
+        """Generate Greenlight compliance report."""
+        findings = scan.get("findings", [])
+        score = scan.get("compliance_score", 0)
+
+        # Calculate summary if not provided
+        summary = scan.get("summary", {})
+        if not summary:
+            summary = {"blockers": 0, "warnings": 0, "suggestions": 0}
+            for f in findings:
+                sev = f.get("severity", "suggestion").lower()
+                if sev == "blocker":
+                    summary["blockers"] += 1
+                elif sev == "warning":
+                    summary["warnings"] += 1
+                else:
+                    summary["suggestions"] += 1
+
+        # Determine overall status
+        if summary.get("blockers", 0) > 0:
+            status_emoji = "🔴"
+            status_text = "WILL LIKELY BE REJECTED"
+        elif summary.get("warnings", 0) > 0:
+            status_emoji = "🟡"
+            status_text = "REVIEW NEEDED"
+        else:
+            status_emoji = "🟢"
+            status_text = "READY FOR SUBMISSION"
+
+        md = f"""# Greenlight iOS Compliance Report
+
+**Scan ID:** {scan['id']}
+**App Path:** {scan.get('app_path', 'N/A')}
+**Scanned:** {scan.get('completed_at', 'N/A')}
+
+## Overall Status: {status_emoji} {status_text}
+
+**Compliance Score:** {score}/100
+
+## Summary
+
+| Type | Count |
+|------|-------|
+| 🔴 Blockers | {summary.get('blockers', 0)} |
+| 🟡 Warnings | {summary.get('warnings', 0)} |
+| 💡 Suggestions | {summary.get('suggestions', 0)} |
+
+## Category Results
+
+"""
+        # Category status
+        passed = scan.get("passed_categories", [])
+        failed = scan.get("failed_categories", [])
+
+        for cat_key, cat_info in GREENLIGHT_CATEGORIES.items():
+            if cat_key in passed:
+                md += f"- ✅ **{cat_info['name']}** — Passed\n"
+            elif cat_key in failed:
+                md += f"- ❌ **{cat_info['name']}** — Issues Found\n"
+            else:
+                md += f"- ⏭️ **{cat_info['name']}** — Not Scanned\n"
+
+        md += "\n## Findings\n\n"
+
+        severity_icons = {
+            "blocker": "🔴",
+            "warning": "🟡",
+            "suggestion": "💡",
+        }
+
+        for i, finding in enumerate(findings, 1):
+            icon = severity_icons.get(finding.get("severity", "suggestion").lower(), "ℹ️")
+            guideline = finding.get("guideline", "N/A")
+            md += f"""### {i}. {icon} {finding.get('title', 'Untitled')}
+
+**Severity:** {finding.get('severity', 'unknown')}
+**Category:** {finding.get('category', 'N/A')}
+**Guideline:** [{guideline}](https://developer.apple.com/app-store/review/guidelines/#{guideline.replace('.', '')})
+**File:** {finding.get('file', 'N/A')}
+
+{finding.get('description', 'No description')}
+
+**Recommendation:** {finding.get('recommendation', 'N/A')}
+
+"""
+            if finding.get("documentation_url"):
+                md += f"📚 [Apple Documentation]({finding['documentation_url']})\n"
+
+            md += "---\n\n"
+
+        if not findings:
+            md += "*No compliance issues found! Your app is ready for submission.*\n\n"
+
+        md += """
+## Quick Fix Checklist
+
+Based on the findings above, here's your to-do list:
+
+"""
+        blockers = [f for f in findings if f.get("severity") == "blocker"]
+        warnings = [f for f in findings if f.get("severity") == "warning"]
+
+        if blockers:
+            md += "### 🔴 Must Fix Before Submission\n"
+            for b in blockers:
+                md += f"- [ ] {b.get('title', 'Fix issue')}\n"
+            md += "\n"
+
+        if warnings:
+            md += "### 🟡 Recommended Fixes\n"
+            for w in warnings:
+                md += f"- [ ] {w.get('title', 'Review issue')}\n"
+            md += "\n"
+
+        md += """
+---
+*Generated by Unity Greenlight — Rick's iOS App Store compliance checker*
+*"Listen Morty, I didn't invent interdimensional travel just to get rejected by the App Store."*
+"""
+
+        # Save markdown report
+        md_fp = reports_dir(self.root) / f"{scan['id']}-report.md"
+        with open(md_fp, "w") as f:
+            f.write(md)
+
+        # Save JSON report
+        json_fp = reports_dir(self.root) / f"{scan['id']}-report.json"
+        save_json(json_fp, {
+            "id": scan["id"],
+            "app_path": scan.get("app_path"),
+            "completed_at": scan.get("completed_at"),
+            "compliance_score": score,
+            "status_text": status_text,
+            "passed_categories": passed,
+            "failed_categories": failed,
+            "summary": summary,
+            "findings": findings,
+        })
+
+    def get_scan_result(self, scan_id: str) -> dict:
+        """Get the result of a Greenlight scan."""
+        # Check for report
+        report_fp = reports_dir(self.root) / f"{scan_id}-report.json"
+        if report_fp.exists():
+            return load_json(report_fp)
+
+        # Check workflow
+        fp = workflows_dir(self.root) / f"{scan_id}.json"
+        if not fp.exists():
+            return {"error": f"Scan {scan_id} not found"}
+
+        return load_json(fp)
+
+
 # ── CLI Commands ─────────────────────────────────────────────────────────────
 
 def cmd_scan(args):
@@ -650,12 +1127,16 @@ def cmd_check(args):
     """Check Unity dependencies."""
     root = find_cto_root()
     unity = UnitySecurityAgent(root)
+    greenlight = GreenlightScanner(root)
 
     print("Unity Dependency Check")
     print("─" * 40)
     print(f"  Temporal available: {'✅ Yes' if unity.temporal_available else '❌ No'}")
     print(f"  Shannon available:  {'✅ Yes' if unity.shannon_available else '❌ No'}")
     print(f"  Shannon path:       {SHANNON_PATH}")
+    print()
+    print(f"  Greenlight available: {'✅ Yes' if greenlight.greenlight_available else '❌ No (using Claude fallback)'}")
+    print(f"  Greenlight path:      {GREENLIGHT_PATH}")
 
     if unity.temporal_available and unity.shannon_available:
         print("\n  ✅ Full pentest mode available!")
@@ -666,11 +1147,106 @@ def cmd_check(args):
         if not unity.temporal_available:
             print("     Start Temporal: `docker-compose up -d` in vendors/shannon/")
 
+    if not greenlight.greenlight_available:
+        print("\n  📱 Greenlight iOS compliance: Using Claude analysis mode")
+        print("     Install Greenlight for native scanning: npm i -g @revylai/greenlight")
+
+
+# ── Greenlight CLI Commands ───────────────────────────────────────────────────
+
+def cmd_greenlight_scan(args):
+    """Run a Greenlight iOS compliance scan."""
+    root = find_cto_root()
+    scanner = GreenlightScanner(root)
+
+    print(f"*Burrrp* — Running iOS App Store compliance check...")
+    print(f"  App: {args.app}")
+    print(f"  Mode: {'Native Greenlight' if scanner.greenlight_available else 'Claude Analysis'}")
+    print(f"  Categories: {', '.join(args.categories) if args.categories else 'all'}")
+
+    result = scanner.scan_app(
+        app_path=args.app,
+        categories=args.categories,
+        include_suggestions=not args.no_suggestions,
+    )
+
+    print(f"\n  Scan ID: {result['id']}")
+    print(f"  Status: {result['status']}")
+
+    if result["status"] == "completed":
+        score = result.get("compliance_score", 0)
+        blockers = sum(1 for f in result.get("findings", []) if f.get("severity") == "blocker")
+        warnings = sum(1 for f in result.get("findings", []) if f.get("severity") == "warning")
+
+        # Status determination
+        if blockers > 0:
+            print(f"\n  🔴 COMPLIANCE SCORE: {score}/100 — WILL LIKELY BE REJECTED")
+        elif warnings > 0:
+            print(f"\n  🟡 COMPLIANCE SCORE: {score}/100 — REVIEW NEEDED")
+        else:
+            print(f"\n  🟢 COMPLIANCE SCORE: {score}/100 — READY FOR SUBMISSION!")
+
+        if blockers > 0 or warnings > 0:
+            print(f"\n  Issues found:")
+            print(f"    🔴 Blockers: {blockers}")
+            print(f"    🟡 Warnings: {warnings}")
+
+            # Show first few blockers
+            for f in result.get("findings", [])[:3]:
+                sev_icon = "🔴" if f.get("severity") == "blocker" else "🟡"
+                print(f"    {sev_icon} [{f.get('guideline', '?')}] {f.get('title', 'Issue')}")
+
+        print(f"\n  Full report: python scripts/unity.py greenlight-report {result['id']}")
+    elif result.get("error"):
+        print(f"\n  Error: {result['error']}")
+
+
+def cmd_greenlight_report(args):
+    """Get a Greenlight compliance report."""
+    root = find_cto_root()
+    scanner = GreenlightScanner(root)
+
+    result = scanner.get_scan_result(args.scan_id)
+
+    if "error" in result and result.get("status") != "error":
+        print(f"Error: {result['error']}")
+        return
+
+    # Check if markdown report exists
+    md_fp = reports_dir(root) / f"{args.scan_id}-report.md"
+    if md_fp.exists() and not args.json:
+        with open(md_fp) as f:
+            print(f.read())
+    else:
+        print(json.dumps(result, indent=2))
+
+
+def cmd_greenlight_categories(args):
+    """List available Greenlight compliance categories."""
+    print("""
+╔═══════════════════════════════════════════════════════════════════╗
+║  GREENLIGHT iOS COMPLIANCE CATEGORIES                             ║
+╠═══════════════════════════════════════════════════════════════════╣
+""")
+    for key, info in GREENLIGHT_CATEGORIES.items():
+        guidelines = ", ".join(info["guidelines"])
+        print(f"║  {key:<12} │ {info['name']:<40} ║")
+        print(f"║  {'':<12} │ Guidelines: {guidelines:<27} ║")
+        print(f"║  {'':<12} │ {info['description'][:42]:<42} ║")
+        print("║─────────────┼──────────────────────────────────────────║")
+
+    print("""╚═══════════════════════════════════════════════════════════════════╝
+
+Usage:
+  python scripts/unity.py greenlight-scan --app ./MyApp.xcodeproj
+  python scripts/unity.py greenlight-scan --app ./build/MyApp.ipa --categories payment,privacy
+""")
+
 
 # ── CLI Parser ───────────────────────────────────────────────────────────────
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="unity", description="Unity Security Agent — Shannon pentest wrapper *burp*")
+    p = argparse.ArgumentParser(prog="unity", description="Unity Security Agent — Shannon pentest + Greenlight iOS compliance *burp*")
     sub = p.add_subparsers(dest="command", required=True)
 
     # scan
@@ -696,6 +1272,25 @@ def build_parser():
     # check
     sub.add_parser("check", help="Check Unity dependencies")
 
+    # ── Greenlight iOS Compliance Commands ────────────────────────────────────
+
+    # greenlight-scan
+    gl_scan = sub.add_parser("greenlight-scan", help="Run iOS App Store compliance scan")
+    gl_scan.add_argument("--app", required=True, help="Path to .app, .ipa, or Xcode project")
+    gl_scan.add_argument("--categories", nargs="*",
+                         choices=list(GREENLIGHT_CATEGORIES.keys()),
+                         help="Categories to check (default: all)")
+    gl_scan.add_argument("--no-suggestions", action="store_true",
+                         help="Skip improvement suggestions")
+
+    # greenlight-report
+    gl_report = sub.add_parser("greenlight-report", help="Get Greenlight compliance report")
+    gl_report.add_argument("scan_id", help="Scan ID")
+    gl_report.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # greenlight-categories
+    sub.add_parser("greenlight-categories", help="List available compliance categories")
+
     return p
 
 
@@ -709,6 +1304,10 @@ def main():
         "report": cmd_report,
         "list": cmd_list,
         "check": cmd_check,
+        # Greenlight commands
+        "greenlight-scan": cmd_greenlight_scan,
+        "greenlight-report": cmd_greenlight_report,
+        "greenlight-categories": cmd_greenlight_categories,
     }
     dispatch[args.command](args)
 
