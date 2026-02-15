@@ -1,0 +1,1021 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0018555CFB33C958F923C53F /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397945DC03C788E57EE1EC46 /* MarkdownRenderer.swift */; };
+		0E4C15B303FB73B02CC3DA3B /* TerminalInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9311D56941D575D15BB310D5 /* TerminalInteractionTests.swift */; };
+		14C910FB010AB4181DB141ED /* GeneralPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA940AA479D574169B23893 /* GeneralPreferencesView.swift */; };
+		4196AB40F7C33001A0B545BE /* ClaudeOutputFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4BC8B71D00FB7C8BDCB45C /* ClaudeOutputFormatter.swift */; };
+		4D0722200D892382FA12AA19 /* ClaudeOutputStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3759A970072E3759FBDD23 /* ClaudeOutputStyler.swift */; };
+		51C770417559435A95CD4639 /* KeyboardShortcutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9656696E8D5540BB9409A01E /* KeyboardShortcutManager.swift */; };
+		5C3D36E413BE4CCFAA5AD527 /* ErrorAlertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F948A7331BF852BF3D9459 /* ErrorAlertView.swift */; };
+		5CBD0BF9D9A04F91B1C3CF66 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E08F58A831EDF82BCDC50C20 /* PreferencesView.swift */; };
+		6CA1F7DE27C24AE38F44DE56 /* KeyboardShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79520D9EDA714C5E9F2406AE /* KeyboardShortcut.swift */; };
+		6D3914D2138F462981CB24F7 /* FileBrowserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15714CD327910C6D6E2A10E6 /* FileBrowserTests.swift */; };
+		75AF33A0E3E0ABE7222C37CA /* AppearancePreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541CC7617BAD90D22F179B6F /* AppearancePreferencesView.swift */; };
+		7E9EC10533D440CEBF888490 /* KeyboardShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FDFA7349894EDF84A1AC21 /* KeyboardShortcutsView.swift */; };
+		8A5831DC006FFDA4E1E3BAE1 /* ANSIStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18819B96D9703A9D79FF1A2D /* ANSIStyler.swift */; };
+		8BD16C50E246E60C20E0BFA8 /* KeyboardShortcutsPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792F1E3F8F897FEAAE9ADEAB /* KeyboardShortcutsPreferencesView.swift */; };
+		B1000001 /* RickTerminalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001 /* RickTerminalApp.swift */; };
+		B1000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000002 /* ContentView.swift */; };
+		B1000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2000003 /* Assets.xcassets */; };
+		B1000004 /* ShellSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000004 /* ShellSession.swift */; };
+		B1000005 /* ShellSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000005 /* ShellSessionManager.swift */; };
+		B1000006 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000006 /* Color+Theme.swift */; };
+		B1000007 /* RickTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000007 /* RickTheme.swift */; };
+		B1000008 /* ThemePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000008 /* ThemePreview.swift */; };
+		B1000009 /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000009 /* TerminalView.swift */; };
+		B100000A /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000A /* MainWindowView.swift */; };
+		B100000B /* RickTerminalViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000B /* RickTerminalViewController.swift */; };
+		B100000C /* TerminalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000C /* TerminalSettings.swift */; };
+		B100000D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = B400000D /* SwiftTerm */; };
+		B100000E /* ClaudePathDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000F /* ClaudePathDetector.swift */; };
+		B100000F /* ClaudeToolEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000010 /* ClaudeToolEvent.swift */; };
+		B1000010 /* ClaudeOutputParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000011 /* ClaudeOutputParser.swift */; };
+		B1000011 /* ClaudeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000012 /* ClaudeSettingsView.swift */; };
+		B1000012 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000D /* AppDelegate.swift */; };
+		B1000013 /* TodoWriteParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000013 /* TodoWriteParser.swift */; };
+		B1000014 /* KanbanEventBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000014 /* KanbanEventBridge.swift */; };
+		B1000020 /* KanbanBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000020 /* KanbanBoard.swift */; };
+		B1000021 /* KanbanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000021 /* KanbanCard.swift */; };
+		B1000022 /* KanbanColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000022 /* KanbanColumn.swift */; };
+		B1000023 /* CardSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000023 /* CardSource.swift */; };
+		B1000024 /* KanbanManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000024 /* KanbanManager.swift */; };
+		B1000025 /* KanbanBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000025 /* KanbanBoardView.swift */; };
+		B1000026 /* KanbanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000026 /* KanbanCardView.swift */; };
+		B1000027 /* KanbanColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000027 /* KanbanColumnView.swift */; };
+		B1000028 /* KanbanPersistenceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000028 /* KanbanPersistenceManager.swift */; };
+		B1000030 /* AgentRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000030 /* AgentRole.swift */; };
+		B1000031 /* AgentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000031 /* AgentStatus.swift */; };
+		B1000032 /* AgentColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000032 /* AgentColumn.swift */; };
+		B1000033 /* AgentColumnsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000033 /* AgentColumnsManager.swift */; };
+		B1000034 /* AgentColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000034 /* AgentColumnView.swift */; };
+		B1000035 /* AgentColumnsContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000035 /* AgentColumnsContainer.swift */; };
+		B1000040 /* FileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000040 /* FileNode.swift */; };
+		B1000041 /* FileTreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000041 /* FileTreeManager.swift */; };
+		B1000042 /* FileBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000042 /* FileBrowserView.swift */; };
+		B1000050 /* EditorFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000050 /* EditorFile.swift */; };
+		B1000051 /* EditorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000051 /* EditorManager.swift */; };
+		B1000052 /* CodeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000052 /* CodeEditorView.swift */; };
+		B1000053 /* EditorPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000053 /* EditorPanelView.swift */; };
+		B1000060 /* SessionPersistenceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000060 /* SessionPersistenceManager.swift */; };
+		B1000061 /* SessionRestorationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000061 /* SessionRestorationView.swift */; };
+		B180AA73A215A152AC451C5B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 49021298CE52A91A4CE76722 /* Foundation.framework */; };
+		B37DC5BF9770B1A635314219 /* AppLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59E958314A84F761BA5DC866 /* AppLaunchTests.swift */; };
+		B92551208C6EBFF3BE96A98D /* ClaudeOutputDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A529985B930071F3204582B1 /* ClaudeOutputDetector.swift */; };
+		C185467153D42495839A5198 /* SyntaxHighlightingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0BDBA4D8DFFFBABCBC2ED7B /* SyntaxHighlightingService.swift */; };
+		C1A8CB05A92CAC9AEDFA03A9 /* RTIcon+Examples.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A3418EE766D3B2340893EE /* RTIcon+Examples.swift */; };
+		C65E4D98D2820B421F6D6237 /* FileOperationsHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ECF050EC7BE8A4A73E2D53 /* FileOperationsHelper.swift */; };
+		CA4EA8FEBF4AC49205C536B9 /* TerminalPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C912EC9B2D0DC30A70DAD0D2 /* TerminalPreferencesView.swift */; };
+		CAADAA05B7E35858067E6A99 /* SyntaxHighlightingTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7362C93B96FDC4BC0C7A470C /* SyntaxHighlightingTypes.swift */; };
+		CAF45D4E7EDBA3297512756C /* ClaudeIntegrationPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC2FB0BF4079B6F242282AB /* ClaudeIntegrationPreferencesView.swift */; };
+		D56663032FDB2AF3F3BAC4C4 /* CardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D5F7D12E39638F86B25EA46 /* CardDetailView.swift */; };
+		D5DD9FD45D18042F52F79B5B /* FallbackSyntaxHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8A64EC2FDEC911CCFCB74D5 /* FallbackSyntaxHighlighter.swift */; };
+		D8000C8175B212BF15E5F696 /* KanbanBoardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0D338C0F24666995BB76B9 /* KanbanBoardTests.swift */; };
+		DEC7BC6C958C9E3F5677BEB4 /* RTError.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90FA3EAEF05AAB111B962AD /* RTError.swift */; };
+		E150AC34DF80B05782F33458 /* ErrorHandlingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C8623750D16CF602DA55AA /* ErrorHandlingTests.swift */; };
+		E28C8F69F3944E80A50747FF /* RTIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DA08D33DD089B630108147 /* RTIcon.swift */; };
+		F9CEA22C05EFD268312BE63E /* ErrorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84DB115AD73B1188CA75053A /* ErrorManager.swift */; };
+		FEC6965FE729039D7B16AA3E /* ClaudeOutputStyling+Demo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E85984B5F56630B2861CD1 /* ClaudeOutputStyling+Demo.swift */; };
+		651653AA27D09C67D5808355 /* CommandBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C2D91A3E475C28749719C8 /* CommandBlock.swift */; };
+		96C3EB5631B0CBDAE0B01310 /* ShellIntegrationParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D5FA41948C715DB1BA934A /* ShellIntegrationParser.swift */; };
+		FBF8764701BBF1CBBAB31944 /* TerminalOutputDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5743C551D019109AD7CA8C28 /* TerminalOutputDelegate.swift */; };
+		E1D302F78A6F3A86F13202E5 /* TerminalOutputBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48A6B016BA63C7CD381A066 /* TerminalOutputBuffer.swift */; };
+		EE27D45CCB46A8DFEA701B37 /* ClaudeProgressOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BD3421DBE9FBF135C07465 /* ClaudeProgressOverlay.swift */; };
+		550D3A6AC4B1D4070A3398A7 /* shell-integration.zsh in Resources */ = {isa = PBXBuildFile; fileRef = 857DAD951D7372F47164C162 /* shell-integration.zsh */; };
+		96D7AB39B32DA11792395241 /* shell-integration.bash in Resources */ = {isa = PBXBuildFile; fileRef = D547BCB84D20CCD59228D92B /* shell-integration.bash */; };
+		B1000070 /* CTOEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000070 /* CTOEvent.swift */; };
+		B1000071 /* RoroWebhookClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000071 /* RoroWebhookClient.swift */; };
+		B1000072 /* CTOEventBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000072 /* CTOEventBridge.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		DEE8D6AE3112BCA03804F94E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BB000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B7000001;
+			remoteInfo = RickTerminal;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0CB5C2C290FA882A85BD6D4D /* KeyboardShortcutsPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsPreferencesView.swift; sourceTree = "<group>"; };
+		0D5F7D12E39638F86B25EA46 /* CardDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
+		15714CD327910C6D6E2A10E6 /* FileBrowserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FileBrowserTests.swift; path = RickTerminalUITests/FileBrowserTests.swift; sourceTree = "<group>"; };
+		18819B96D9703A9D79FF1A2D /* ANSIStyler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ANSIStyler.swift; sourceTree = "<group>"; };
+		27420D28FD1D10139B6E409B /* PreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		2BA940AA479D574169B23893 /* GeneralPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GeneralPreferencesView.swift; path = Preferences/GeneralPreferencesView.swift; sourceTree = "<group>"; };
+		3543B8A1E0E3B46078F5FE94 /* ErrorManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorManager.swift; sourceTree = "<group>"; };
+		37E85984B5F56630B2861CD1 /* ClaudeOutputStyling+Demo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ClaudeOutputStyling+Demo.swift"; sourceTree = "<group>"; };
+		397945DC03C788E57EE1EC46 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
+		39C8623750D16CF602DA55AA /* ErrorHandlingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ErrorHandlingTests.swift; path = Error/ErrorHandlingTests.swift; sourceTree = "<group>"; };
+		420048F5494AA529412E44A8 /* RTError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RTError.swift; sourceTree = "<group>"; };
+		49021298CE52A91A4CE76722 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		49FDFA7349894EDF84A1AC21 /* KeyboardShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsView.swift; sourceTree = "<group>"; };
+		4F4BC8B71D00FB7C8BDCB45C /* ClaudeOutputFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeOutputFormatter.swift; sourceTree = "<group>"; };
+		50A3418EE766D3B2340893EE /* RTIcon+Examples.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "RTIcon+Examples.swift"; sourceTree = "<group>"; };
+		541CC7617BAD90D22F179B6F /* AppearancePreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppearancePreferencesView.swift; path = Preferences/AppearancePreferencesView.swift; sourceTree = "<group>"; };
+		5746031AABE625765E3388D6 /* RickTerminalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RickTerminalUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		59E958314A84F761BA5DC866 /* AppLaunchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppLaunchTests.swift; path = RickTerminalUITests/AppLaunchTests.swift; sourceTree = "<group>"; };
+		69DA08D33DD089B630108147 /* RTIcon.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RTIcon.swift; sourceTree = "<group>"; };
+		7362C93B96FDC4BC0C7A470C /* SyntaxHighlightingTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyntaxHighlightingTypes.swift; path = SyntaxHighlighting/SyntaxHighlightingTypes.swift; sourceTree = "<group>"; };
+		75A3DA8FE4144ECDC9E24522 /* ErrorAlertView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorAlertView.swift; sourceTree = "<group>"; };
+		792F1E3F8F897FEAAE9ADEAB /* KeyboardShortcutsPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeyboardShortcutsPreferencesView.swift; path = Preferences/KeyboardShortcutsPreferencesView.swift; sourceTree = "<group>"; };
+		79520D9EDA714C5E9F2406AE /* KeyboardShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcut.swift; sourceTree = "<group>"; };
+		83ECF050EC7BE8A4A73E2D53 /* FileOperationsHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FileOperationsHelper.swift; path = Utilities/FileOperationsHelper.swift; sourceTree = "<group>"; };
+		84DB115AD73B1188CA75053A /* ErrorManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ErrorManager.swift; path = Error/ErrorManager.swift; sourceTree = "<group>"; };
+		85CC414FBFCCEDC3A43F0275 /* AppearancePreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppearancePreferencesView.swift; sourceTree = "<group>"; };
+		925D4A3744B4B6A4DF327250 /* SyntaxHighlightingTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyntaxHighlightingTypes.swift; sourceTree = "<group>"; };
+		9311D56941D575D15BB310D5 /* TerminalInteractionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TerminalInteractionTests.swift; path = RickTerminalUITests/TerminalInteractionTests.swift; sourceTree = "<group>"; };
+		9656696E8D5540BB9409A01E /* KeyboardShortcutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutManager.swift; sourceTree = "<group>"; };
+		96F948A7331BF852BF3D9459 /* ErrorAlertView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ErrorAlertView.swift; path = Error/ErrorAlertView.swift; sourceTree = "<group>"; };
+		9A0D338C0F24666995BB76B9 /* KanbanBoardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KanbanBoardTests.swift; path = RickTerminalUITests/KanbanBoardTests.swift; sourceTree = "<group>"; };
+		9DC2FB0BF4079B6F242282AB /* ClaudeIntegrationPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ClaudeIntegrationPreferencesView.swift; path = Preferences/ClaudeIntegrationPreferencesView.swift; sourceTree = "<group>"; };
+		A529985B930071F3204582B1 /* ClaudeOutputDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeOutputDetector.swift; sourceTree = "<group>"; };
+		AD3BAF428851E29886E82AC4 /* GeneralPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeneralPreferencesView.swift; sourceTree = "<group>"; };
+		B2000001 /* RickTerminalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RickTerminalApp.swift; sourceTree = "<group>"; };
+		B2000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B2000003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B2000004 /* ShellSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellSession.swift; sourceTree = "<group>"; };
+		B2000005 /* ShellSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellSessionManager.swift; sourceTree = "<group>"; };
+		B2000006 /* Color+Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
+		B2000007 /* RickTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RickTheme.swift; sourceTree = "<group>"; };
+		B2000008 /* ThemePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePreview.swift; sourceTree = "<group>"; };
+		B2000009 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
+		B200000A /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
+		B200000B /* RickTerminalViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RickTerminalViewController.swift; sourceTree = "<group>"; };
+		B200000C /* TerminalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettings.swift; sourceTree = "<group>"; };
+		B200000D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B200000E /* RickTerminal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RickTerminal.entitlements; sourceTree = "<group>"; };
+		B200000F /* ClaudePathDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePathDetector.swift; sourceTree = "<group>"; };
+		B2000010 /* ClaudeToolEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeToolEvent.swift; sourceTree = "<group>"; };
+		B2000011 /* ClaudeOutputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOutputParser.swift; sourceTree = "<group>"; };
+		B2000012 /* ClaudeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSettingsView.swift; sourceTree = "<group>"; };
+		B2000013 /* TodoWriteParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoWriteParser.swift; sourceTree = "<group>"; };
+		B2000014 /* KanbanEventBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanEventBridge.swift; sourceTree = "<group>"; };
+		B2000020 /* KanbanBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanBoard.swift; sourceTree = "<group>"; };
+		B2000021 /* KanbanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCard.swift; sourceTree = "<group>"; };
+		B2000022 /* KanbanColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanColumn.swift; sourceTree = "<group>"; };
+		B2000023 /* CardSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSource.swift; sourceTree = "<group>"; };
+		B2000024 /* KanbanManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanManager.swift; sourceTree = "<group>"; };
+		B2000025 /* KanbanBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanBoardView.swift; sourceTree = "<group>"; };
+		B2000026 /* KanbanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCardView.swift; sourceTree = "<group>"; };
+		B2000027 /* KanbanColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanColumnView.swift; sourceTree = "<group>"; };
+		B2000028 /* KanbanPersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanPersistenceManager.swift; sourceTree = "<group>"; };
+		B2000030 /* AgentRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRole.swift; sourceTree = "<group>"; };
+		B2000031 /* AgentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatus.swift; sourceTree = "<group>"; };
+		B2000032 /* AgentColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentColumn.swift; sourceTree = "<group>"; };
+		B2000033 /* AgentColumnsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentColumnsManager.swift; sourceTree = "<group>"; };
+		B2000034 /* AgentColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentColumnView.swift; sourceTree = "<group>"; };
+		B2000035 /* AgentColumnsContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentColumnsContainer.swift; sourceTree = "<group>"; };
+		B2000040 /* FileNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileNode.swift; sourceTree = "<group>"; };
+		B2000041 /* FileTreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTreeManager.swift; sourceTree = "<group>"; };
+		B2000042 /* FileBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileBrowserView.swift; sourceTree = "<group>"; };
+		B2000050 /* EditorFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorFile.swift; sourceTree = "<group>"; };
+		B2000051 /* EditorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorManager.swift; sourceTree = "<group>"; };
+		B2000052 /* CodeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorView.swift; sourceTree = "<group>"; };
+		B2000053 /* EditorPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPanelView.swift; sourceTree = "<group>"; };
+		B2000060 /* SessionPersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistenceManager.swift; sourceTree = "<group>"; };
+		B2000061 /* SessionRestorationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRestorationView.swift; sourceTree = "<group>"; };
+		B3000001 /* RickTerminal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RickTerminal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B32462C0DE4A0A1E3C651EB8 /* ErrorHandlingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorHandlingTests.swift; sourceTree = "<group>"; };
+		C0BDBA4D8DFFFBABCBC2ED7B /* SyntaxHighlightingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyntaxHighlightingService.swift; path = SyntaxHighlighting/SyntaxHighlightingService.swift; sourceTree = "<group>"; };
+		C2C2AAB3FDFF0EEFCF185E24 /* SyntaxHighlightingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyntaxHighlightingService.swift; sourceTree = "<group>"; };
+		C912EC9B2D0DC30A70DAD0D2 /* TerminalPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TerminalPreferencesView.swift; path = Preferences/TerminalPreferencesView.swift; sourceTree = "<group>"; };
+		D90FA3EAEF05AAB111B962AD /* RTError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RTError.swift; path = Error/RTError.swift; sourceTree = "<group>"; };
+		DF003AC2317E403238007D28 /* TerminalPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalPreferencesView.swift; sourceTree = "<group>"; };
+		E08F58A831EDF82BCDC50C20 /* PreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PreferencesView.swift; path = Preferences/PreferencesView.swift; sourceTree = "<group>"; };
+		E480847EBD7E945D24C68B6D /* FileOperationsHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOperationsHelper.swift; sourceTree = "<group>"; };
+		E7B286FC011CD1177F1E84B2 /* ClaudeIntegrationPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeIntegrationPreferencesView.swift; sourceTree = "<group>"; };
+		E82E412BD003D3C3CE1E59E9 /* FallbackSyntaxHighlighter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FallbackSyntaxHighlighter.swift; sourceTree = "<group>"; };
+		E8A64EC2FDEC911CCFCB74D5 /* FallbackSyntaxHighlighter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FallbackSyntaxHighlighter.swift; path = SyntaxHighlighting/FallbackSyntaxHighlighter.swift; sourceTree = "<group>"; };
+		FE3759A970072E3759FBDD23 /* ClaudeOutputStyler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeOutputStyler.swift; sourceTree = "<group>"; };
+		C6C2D91A3E475C28749719C8 /* CommandBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBlock.swift; sourceTree = "<group>"; };
+		32D5FA41948C715DB1BA934A /* ShellIntegrationParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegrationParser.swift; sourceTree = "<group>"; };
+		5743C551D019109AD7CA8C28 /* TerminalOutputDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalOutputDelegate.swift; sourceTree = "<group>"; };
+		F48A6B016BA63C7CD381A066 /* TerminalOutputBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalOutputBuffer.swift; sourceTree = "<group>"; };
+		E5BD3421DBE9FBF135C07465 /* ClaudeProgressOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProgressOverlay.swift; sourceTree = "<group>"; };
+		857DAD951D7372F47164C162 /* shell-integration.zsh */ = {isa = PBXFileReference; lastKnownFileType = text.script.zsh; path = shell-integration.zsh; sourceTree = "<group>"; };
+		D547BCB84D20CCD59228D92B /* shell-integration.bash */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = shell-integration.bash; sourceTree = "<group>"; };
+		B2000070 /* CTOEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CTOEvent.swift; sourceTree = "<group>"; };
+		B2000071 /* RoroWebhookClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoroWebhookClient.swift; sourceTree = "<group>"; };
+		B2000072 /* CTOEventBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CTOEventBridge.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B1BADE9FCFDB8A1F25D6B820 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B180AA73A215A152AC451C5B /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B5000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B100000D /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		03E67140415D46E972CEF4BC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				82CE0128C2A4648CC261B862 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		08924E13C70195663017AC7F /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				AD3BAF428851E29886E82AC4 /* GeneralPreferencesView.swift */,
+			);
+			name = Preferences;
+			sourceTree = "<group>";
+		};
+		1CE56994B185C53253C6DF24 /* Error */ = {
+			isa = PBXGroup;
+			children = (
+				420048F5494AA529412E44A8 /* RTError.swift */,
+			);
+			name = Error;
+			sourceTree = "<group>";
+		};
+		2073302D3C94A943141D38A4 /* SyntaxHighlighting */ = {
+			isa = PBXGroup;
+			children = (
+				E82E412BD003D3C3CE1E59E9 /* FallbackSyntaxHighlighter.swift */,
+				E8A64EC2FDEC911CCFCB74D5 /* FallbackSyntaxHighlighter.swift */,
+				C0BDBA4D8DFFFBABCBC2ED7B /* SyntaxHighlightingService.swift */,
+				7362C93B96FDC4BC0C7A470C /* SyntaxHighlightingTypes.swift */,
+			);
+			name = SyntaxHighlighting;
+			sourceTree = "<group>";
+		};
+		2B3A23990AE7CD1CBCD75F17 /* Error */ = {
+			isa = PBXGroup;
+			children = (
+				75A3DA8FE4144ECDC9E24522 /* ErrorAlertView.swift */,
+			);
+			name = Error;
+			sourceTree = "<group>";
+		};
+		310A1CE66EA0C500F5496829 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				E7B286FC011CD1177F1E84B2 /* ClaudeIntegrationPreferencesView.swift */,
+			);
+			name = Preferences;
+			sourceTree = "<group>";
+		};
+		3A23EEF187FD11E6F73B0D0C /* SyntaxHighlighting */ = {
+			isa = PBXGroup;
+			children = (
+				925D4A3744B4B6A4DF327250 /* SyntaxHighlightingTypes.swift */,
+			);
+			name = SyntaxHighlighting;
+			sourceTree = "<group>";
+		};
+		4C92B744BC89EBBA42A0623F /* SyntaxHighlighting */ = {
+			isa = PBXGroup;
+			children = (
+				C2C2AAB3FDFF0EEFCF185E24 /* SyntaxHighlightingService.swift */,
+			);
+			name = SyntaxHighlighting;
+			sourceTree = "<group>";
+		};
+		7AB1DB5C924AFDE72F300820 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				27420D28FD1D10139B6E409B /* PreferencesView.swift */,
+			);
+			name = Preferences;
+			sourceTree = "<group>";
+		};
+		82CE0128C2A4648CC261B862 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				49021298CE52A91A4CE76722 /* Foundation.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		8390ED6E8EA699F9E972F8E9 /* Error */ = {
+			isa = PBXGroup;
+			children = (
+				B32462C0DE4A0A1E3C651EB8 /* ErrorHandlingTests.swift */,
+				39C8623750D16CF602DA55AA /* ErrorHandlingTests.swift */,
+				D90FA3EAEF05AAB111B962AD /* RTError.swift */,
+				96F948A7331BF852BF3D9459 /* ErrorAlertView.swift */,
+				84DB115AD73B1188CA75053A /* ErrorManager.swift */,
+			);
+			name = Error;
+			sourceTree = "<group>";
+		};
+		888A11BFA7DA4610F188EF8A /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				DF003AC2317E403238007D28 /* TerminalPreferencesView.swift */,
+			);
+			name = Preferences;
+			sourceTree = "<group>";
+		};
+		8F227CD0DF677D564A8A9F24 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				85CC414FBFCCEDC3A43F0275 /* AppearancePreferencesView.swift */,
+			);
+			name = Preferences;
+			sourceTree = "<group>";
+		};
+		9B436387E86C65482695F7A8 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				0CB5C2C290FA882A85BD6D4D /* KeyboardShortcutsPreferencesView.swift */,
+				792F1E3F8F897FEAAE9ADEAB /* KeyboardShortcutsPreferencesView.swift */,
+				541CC7617BAD90D22F179B6F /* AppearancePreferencesView.swift */,
+				E08F58A831EDF82BCDC50C20 /* PreferencesView.swift */,
+				2BA940AA479D574169B23893 /* GeneralPreferencesView.swift */,
+				C912EC9B2D0DC30A70DAD0D2 /* TerminalPreferencesView.swift */,
+				9DC2FB0BF4079B6F242282AB /* ClaudeIntegrationPreferencesView.swift */,
+			);
+			name = Preferences;
+			sourceTree = "<group>";
+		};
+		9ED919F5101638D1C719D11E /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				E480847EBD7E945D24C68B6D /* FileOperationsHelper.swift */,
+				83ECF050EC7BE8A4A73E2D53 /* FileOperationsHelper.swift */,
+			);
+			name = Utilities;
+			sourceTree = "<group>";
+		};
+		B6000001 = {
+			isa = PBXGroup;
+			children = (
+				B6000002 /* RickTerminal */,
+				B6000003 /* Products */,
+				03E67140415D46E972CEF4BC /* Frameworks */,
+				D7FE9E7046F6CE190F3005A0 /* RickTerminalUITests */,
+			);
+			sourceTree = "<group>";
+		};
+		B6000002 /* RickTerminal */ = {
+			isa = PBXGroup;
+			children = (
+				B2000001 /* RickTerminalApp.swift */,
+				B200000D /* AppDelegate.swift */,
+				B2000002 /* ContentView.swift */,
+				B200000A /* MainWindowView.swift */,
+				B200000B /* RickTerminalViewController.swift */,
+				B2000009 /* TerminalView.swift */,
+				B200000C /* TerminalSettings.swift */,
+				B2000012 /* ClaudeSettingsView.swift */,
+				B2000004 /* ShellSession.swift */,
+				B2000005 /* ShellSessionManager.swift */,
+				B2000060 /* SessionPersistenceManager.swift */,
+				B2000061 /* SessionRestorationView.swift */,
+				B6000004 /* Claude */,
+				B6000005 /* Kanban */,
+				B6000006 /* Agent */,
+				B600000C /* CTO */,
+				B6000008 /* FileBrowser */,
+				B600000A /* Editor */,
+				B26904ABC1D92BBEC529B0F8 /* Terminal */,
+				176FD02F452903383E9B44F6 /* Resources */,
+				B600000B /* Keyboard */,
+				B2000006 /* Color+Theme.swift */,
+				B2000007 /* RickTheme.swift */,
+				B2000008 /* ThemePreview.swift */,
+				B2000003 /* Assets.xcassets */,
+				B200000E /* RickTerminal.entitlements */,
+				9B436387E86C65482695F7A8 /* Preferences */,
+				8F227CD0DF677D564A8A9F24 /* Preferences */,
+				7AB1DB5C924AFDE72F300820 /* Preferences */,
+				08924E13C70195663017AC7F /* Preferences */,
+				888A11BFA7DA4610F188EF8A /* Preferences */,
+				310A1CE66EA0C500F5496829 /* Preferences */,
+				2073302D3C94A943141D38A4 /* SyntaxHighlighting */,
+				4C92B744BC89EBBA42A0623F /* SyntaxHighlighting */,
+				3A23EEF187FD11E6F73B0D0C /* SyntaxHighlighting */,
+				50A3418EE766D3B2340893EE /* RTIcon+Examples.swift */,
+				9ED919F5101638D1C719D11E /* Utilities */,
+				69DA08D33DD089B630108147 /* RTIcon.swift */,
+				8390ED6E8EA699F9E972F8E9 /* Error */,
+				1CE56994B185C53253C6DF24 /* Error */,
+				2B3A23990AE7CD1CBCD75F17 /* Error */,
+				DBD96946C87E475CEFE0E2AD /* Error */,
+			);
+			path = RickTerminal;
+			sourceTree = "<group>";
+		};
+		B6000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B3000001 /* RickTerminal.app */,
+				5746031AABE625765E3388D6 /* RickTerminalUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B6000004 /* Claude */ = {
+			isa = PBXGroup;
+			children = (
+				B200000F /* ClaudePathDetector.swift */,
+				B2000010 /* ClaudeToolEvent.swift */,
+				B2000011 /* ClaudeOutputParser.swift */,
+				B2000013 /* TodoWriteParser.swift */,
+				B2000014 /* KanbanEventBridge.swift */,
+				FE3759A970072E3759FBDD23 /* ClaudeOutputStyler.swift */,
+				37E85984B5F56630B2861CD1 /* ClaudeOutputStyling+Demo.swift */,
+				A529985B930071F3204582B1 /* ClaudeOutputDetector.swift */,
+				18819B96D9703A9D79FF1A2D /* ANSIStyler.swift */,
+				397945DC03C788E57EE1EC46 /* MarkdownRenderer.swift */,
+				4F4BC8B71D00FB7C8BDCB45C /* ClaudeOutputFormatter.swift */,
+				E5BD3421DBE9FBF135C07465 /* ClaudeProgressOverlay.swift */,
+			);
+			path = Claude;
+			sourceTree = "<group>";
+		};
+		B6000005 /* Kanban */ = {
+			isa = PBXGroup;
+			children = (
+				B2000020 /* KanbanBoard.swift */,
+				B2000021 /* KanbanCard.swift */,
+				B2000022 /* KanbanColumn.swift */,
+				B2000023 /* CardSource.swift */,
+				B2000024 /* KanbanManager.swift */,
+				B2000028 /* KanbanPersistenceManager.swift */,
+				B6000009 /* Views */,
+			);
+			path = Kanban;
+			sourceTree = "<group>";
+		};
+		B6000006 /* Agent */ = {
+			isa = PBXGroup;
+			children = (
+				B2000030 /* AgentRole.swift */,
+				B2000031 /* AgentStatus.swift */,
+				B2000032 /* AgentColumn.swift */,
+				B2000033 /* AgentColumnsManager.swift */,
+				B6000007 /* Views */,
+			);
+			path = Agent;
+			sourceTree = "<group>";
+		};
+		B600000C /* CTO */ = {
+			isa = PBXGroup;
+			children = (
+				B2000070 /* CTOEvent.swift */,
+				B2000071 /* RoroWebhookClient.swift */,
+				B2000072 /* CTOEventBridge.swift */,
+			);
+			path = CTO;
+			sourceTree = "<group>";
+		};
+		B6000007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B2000034 /* AgentColumnView.swift */,
+				B2000035 /* AgentColumnsContainer.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		B6000008 /* FileBrowser */ = {
+			isa = PBXGroup;
+			children = (
+				B2000040 /* FileNode.swift */,
+				B2000041 /* FileTreeManager.swift */,
+				B2000042 /* FileBrowserView.swift */,
+			);
+			path = FileBrowser;
+			sourceTree = "<group>";
+		};
+		B6000009 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B2000025 /* KanbanBoardView.swift */,
+				B2000026 /* KanbanCardView.swift */,
+				B2000027 /* KanbanColumnView.swift */,
+				0D5F7D12E39638F86B25EA46 /* CardDetailView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		B600000A /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				B2000050 /* EditorFile.swift */,
+				B2000051 /* EditorManager.swift */,
+				B2000052 /* CodeEditorView.swift */,
+				B2000053 /* EditorPanelView.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		B600000B /* Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				79520D9EDA714C5E9F2406AE /* KeyboardShortcut.swift */,
+				9656696E8D5540BB9409A01E /* KeyboardShortcutManager.swift */,
+				49FDFA7349894EDF84A1AC21 /* KeyboardShortcutsView.swift */,
+			);
+			path = Keyboard;
+			sourceTree = "<group>";
+		};
+		D7FE9E7046F6CE190F3005A0 /* RickTerminalUITests */ = {
+			isa = PBXGroup;
+			children = (
+				59E958314A84F761BA5DC866 /* AppLaunchTests.swift */,
+				9311D56941D575D15BB310D5 /* TerminalInteractionTests.swift */,
+				15714CD327910C6D6E2A10E6 /* FileBrowserTests.swift */,
+				9A0D338C0F24666995BB76B9 /* KanbanBoardTests.swift */,
+			);
+			name = RickTerminalUITests;
+			sourceTree = SOURCE_ROOT;
+		};
+		DBD96946C87E475CEFE0E2AD /* Error */ = {
+			isa = PBXGroup;
+			children = (
+				3543B8A1E0E3B46078F5FE94 /* ErrorManager.swift */,
+			);
+			name = Error;
+			sourceTree = "<group>";
+		};
+		B26904ABC1D92BBEC529B0F8 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				C6C2D91A3E475C28749719C8 /* CommandBlock.swift */,
+				32D5FA41948C715DB1BA934A /* ShellIntegrationParser.swift */,
+				5743C551D019109AD7CA8C28 /* TerminalOutputDelegate.swift */,
+				F48A6B016BA63C7CD381A066 /* TerminalOutputBuffer.swift */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
+		176FD02F452903383E9B44F6 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				857DAD951D7372F47164C162 /* shell-integration.zsh */,
+				D547BCB84D20CCD59228D92B /* shell-integration.bash */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		35F4F1AE5179CC66AB0F66FA /* RickTerminalUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A4036E6F9416394F9F5CD5E /* Build configuration list for PBXNativeTarget "RickTerminalUITests" */;
+			buildPhases = (
+				A70CDAE68DAC5ADE8659A112 /* Sources */,
+				B1BADE9FCFDB8A1F25D6B820 /* Frameworks */,
+				2B86F29FA340FFD553982E8D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EAB76E6A2E6F5D2D0369537E /* PBXTargetDependency */,
+			);
+			name = RickTerminalUITests;
+			productName = RickTerminalUITests;
+			productReference = 5746031AABE625765E3388D6 /* RickTerminalUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		B7000001 /* RickTerminal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B8000001 /* Build configuration list for PBXNativeTarget "RickTerminal" */;
+			buildPhases = (
+				B9000001 /* Sources */,
+				B5000001 /* Frameworks */,
+				BA000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RickTerminal;
+			packageProductDependencies = (
+				B400000D /* SwiftTerm */,
+			);
+			productName = RickTerminal;
+			productReference = B3000001 /* RickTerminal.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BB000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					B7000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = BC000001 /* Build configuration list for PBXProject "RickTerminal" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B6000001;
+			packageReferences = (
+				BD000001 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
+			productRefGroup = B6000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B7000001 /* RickTerminal */,
+				35F4F1AE5179CC66AB0F66FA /* RickTerminalUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2B86F29FA340FFD553982E8D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000003 /* Assets.xcassets in Resources */,
+				550D3A6AC4B1D4070A3398A7 /* shell-integration.zsh in Resources */,
+				96D7AB39B32DA11792395241 /* shell-integration.bash in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A70CDAE68DAC5ADE8659A112 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B37DC5BF9770B1A635314219 /* AppLaunchTests.swift in Sources */,
+				0E4C15B303FB73B02CC3DA3B /* TerminalInteractionTests.swift in Sources */,
+				6D3914D2138F462981CB24F7 /* FileBrowserTests.swift in Sources */,
+				D8000C8175B212BF15E5F696 /* KanbanBoardTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B9000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6CA1F7DE27C24AE38F44DE56 /* KeyboardShortcut.swift in Sources */,
+				51C770417559435A95CD4639 /* KeyboardShortcutManager.swift in Sources */,
+				7E9EC10533D440CEBF888490 /* KeyboardShortcutsView.swift in Sources */,
+				B1000001 /* RickTerminalApp.swift in Sources */,
+				B1000002 /* ContentView.swift in Sources */,
+				B1000004 /* ShellSession.swift in Sources */,
+				B1000005 /* ShellSessionManager.swift in Sources */,
+				B1000006 /* Color+Theme.swift in Sources */,
+				B1000007 /* RickTheme.swift in Sources */,
+				B1000008 /* ThemePreview.swift in Sources */,
+				B1000009 /* TerminalView.swift in Sources */,
+				B100000A /* MainWindowView.swift in Sources */,
+				B100000B /* RickTerminalViewController.swift in Sources */,
+				B100000C /* TerminalSettings.swift in Sources */,
+				B100000E /* ClaudePathDetector.swift in Sources */,
+				B100000F /* ClaudeToolEvent.swift in Sources */,
+				B1000010 /* ClaudeOutputParser.swift in Sources */,
+				B1000011 /* ClaudeSettingsView.swift in Sources */,
+				B1000020 /* KanbanBoard.swift in Sources */,
+				B1000021 /* KanbanCard.swift in Sources */,
+				B1000022 /* KanbanColumn.swift in Sources */,
+				B1000030 /* AgentRole.swift in Sources */,
+				B1000031 /* AgentStatus.swift in Sources */,
+				B1000032 /* AgentColumn.swift in Sources */,
+				B1000033 /* AgentColumnsManager.swift in Sources */,
+				B1000034 /* AgentColumnView.swift in Sources */,
+				B1000035 /* AgentColumnsContainer.swift in Sources */,
+				B1000070 /* CTOEvent.swift in Sources */,
+				B1000071 /* RoroWebhookClient.swift in Sources */,
+				B1000072 /* CTOEventBridge.swift in Sources */,
+				B1000040 /* FileNode.swift in Sources */,
+				B1000041 /* FileTreeManager.swift in Sources */,
+				B1000042 /* FileBrowserView.swift in Sources */,
+				B1000013 /* TodoWriteParser.swift in Sources */,
+				B1000014 /* KanbanEventBridge.swift in Sources */,
+				B1000023 /* CardSource.swift in Sources */,
+				B1000024 /* KanbanManager.swift in Sources */,
+				B1000028 /* KanbanPersistenceManager.swift in Sources */,
+				B1000025 /* KanbanBoardView.swift in Sources */,
+				B1000026 /* KanbanCardView.swift in Sources */,
+				B1000027 /* KanbanColumnView.swift in Sources */,
+				B1000012 /* AppDelegate.swift in Sources */,
+				651653AA27D09C67D5808355 /* CommandBlock.swift in Sources */,
+				96C3EB5631B0CBDAE0B01310 /* ShellIntegrationParser.swift in Sources */,
+				FBF8764701BBF1CBBAB31944 /* TerminalOutputDelegate.swift in Sources */,
+				E1D302F78A6F3A86F13202E5 /* TerminalOutputBuffer.swift in Sources */,
+				EE27D45CCB46A8DFEA701B37 /* ClaudeProgressOverlay.swift in Sources */,
+				B1000060 /* SessionPersistenceManager.swift in Sources */,
+				B1000061 /* SessionRestorationView.swift in Sources */,
+				B1000050 /* EditorFile.swift in Sources */,
+				B1000051 /* EditorManager.swift in Sources */,
+				B1000052 /* CodeEditorView.swift in Sources */,
+				B1000053 /* EditorPanelView.swift in Sources */,
+				D56663032FDB2AF3F3BAC4C4 /* CardDetailView.swift in Sources */,
+				4D0722200D892382FA12AA19 /* ClaudeOutputStyler.swift in Sources */,
+				FEC6965FE729039D7B16AA3E /* ClaudeOutputStyling+Demo.swift in Sources */,
+				B92551208C6EBFF3BE96A98D /* ClaudeOutputDetector.swift in Sources */,
+				8A5831DC006FFDA4E1E3BAE1 /* ANSIStyler.swift in Sources */,
+				0018555CFB33C958F923C53F /* MarkdownRenderer.swift in Sources */,
+				4196AB40F7C33001A0B545BE /* ClaudeOutputFormatter.swift in Sources */,
+				C1A8CB05A92CAC9AEDFA03A9 /* RTIcon+Examples.swift in Sources */,
+				E28C8F69F3944E80A50747FF /* RTIcon.swift in Sources */,
+				8BD16C50E246E60C20E0BFA8 /* KeyboardShortcutsPreferencesView.swift in Sources */,
+				75AF33A0E3E0ABE7222C37CA /* AppearancePreferencesView.swift in Sources */,
+				5CBD0BF9D9A04F91B1C3CF66 /* PreferencesView.swift in Sources */,
+				14C910FB010AB4181DB141ED /* GeneralPreferencesView.swift in Sources */,
+				CA4EA8FEBF4AC49205C536B9 /* TerminalPreferencesView.swift in Sources */,
+				CAF45D4E7EDBA3297512756C /* ClaudeIntegrationPreferencesView.swift in Sources */,
+				D5DD9FD45D18042F52F79B5B /* FallbackSyntaxHighlighter.swift in Sources */,
+				C185467153D42495839A5198 /* SyntaxHighlightingService.swift in Sources */,
+				CAADAA05B7E35858067E6A99 /* SyntaxHighlightingTypes.swift in Sources */,
+				C65E4D98D2820B421F6D6237 /* FileOperationsHelper.swift in Sources */,
+				E150AC34DF80B05782F33458 /* ErrorHandlingTests.swift in Sources */,
+				DEC7BC6C958C9E3F5677BEB4 /* RTError.swift in Sources */,
+				5C3D36E413BE4CCFAA5AD527 /* ErrorAlertView.swift in Sources */,
+				F9CEA22C05EFD268312BE63E /* ErrorManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		EAB76E6A2E6F5D2D0369537E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RickTerminal;
+			target = B7000001 /* RickTerminal */;
+			targetProxy = DEE8D6AE3112BCA03804F94E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AC97D03D4D772D1B56D23C30 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rickportal.RickTerminalUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = RickTerminal;
+			};
+			name = Debug;
+		};
+		B9461879BF65516F8EC109E0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rickportal.RickTerminalUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = RickTerminal;
+			};
+			name = Release;
+		};
+		BE000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		BE000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		BF000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RickTerminal/RickTerminal.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rick Terminal";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rickterm.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BF000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RickTerminal/RickTerminal.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rick Terminal";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rickterm.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7A4036E6F9416394F9F5CD5E /* Build configuration list for PBXNativeTarget "RickTerminalUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B9461879BF65516F8EC109E0 /* Release */,
+				AC97D03D4D772D1B56D23C30 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B8000001 /* Build configuration list for PBXNativeTarget "RickTerminal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BF000001 /* Debug */,
+				BF000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BC000001 /* Build configuration list for PBXProject "RickTerminal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BE000001 /* Debug */,
+				BE000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BD000001 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B400000D /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD000001 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = BB000001 /* Project object */;
+}

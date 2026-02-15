@@ -32,6 +32,7 @@ import urllib.error
 DEFAULT_CONFIG = {
     "enabled": True,
     "endpoint": "http://localhost:3067/hooks/agent-event",
+    "rick_terminal_endpoint": "http://localhost:3068",  # Rick Terminal integration
     "timeout": 2.0,
     "verbose": False,
 }
@@ -266,13 +267,23 @@ def emit(
         "data": data,
     }
 
-    # Send in background thread (fire-and-forget)
+    # Send to roro endpoint in background thread (fire-and-forget)
     thread = threading.Thread(
         target=_send_event,
         args=(config["endpoint"], payload, config["timeout"], config.get("verbose", False)),
         daemon=True,
     )
     thread.start()
+
+    # Also send to Rick Terminal if endpoint is configured
+    rick_endpoint = config.get("rick_terminal_endpoint")
+    if rick_endpoint:
+        rick_thread = threading.Thread(
+            target=_send_event,
+            args=(rick_endpoint, payload, config["timeout"], config.get("verbose", False)),
+            daemon=True,
+        )
+        rick_thread.start()
 
 
 # ── Decorator ─────────────────────────────────────────────────────────────────
