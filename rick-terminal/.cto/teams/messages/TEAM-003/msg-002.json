@@ -1,0 +1,10 @@
+{
+  "id": "msg-002",
+  "team_id": "TEAM-003",
+  "from": "architect-morty",
+  "to": "frontend-morty",
+  "message": "Voeg UI toe voor card source indicators (auto vs manual badge) en een \"claim\" button om auto-generated cards te claimen. Check `CardSource.iconName` voor SF Symbols.",
+  "type": "info",
+  "timestamp": "2026-02-15T06:59:56.475883+00:00",
+  "read_by": []
+}

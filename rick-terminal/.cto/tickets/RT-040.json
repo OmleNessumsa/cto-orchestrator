@@ -1,0 +1,45 @@
+{
+  "id": "RT-040",
+  "title": "Create App Icon and Branding Assets",
+  "description": "Design the Rick Terminal app icon - should be distinctive, professional, and work at all macOS icon sizes. Create toolbar icons, document icons if needed. Follow Apple's icon guidelines while maintaining Rick Terminal brand.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "architect-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [
+    "RT-007"
+  ],
+  "acceptance_criteria": [
+    "1024x1024 app icon created",
+    "Icon looks good at all sizes",
+    "Icons in Assets catalog",
+    "Consistent with app branding",
+    "Meets Apple icon guidelines"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.884789+00:00",
+  "updated_at": "2026-02-15T09:11:36.547246+00:00",
+  "completed_at": "2026-02-15T09:11:36.547232+00:00",
+  "agent_output": "Created a complete set of macOS app icons featuring a terminal prompt symbol (`>_`) in Rick Terminal's signature green on a dark background with purple accent border. The icon follows Apple's Big Sur+ design guidelines with proper rounded rectangle shape. All 10 required sizes (16-512px at 1x and 2x) are generated programmatically via a Swift script that can be re-run to regenerate icons after design changes. The Assets catalog validates successfully. No toolbar or document icons were needed as the app uses SF Symbols and doesn't define custom document types.",
+  "review_notes": null,
+  "files_touched": [
+    "Scripts/GenerateAppIcon.swift (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_16x16.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_32x32.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_128x128.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_256x256.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_512x512.png (new)",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png (new - 1024x1024 master)",
+    "docs/ICON_SYSTEM.md",
+    "IMPLEMENTATION_RT-040_SUMMARY.md (new)"
+  ]
+}

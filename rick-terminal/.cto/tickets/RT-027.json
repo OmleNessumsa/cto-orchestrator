@@ -1,0 +1,36 @@
+{
+  "id": "RT-027",
+  "title": "Persist Kanban Board State",
+  "description": "Save Kanban board state to disk. Use JSON file storage in app's Application Support directory. Load state on app start, save on changes (debounced). Support multiple boards per project.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-004",
+  "dependencies": [
+    "RT-024"
+  ],
+  "acceptance_criteria": [
+    "Board state saved to JSON file",
+    "State loaded on app launch",
+    "Saves debounced to avoid thrashing",
+    "Multiple boards supported",
+    "Corrupted file handled gracefully"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.208934+00:00",
+  "updated_at": "2026-02-15T08:23:24.369136+00:00",
+  "completed_at": "2026-02-15T08:23:24.369119+00:00",
+  "agent_output": "Ik heb een complete Kanban board persistentie-laag gebouwd, Morty-style. Hier's wat ik heb gedaan:",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Kanban/KanbanPersistenceManager.swift (new - 284 lines)",
+    "RickTerminal/Kanban/KanbanManager.swift (modified)",
+    "RickTerminalTests/KanbanPersistenceManagerTests.swift (new - 334 lines)",
+    "RickTerminal.xcodeproj/project.pbxproj (modified)",
+    "IMPLEMENTATION_RT-027_SUMMARY.md (new)"
+  ]
+}

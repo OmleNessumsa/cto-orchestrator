@@ -1,0 +1,37 @@
+{
+  "id": "RT-006",
+  "title": "Initialize Xcode Project with SwiftUI App Lifecycle",
+  "description": "Create a new Xcode project for Rick Terminal. Configure it with SwiftUI app lifecycle, set bundle identifier to something like 'com.rickterm.app', enable Hardened Runtime for App Store compatibility, and configure minimum deployment target to macOS 13.0 for modern SwiftUI features.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Xcode project created and opens without errors",
+    "Bundle identifier set correctly",
+    "App lifecycle uses SwiftUI @main",
+    "Hardened Runtime enabled in signing settings",
+    "Minimum deployment target is macOS 13.0+"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.236307+00:00",
+  "updated_at": "2026-02-14T20:20:38.690008+00:00",
+  "completed_at": "2026-02-14T20:20:38.689996+00:00",
+  "agent_output": "Created a complete Xcode project for Rick Terminal with all acceptance criteria met:\n- Created RickTerminal.xcodeproj with proper project structure\n- Configured bundle identifier as `com.rickterm.app`\n- Set minimum deployment target to macOS 13.0\n- Enabled Hardened Runtime in build settings (ENABLE_HARDENED_RUNTIME = YES)\n- Implemented SwiftUI app lifecycle using @main attribute in RickTerminalApp.swift\n- Created initial ContentView with Rick-themed terminal UI\n- Set up Assets.xcassets with AppIcon and AccentColor\n- Created entitlements file with App Sandbox and Hardened Runtime capabilities\n- Updated .gitignore to exclude Xcode build artifacts\n- Verified project builds successfully with xcodebuild\n\nThe project opens without errors and compiles successfully. All modern SwiftUI features are available with the macOS 13.0 deployment target.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal.xcodeproj/project.pbxproj",
+    "RickTerminal/RickTerminalApp.swift",
+    "RickTerminal/ContentView.swift",
+    "RickTerminal/Assets.xcassets/Contents.json",
+    "RickTerminal/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "RickTerminal/Assets.xcassets/AccentColor.colorset/Contents.json",
+    "RickTerminal/RickTerminal.entitlements",
+    ".gitignore"
+  ]
+}

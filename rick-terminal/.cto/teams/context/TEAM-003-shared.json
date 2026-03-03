@@ -1,0 +1,49 @@
+{
+  "team_id": "TEAM-003",
+  "parent_ticket": "RT-026",
+  "decisions": [
+    {
+      "decision": "Content-based SHA256 hashing voor duplicate detection (status wijzigingen cre\u00ebren geen nieuwe cards)",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:59:56.476063+00:00"
+    },
+    {
+      "decision": "Cards met `source: .manual` worden NOOIT auto-updated",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:59:56.476068+00:00"
+    },
+    {
+      "decision": "Sub-agent tasks cre\u00ebren cards in \"In Progress\" column",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:59:56.476069+00:00"
+    },
+    {
+      "decision": "Combine-based real-time updates via existing `@Published` pattern",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:59:56.476071+00:00"
+    },
+    {
+      "decision": "Used KanbanManager as a facade pattern to simplify lifecycle management",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T07:06:06.279940+00:00"
+    },
+    {
+      "decision": "Hover-based \"Claim\" button UX (only shows when hovering auto-generated cards)",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T07:06:06.279944+00:00"
+    },
+    {
+      "decision": "Card details in modal sheet instead of inline editing (simpler UX for MVP)",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T07:06:06.279946+00:00"
+    },
+    {
+      "decision": "Statistics in footer for constant visibility without taking vertical space",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T07:06:06.279947+00:00"
+    }
+  ],
+  "interfaces": [],
+  "notes": [],
+  "updated_at": "2026-02-15T07:06:06.279948+00:00"
+}

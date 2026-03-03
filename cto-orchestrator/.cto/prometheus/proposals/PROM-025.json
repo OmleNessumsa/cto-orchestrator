@@ -1,0 +1,19 @@
+{
+  "id": "PROM-025",
+  "title": "Use Haiku 4.5 for smart ticket routing and triage",
+  "category": "claude-features",
+  "source": "Anthropic model overview \u2014 Haiku 4.5 for classification/routing at fraction of cost",
+  "description": "Replace keyword matching in auto_select_agent() with Haiku-powered smart routing. Use Haiku for plan validation. Reduces costs while improving routing accuracy.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Replace auto_select_agent() with smart_select_agent() calling Haiku for JSON routing response. Use returned complexity estimate for team need detection. Add --smart-routing flag.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.735987+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

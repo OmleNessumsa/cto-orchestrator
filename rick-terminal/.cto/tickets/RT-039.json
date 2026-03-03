@@ -1,0 +1,33 @@
+{
+  "id": "RT-039",
+  "title": "Performance Profiling and Optimization",
+  "description": "Profile app with Instruments. Identify and fix performance bottlenecks in: terminal rendering, file browser loading, Kanban updates. Target 60fps UI, <100ms response times. Document performance baseline.",
+  "type": "spike",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "architect-morty",
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-025",
+    "RT-018",
+    "RT-031"
+  ],
+  "acceptance_criteria": [
+    "Instruments profiling completed",
+    "Major bottlenecks identified",
+    "Terminal scrolling is smooth",
+    "Large directories load acceptably",
+    "Memory usage reasonable",
+    "Performance baseline documented"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.837174+00:00",
+  "updated_at": "2026-02-17T08:39:21.370079+00:00",
+  "completed_at": "2026-02-17T08:39:21.370061+00:00",
+  "agent_output": "Completed comprehensive performance profiling and analysis for Rick Terminal (RT-039). Identified and documented the following critical bottlenecks:",
+  "review_notes": null,
+  "files_touched": []
+}

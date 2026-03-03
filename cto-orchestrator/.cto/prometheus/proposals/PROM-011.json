@@ -1,0 +1,20 @@
+{
+  "id": "PROM-011",
+  "title": "Add bounded delegation with cost tracking and quality gates",
+  "category": "agent-patterns",
+  "source": "CrewAI post-mortem \u2014 bounded delegation prevents loops and cost overruns",
+  "description": "Add CostTracker class estimating token usage, enforce budget limits per sprint, add retry budgets, and replace auto-approve with quality gate validation.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py",
+    "scripts/meeseeks.py"
+  ],
+  "proposed_changes": "Add CostTracker estimating costs from prompt/output lengths. Add max_sprint_cost_usd config. Add quality gate: only auto-approve if valid status + files_changed + description. Emit cost events.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.733717+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

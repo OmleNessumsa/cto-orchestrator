@@ -1,0 +1,30 @@
+{
+  "id": "RT-004",
+  "title": "EPIC: Live Kanban Board & Agent Visualization",
+  "description": "Build the real-time Kanban board that displays project progress and the Morty agent columns that show what each sub-agent is doing. This is what makes Rick Terminal special - you can actually SEE the multiverse of productivity happening.",
+  "type": "epic",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-003"
+  ],
+  "acceptance_criteria": [
+    "Kanban board renders with draggable cards",
+    "Board state persists between sessions",
+    "Agent columns dynamically appear/disappear based on active agents",
+    "Real-time updates from Claude activity",
+    "Visual indicators for task status changes"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.142628+00:00",
+  "updated_at": "2026-02-17T08:21:42.236221+00:00",
+  "completed_at": "2026-02-17T08:21:42.236218+00:00",
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

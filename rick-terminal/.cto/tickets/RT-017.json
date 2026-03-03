@@ -1,0 +1,39 @@
+{
+  "id": "RT-017",
+  "title": "Detect and Configure Claude CLI Path",
+  "description": "Create a service that detects the Claude CLI installation. Check common locations (/usr/local/bin/claude, ~/.local/bin/claude, homebrew paths). Allow manual configuration if auto-detection fails. Store the path in UserDefaults.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-003",
+  "dependencies": [
+    "RT-013"
+  ],
+  "acceptance_criteria": [
+    "Claude CLI detected in common locations",
+    "Path stored persistently",
+    "Settings UI for manual path configuration",
+    "Validation that path points to executable",
+    "Helpful error if Claude not found"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.752770+00:00",
+  "updated_at": "2026-02-15T06:37:36.722957+00:00",
+  "completed_at": "2026-02-15T06:37:36.722944+00:00",
+  "agent_output": "Volledig Claude CLI detectie- en configuratiesysteem ge\u00efmplementeerd met:\n\n1. **ClaudePathDetector service** - Auto-detectie van Claude CLI in common locaties (/usr/local/bin, /opt/homebrew/bin, ~/.local/bin, etc.) + fallback naar `which` command. Inclusief validatie dat het bestand executable is en reageert op --version.\n\n2. **TerminalSettings integratie** - Claude CLI path opgeslagen in UserDefaults via @AppStorage. Lazy auto-detection (alleen bij eerste gebruik). Methodes voor get/set/reset path met validatie.\n\n3. **ClaudeSettingsView UI** - Volledige SwiftUI settings interface met:\n   - Status indicator (geconfigureerd/niet geconfigureerd)\n   - Auto-detect knop met loading state\n   - Manuele path input met file browser\n   - Real-time validatie met visuele feedback\n   - Reset functionaliteit\n\n4. **Settings window** - Toegevoegd aan RickTerminalApp, toegankelijk via Cmd+, of menu bar.\n\n5. **Testing** - Build succesvol. Auto-detection vindt Claude CLI op `/opt/homebrew/bin/claude`. Alle acceptance criteria voldaan.\n\n6. **Documentatie** - Comprehensive docs met user guide, developer guide, implementation report en integration examples.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Claude/ClaudePathDetector.swift (nieuw)",
+    "RickTerminal/ClaudeSettingsView.swift (nieuw)",
+    "RickTerminal/TerminalSettings.swift (uitgebreid)",
+    "RickTerminal/RickTerminalApp.swift (uitgebreid)",
+    "RickTerminal.xcodeproj/project.pbxproj (aangepast)",
+    "docs/CLAUDE_CLI_CONFIGURATION.md (nieuw)",
+    "examples/ClaudeIntegrationExample.swift (nieuw)",
+    "IMPLEMENTATION_RT-017.md (nieuw)"
+  ]
+}

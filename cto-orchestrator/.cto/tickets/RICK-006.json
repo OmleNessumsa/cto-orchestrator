@@ -1,0 +1,31 @@
+{
+  "id": "RICK-006",
+  "title": "Implement SQLite Database Layer",
+  "description": "Create the SQLite database schema and Rust data access layer using tauri-plugin-sql. Design tables for: tickets (id, title, description, status, priority, complexity, parent_id, created_at, updated_at), agents (id, name, status, current_ticket_id, pid, started_at), sessions (id, context, created_at), and settings (key, value). Implement CRUD functions exposed via Tauri commands.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-004"
+  ],
+  "acceptance_criteria": [
+    "SQLite database file created at app data directory on first launch",
+    "Schema migrations run automatically on app start",
+    "Rust functions for create, read, update, delete on all tables compile",
+    "Tauri commands exposed: get_tickets, create_ticket, update_ticket, delete_ticket",
+    "Foreign key constraints enforce referential integrity",
+    "Indexes on frequently queried columns (status, priority, parent_id)"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.700912+00:00",
+  "updated_at": "2026-02-13T14:24:16.856269+00:00",
+  "completed_at": "2026-02-13T14:24:16.856122+00:00",
+  "agent_output": "SQLite database layer implemented with useTickets and useSettings hooks, including full CRUD operations and table schema for tickets, sessions, and settings.",
+  "review_notes": null,
+  "files_touched": []
+}

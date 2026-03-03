@@ -1,0 +1,10 @@
+{
+  "id": "msg-003",
+  "team_id": "TEAM-004",
+  "from": "architect-morty",
+  "to": "*",
+  "message": "Alle types, protocols en service zijn production-ready. Fallback highlighter ondersteunt 20 talen met theme colors.",
+  "type": "info",
+  "timestamp": "2026-02-15T08:39:59.893678+00:00",
+  "read_by": []
+}

@@ -1,0 +1,10 @@
+{
+  "id": "msg-001",
+  "team_id": "TEAM-004",
+  "from": "architect-morty",
+  "to": "backend-morty",
+  "message": "Start met Task B1 (package dependency), dan B2 (HighlightSwiftHighlighter implementeren). Alle interfaces staan klaar in SyntaxHighlightingTypes.swift",
+  "type": "info",
+  "timestamp": "2026-02-15T08:39:59.893303+00:00",
+  "read_by": []
+}

@@ -1,0 +1,35 @@
+{
+  "id": "RICK-014",
+  "title": "Implement Kanban Board with Drag-Drop",
+  "description": "Build the core Kanban board view with columns for ticket statuses: Backlog, Ready, In Progress, Review, Done. Use @dnd-kit/core for accessible drag-and-drop. Tickets rendered as GlassCards. Support filtering by priority, complexity, assignee. Include quick-add ticket button per column.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-006",
+    "RICK-011",
+    "RICK-013"
+  ],
+  "acceptance_criteria": [
+    "Five columns render with proper headers and ticket counts",
+    "Tickets can be dragged between columns updating status in SQLite",
+    "Drag preview shows semi-transparent card following cursor",
+    "Drop zones highlight when dragging over valid targets",
+    "Filter bar allows filtering by priority (multi-select) and complexity",
+    "Quick-add button opens inline form to create ticket in that column",
+    "Keyboard navigation: arrow keys move focus, Enter to grab/drop",
+    "Optimistic UI updates with rollback on backend failure"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.090466+00:00",
+  "updated_at": "2026-02-13T14:10:45.361750+00:00",
+  "completed_at": "2026-02-13T14:10:45.361604+00:00",
+  "agent_output": "Kanban board with drag-drop functionality implemented using @dnd-kit",
+  "review_notes": null,
+  "files_touched": []
+}

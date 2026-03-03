@@ -1,0 +1,35 @@
+{
+  "id": "RICK-020",
+  "title": "Implement Meeseeks Quick-Task Interface",
+  "description": "Build a quick-task popup triggered by keyboard shortcut (Cmd/Ctrl+M). Meeseeks-themed input for rapid task creation that spawns a temporary agent, completes the task, and self-destructs. Show Meeseeks avatar with cyan theme. Tasks are ephemeral (not persisted as tickets) unless user chooses to save.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-007",
+    "RICK-011",
+    "RICK-012"
+  ],
+  "acceptance_criteria": [
+    "Cmd/Ctrl+M opens floating Meeseeks popup centered on screen",
+    "Popup has cyan (#5bcefa) accent theme with Meeseeks avatar",
+    "Text input with placeholder 'I'm Mr. Meeseeks! Look at me!'",
+    "Enter spawns agent with task, shows progress spinner",
+    "Agent output streams below input in collapsible panel",
+    "On completion, shows result with Copy and Save as Ticket buttons",
+    "Escape or click-outside dismisses popup",
+    "Animation: Meeseeks appears with pop-in, disappears with poof"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.384321+00:00",
+  "updated_at": "2026-02-13T14:29:58.557581+00:00",
+  "completed_at": "2026-02-13T14:29:58.557432+00:00",
+  "agent_output": "Meeseeks modal with quick task buttons, task input, file targeting, and animated spawn sequence.",
+  "review_notes": null,
+  "files_touched": []
+}

@@ -1,0 +1,32 @@
+{
+  "id": "RICK-003",
+  "title": "EPIC: Core Feature Implementation",
+  "description": "Build all the actual features that make RickTerminal useful: Kanban board, Morty tracking, terminal integration, ticket management, team collaboration, and all the CRUD operations. This is where the magic happens - or as Morty would call it, 'the confusing stuff that somehow works.'",
+  "type": "epic",
+  "status": "backlog",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [
+    "RICK-001",
+    "RICK-002"
+  ],
+  "acceptance_criteria": [
+    "Kanban board displays tickets with drag-drop functionality",
+    "Real-time Morty tracking dashboard shows all active claude subprocess agents",
+    "Integrated terminal executes commands with Rick persona responses",
+    "Ticket CRUD operations persist to SQLite and sync across views",
+    "Team collaboration view displays parallel Morty work streams",
+    "Session persistence maintains state across app restarts"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.551893+00:00",
+  "updated_at": "2026-02-13T13:40:45.552066+00:00",
+  "completed_at": null,
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

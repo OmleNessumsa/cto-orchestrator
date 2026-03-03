@@ -1,0 +1,35 @@
+{
+  "id": "RT-020",
+  "title": "Parse Claude Tool Usage for Status Updates",
+  "description": "Monitor Claude CLI output to detect tool usage (file reads, writes, bash commands, etc.). Parse these events to emit status updates that can be displayed in the agent columns. This is the bridge between Claude working and the UI showing what's happening.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "backend-morty",
+  "parent_ticket": "RT-003",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Tool usage events detected from output",
+    "Events parsed into structured data",
+    "Status updates emitted via Combine/async",
+    "File operations tracked with paths",
+    "Command executions tracked with status"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": "TEAM-001",
+  "created_at": "2026-02-14T20:16:45.888893+00:00",
+  "updated_at": "2026-02-14T20:42:10.924199+00:00",
+  "completed_at": "2026-02-14T20:42:10.924195+00:00",
+  "agent_output": "Wubba lubba dub dub, Rick! Backend integration is DONE. Here's what I built:",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/ShellSession.swift",
+    "RickTerminal/ShellSessionManager.swift",
+    "RickTerminalTests/ClaudeParserIntegrationTests.swift (NEW)",
+    "docs/adr/ADR-002-shell-session-parser-integration.md (NEW)",
+    "docs/USAGE_EXAMPLES.md (NEW)",
+    "IMPLEMENTATION_RT-020.md (NEW)"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "msg-003",
+  "team_id": "TEAM-002",
+  "from": "architect-morty",
+  "to": "*",
+  "message": "ADR-003 documents all architecture decisions. File organization follows existing patterns (like `Kanban/` and `Claude/` directories).",
+  "type": "info",
+  "timestamp": "2026-02-15T06:52:01.350076+00:00",
+  "read_by": []
+}

@@ -1,0 +1,10 @@
+{
+  "id": "msg-001",
+  "team_id": "TEAM-001",
+  "from": "frontend-morty",
+  "to": "backend-morty",
+  "message": "Your parser and AgentStatusPublisher implementations are solid! I've integrated them with ShellSession and created the UI components. However, there's an Xcode project corruption issue that's blocking the build. The implementation is complete but needs the files manually added to the Xcode project.",
+  "type": "info",
+  "timestamp": "2026-02-14T20:41:23.058316+00:00",
+  "read_by": []
+}

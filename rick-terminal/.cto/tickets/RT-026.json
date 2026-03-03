@@ -1,0 +1,39 @@
+{
+  "id": "RT-026",
+  "title": "Connect Claude Events to Kanban Updates",
+  "description": "Wire the Claude tool usage events to automatically update the Kanban board. When Claude creates tickets, update the board. When Claude completes tasks, move cards. Parse Claude's TodoWrite and similar outputs to keep board in sync.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-004",
+  "dependencies": [
+    "RT-022"
+  ],
+  "acceptance_criteria": [
+    "TodoWrite events create/update cards",
+    "Task completion moves cards to done",
+    "Sub-agent activity creates agent columns",
+    "Board updates in real-time",
+    "No duplicate cards created",
+    "Manual changes preserved"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": "TEAM-003",
+  "created_at": "2026-02-14T20:16:46.162624+00:00",
+  "updated_at": "2026-02-15T07:06:06.289765+00:00",
+  "completed_at": "2026-02-15T07:06:06.289761+00:00",
+  "agent_output": "Ik heb de volledige UI-implementatie afgerond voor het verbinden van Claude events met Kanban board updates. Dit is wat ik gebouwd heb:",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Kanban/Views/KanbanCardView.swift (nieuw)",
+    "RickTerminal/Kanban/Views/KanbanColumnView.swift (nieuw)",
+    "RickTerminal/Kanban/Views/KanbanBoardView.swift (nieuw)",
+    "RickTerminal/Kanban/KanbanManager.swift (nieuw)",
+    "RickTerminal/MainWindowView.swift (aangepast)",
+    "IMPLEMENTATION_RT-026_SUMMARY.md (nieuw)",
+    "docs/KANBAN_INTEGRATION_GUIDE.md (nieuw)"
+  ]
+}

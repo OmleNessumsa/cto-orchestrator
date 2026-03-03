@@ -1,0 +1,28 @@
+{
+  "id": "RICK-001",
+  "title": "EPIC: RickTerminal Foundation & Tauri Infrastructure",
+  "description": "Set up the foundational Tauri 2.0 cross-platform application with Rust backend, React/TypeScript frontend, and core IPC communication layer. This epic covers all the boring but necessary infrastructure that makes everything else possible. Without this, we got nothing but a bunch of JavaScript files crying in the void.",
+  "type": "epic",
+  "status": "backlog",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Tauri 2.0 project initializes and builds on macOS, Windows, and Linux",
+    "React + TypeScript + Tailwind CSS frontend compiles without errors",
+    "Rust backend responds to IPC calls from frontend",
+    "SQLite database initializes and persists between app launches",
+    "Basic window chrome with Rick-themed dark mode renders correctly"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.452564+00:00",
+  "updated_at": "2026-02-13T13:40:45.452703+00:00",
+  "completed_at": null,
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

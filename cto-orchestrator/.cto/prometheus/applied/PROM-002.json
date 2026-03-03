@@ -1,0 +1,18 @@
+{
+  "id": "PROM-002",
+  "title": "Add --output-format json and --json-schema for structured agent responses",
+  "category": "tooling",
+  "source": "https://docs.anthropic.com/en/docs/claude-code/sdk - Claude Code structured output via --json-schema flag",
+  "description": "The current system relies on fragile regex parsing of markdown (parse_agent_output at delegate.py:615) to extract status, files_changed, and description from agent responses. Claude Code now supports --output-format json and --json-schema for validated structured output. By passing a JSON schema, the CLI guarantees the response conforms to the expected format \u2014 eliminating regex failures, Dutch/English fallback parsing, and the 'last 500 chars' fallback when no structured summary is found.",
+  "impact_score": 9,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "1. Define a JSON schema for agent responses: {status: string, files_changed: string[], description: string, open_questions: string, team_updates?: {messages: [], decisions: [], blocked_on: []}}. Save as scripts/schemas/agent_response.json. 2. In delegate_to_agent() (line 695), add '--output-format', 'json' and '--json-schema', json.dumps(schema) to the cmd list. 3. Replace parse_agent_output() regex parsing (lines 615-670) with json.loads(result.stdout)['result'] to extract the structured response directly. 4. Keep the regex parser as a fallback for backward compatibility during transition. 5. Similarly update parse_team_agent_output() to use a team-aware schema that includes messages_to_team, decisions_made, and blocked_on fields.",
+  "status": "applied",
+  "created_at": "2026-02-27T16:17:33.585237+00:00",
+  "applied_at": "2026-02-27T17:48:38.717250+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-002-20260227T174638"
+}

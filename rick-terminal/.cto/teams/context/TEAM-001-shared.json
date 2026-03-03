@@ -1,0 +1,49 @@
+{
+  "team_id": "TEAM-001",
+  "parent_ticket": "RT-020",
+  "decisions": [
+    {
+      "decision": "Added AgentStatusView as a toggleable sidebar (320px wide) with real-time status",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-14T20:41:23.058821+00:00"
+    },
+    {
+      "decision": "Integrated parser with ShellSession in the readOutput() method for automatic parsing",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-14T20:41:23.058826+00:00"
+    },
+    {
+      "decision": "Created status toggle button in ContentView header",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-14T20:41:23.058828+00:00"
+    },
+    {
+      "decision": "Used @ObservedObject for AgentStatusPublisher to enable reactive UI updates",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-14T20:41:23.058829+00:00"
+    },
+    {
+      "decision": "Parser enabled by default for new sessions",
+      "author": "backend-morty",
+      "timestamp": "2026-02-14T20:42:10.901289+00:00"
+    },
+    {
+      "decision": "Auto-completion on session termination ensures clean state",
+      "author": "backend-morty",
+      "timestamp": "2026-02-14T20:42:10.901297+00:00"
+    },
+    {
+      "decision": "Manager subscribes to all session publishers for centralized tracking",
+      "author": "backend-morty",
+      "timestamp": "2026-02-14T20:42:10.901300+00:00"
+    },
+    {
+      "decision": "Status properties exposed as read-only to maintain encapsulation",
+      "author": "backend-morty",
+      "timestamp": "2026-02-14T20:42:10.901302+00:00"
+    }
+  ],
+  "interfaces": [],
+  "notes": [],
+  "updated_at": "2026-02-14T20:42:10.901304+00:00"
+}

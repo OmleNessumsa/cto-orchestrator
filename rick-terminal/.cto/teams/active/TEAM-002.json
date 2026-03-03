@@ -1,0 +1,43 @@
+{
+  "id": "TEAM-002",
+  "parent_ticket": "RT-025",
+  "template": "fullstack-team",
+  "status": "blocked",
+  "members": [
+    {
+      "role": "architect-morty",
+      "focus": "architecture and interfaces",
+      "assignment": "RT-025-A",
+      "status": "blocked",
+      "started_at": "2026-02-15T06:46:29.290903+00:00",
+      "completed_at": "2026-02-15T06:52:01.350447+00:00",
+      "output_summary": "Implemented complete Agent Column Visualization system for RT-025. Created data models (`AgentRole`, `AgentStatus`, `AgentColumn`, `AgentAction`) and the `AgentColumnsManager` orchestrator that subscr"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "backend implementation",
+      "assignment": "RT-025-B",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "output_summary": null
+    },
+    {
+      "role": "frontend-morty",
+      "focus": "frontend implementation",
+      "assignment": "RT-025-C",
+      "status": "completed",
+      "started_at": "2026-02-15T06:52:01.450547+00:00",
+      "completed_at": "2026-02-15T06:55:05.269535+00:00",
+      "output_summary": "Successfully implemented the frontend integration for agent column visualization (RT-025). The implementation includes:\n\n1. **Parser Integration**: Added `ClaudeOutputParser` to `ShellSession` to auto"
+    }
+  ],
+  "coordination": {
+    "mode": "mixed",
+    "lead": "architect-morty"
+  },
+  "created_at": "2026-02-15T06:46:29.233341+00:00",
+  "started_at": "2026-02-15T06:46:29.290908+00:00",
+  "completed_at": null,
+  "files_reserved": {}
+}

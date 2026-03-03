@@ -1,0 +1,33 @@
+{
+  "id": "RT-007",
+  "title": "Implement Theme System with Rick Terminal Color Palette",
+  "description": "Create a centralized theming system using SwiftUI's environment and Color extensions. Define all colors from the spec: #0D1010 (bg dark), #1E3738 (bg secondary), #7B78AA (accent purple), #7FFC50 (accent green/success), #ffffff (text), #464467 (muted). Make it easy to apply consistently across all views.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Color extension with all theme colors as static properties",
+    "Theme environment object for dynamic theming if needed",
+    "Colors match hex values exactly",
+    "Dark mode is default and only mode",
+    "Sample view demonstrates all colors"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.282281+00:00",
+  "updated_at": "2026-02-14T20:27:24.724078+00:00",
+  "completed_at": "2026-02-14T20:27:24.724057+00:00",
+  "agent_output": "I've implemented a complete theming system for Rick Terminal, Rick. Here's what's done:\n\n1. **Color+Theme.swift**: Created a Color extension with all six theme colors as static properties:\n   - `.rtBackgroundDark` (#0D1010)\n   - `.rtBackgroundSecondary` (#1E3738)\n   - `.rtAccentPurple` (#7B78AA)\n   - `.rtAccentGreen` (#7FFC50)\n   - `.rtText` (#FFFFFF)\n   - `.rtMuted` (#464467)\n   \n   Also includes a hex initializer for precise color matching.\n\n2. **RickTheme.swift**: Created a singleton theme environment object with:\n   - Published properties for all theme colors\n   - Computed properties for semantic colors (terminalPrompt, terminalOutput, activeIndicator, etc.)\n   - Environment key integration for SwiftUI\n   - Convenient `.rickTheme()` view modifier\n\n3. **ThemePreview.swift**: Built a comprehensive sample view showing:\n   - All color swatches with hex values\n   - Button examples (primary, success, muted)\n   - Terminal output styling\n   - Session tab examples (active/inactive states)\n   - Status indicators\n\n4. All files have been added to the Xcode project and the build succeeds without errors.\n\nDark mode is the default and only mode, as specified. All colors match the exact hex values from the spec.",
+  "review_notes": null,
+  "files_touched": [
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/Color+Theme.swift (created)",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/RickTheme.swift (created)",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/ThemePreview.swift (created)",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal.xcodeproj/project.pbxproj (modified)"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "msg-005",
+  "team_id": "TEAM-004",
+  "from": "frontend-morty",
+  "to": "backend-morty",
+  "message": "Integration done on frontend side. The service API works great - both attributedString and ansiString outputs are being used. Fallback highlighter handles all 20 languages acceptably for current needs.",
+  "type": "info",
+  "timestamp": "2026-02-15T08:43:47.479129+00:00",
+  "read_by": []
+}

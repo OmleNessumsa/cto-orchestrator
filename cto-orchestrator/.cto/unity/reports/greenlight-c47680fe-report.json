@@ -1,0 +1,15 @@
+{
+  "id": "greenlight-c47680fe",
+  "app_path": "/Users/elmo.asmussen/Projects/HelmLog/ios/HelmLog.xcodeproj",
+  "completed_at": "2026-02-25T20:32:00.992376+00:00",
+  "compliance_score": 0,
+  "status_text": "READY FOR SUBMISSION",
+  "passed_categories": [],
+  "failed_categories": [],
+  "summary": {
+    "blockers": 0,
+    "warnings": 0,
+    "suggestions": 0
+  },
+  "findings": []
+}

@@ -1,0 +1,43 @@
+{
+  "id": "TEAM-003",
+  "parent_ticket": "RT-026",
+  "template": "fullstack-team",
+  "status": "blocked",
+  "members": [
+    {
+      "role": "architect-morty",
+      "focus": "architecture and interfaces",
+      "assignment": "RT-026-A",
+      "status": "blocked",
+      "started_at": "2026-02-15T06:55:05.383103+00:00",
+      "completed_at": "2026-02-15T06:59:56.476290+00:00",
+      "output_summary": "Architect-Morty heeft de complete architectuur ontworpen voor RT-026: de brug tussen Claude tool events en het Kanban board. Dit omvat:\n\n1. **ADR-004**: Volledige architectuurbeslissing met event flow"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "backend implementation",
+      "assignment": "RT-026-B",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "output_summary": null
+    },
+    {
+      "role": "frontend-morty",
+      "focus": "frontend implementation",
+      "assignment": "RT-026-C",
+      "status": "completed",
+      "started_at": "2026-02-15T06:59:56.532629+00:00",
+      "completed_at": "2026-02-15T07:06:06.280170+00:00",
+      "output_summary": "Ik heb de volledige UI-implementatie afgerond voor het verbinden van Claude events met Kanban board updates. Dit is wat ik gebouwd heb:"
+    }
+  ],
+  "coordination": {
+    "mode": "mixed",
+    "lead": "architect-morty"
+  },
+  "created_at": "2026-02-15T06:55:05.328152+00:00",
+  "started_at": "2026-02-15T06:55:05.383106+00:00",
+  "completed_at": null,
+  "files_reserved": {}
+}

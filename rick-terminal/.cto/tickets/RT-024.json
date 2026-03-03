@@ -1,0 +1,34 @@
+{
+  "id": "RT-024",
+  "title": "Create Card Detail View and Editor",
+  "description": "Build a detail view for Kanban cards. Click on a card to see full description, edit title/description, add labels, view history. Use a sheet or popover presentation. Include keyboard shortcuts for power users.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-004",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Card click opens detail view",
+    "Title and description editable",
+    "Labels can be added/removed",
+    "Changes save automatically",
+    "Escape closes detail view",
+    "Delete card option with confirmation"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.071150+00:00",
+  "updated_at": "2026-02-15T08:08:58.903123+00:00",
+  "completed_at": "2026-02-15T08:08:58.903107+00:00",
+  "agent_output": "Ik heb een complete card detail view en editor gebouwd voor de Kanban board, Morty-style. Hier's wat ik heb gedaan:",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Kanban/Views/CardDetailView.swift (CREATED)",
+    "RickTerminal/Kanban/Views/KanbanBoardView.swift (MODIFIED)",
+    "RickTerminal/Color+Theme.swift (MODIFIED)",
+    "IMPLEMENTATION_RT-024_SUMMARY.md (CREATED)"
+  ]
+}

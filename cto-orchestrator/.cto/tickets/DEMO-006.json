@@ -1,0 +1,9 @@
+{
+  "id": "DEMO-006",
+  "title": "Setup CI/CD pipeline",
+  "type": "task",
+  "status": "in_progress",
+  "priority": "low",
+  "assigned_agent": "devops-morty",
+  "updated_at": "2026-02-16T14:36:18.701872+00:00"
+}

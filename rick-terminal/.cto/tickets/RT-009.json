@@ -1,0 +1,35 @@
+{
+  "id": "RT-009",
+  "title": "Configure Multi-Window and Tab Support",
+  "description": "Enable macOS multi-window support so users can open multiple Rick Terminal windows. Also implement a tab bar within windows for multiple terminal sessions or files. Use WindowGroup and native macOS tab APIs.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "backend-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Cmd+N opens new window",
+    "Cmd+T opens new tab within window",
+    "Tabs display correct titles",
+    "Tab switching works with keyboard shortcuts",
+    "Window state restored on app restart"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.371961+00:00",
+  "updated_at": "2026-02-15T07:10:15.274442+00:00",
+  "completed_at": "2026-02-15T07:10:15.274425+00:00",
+  "agent_output": "Ik heb volledige multi-window en tab support ge\u00efmplementeerd voor Rick Terminal met native macOS integratie:",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/RickTerminalApp.swift",
+    "RickTerminal/MainWindowView.swift",
+    "RickTerminal/AppDelegate.swift (nieuw)",
+    "RickTerminalTests/WindowManagementTests.swift (nieuw)",
+    "IMPLEMENTATION_RT-009.md (nieuw)",
+    "IMPLEMENTATION_RT-009_SUMMARY.md (nieuw)"
+  ]
+}

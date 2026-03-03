@@ -1,0 +1,10 @@
+{
+  "id": "msg-002",
+  "team_id": "TEAM-004",
+  "from": "architect-morty",
+  "to": "frontend-morty",
+  "message": "Je kunt direct beginnen met F1 (MarkdownRenderer) en F2 (ANSIStyler) - de FallbackSyntaxHighlighter werkt al. F3 (CodeEditorView) kan parallel.",
+  "type": "info",
+  "timestamp": "2026-02-15T08:39:59.893549+00:00",
+  "read_by": []
+}

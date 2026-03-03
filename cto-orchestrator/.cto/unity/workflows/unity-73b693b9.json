@@ -1,0 +1,115 @@
+{
+  "id": "unity-73b693b9",
+  "status": "completed",
+  "target_url": null,
+  "repo_path": "/Users/elmo.asmussen/Projects/HelmLog",
+  "config_path": null,
+  "scope": "quick",
+  "mode": "static",
+  "created_at": "2026-02-12T14:16:28.227897+00:00",
+  "started_at": "2026-02-12T14:16:28.230139+00:00",
+  "completed_at": "2026-02-12T14:18:10.726409+00:00",
+  "progress": 100,
+  "current_phase": "completed",
+  "findings": [
+    {
+      "severity": "high",
+      "category": "A02:2021 - Cryptographic Failures / Sensitive Data Exposure",
+      "title": "Hardcoded API Key in Source Code",
+      "description": "The WorldTides API key is hardcoded directly in the source code: 'f8cabccd-bf75-49bb-bec1-3fc2abc2745d'. This key is exposed in version control and could be extracted from the compiled application.",
+      "file": "src/services/tidesService.ts",
+      "line": 13,
+      "recommendation": "Move API keys to environment variables or a secure configuration service. Use react-native-config or similar to load secrets at build time. For production, consider a backend proxy to hide API keys from the client."
+    },
+    {
+      "severity": "medium",
+      "category": "A02:2021 - Cryptographic Failures / Sensitive Data Exposure",
+      "title": "Placeholder API Keys in Code",
+      "description": "RevenueCat API key placeholders ('appl_YOUR_IOS_API_KEY_HERE', 'goog_YOUR_ANDROID_API_KEY_HERE') are stored in source code. When real keys are added, they will be exposed in version control.",
+      "file": "src/services/purchaseService.ts",
+      "line": 16,
+      "recommendation": "Use environment variables or a secrets management solution to inject API keys at build time rather than hardcoding them in source files."
+    },
+    {
+      "severity": "medium",
+      "category": "A05:2021 - Security Misconfiguration",
+      "title": "Insecure Local Storage for Sensitive Settings",
+      "description": "User settings and application state are stored in AsyncStorage, which is not encrypted. Sensitive data like user preferences and cached location data could be accessed by other apps or through device compromise.",
+      "file": "src/services/settingsService.ts",
+      "line": 35,
+      "recommendation": "Consider using react-native-keychain or expo-secure-store for sensitive data. Implement encryption for data stored in AsyncStorage if it contains PII or sensitive information."
+    },
+    {
+      "severity": "medium",
+      "category": "A03:2021 - Injection",
+      "title": "Dynamic Table Name in SQL PRAGMA",
+      "description": "The runMigrations function interpolates a table name directly into a SQL PRAGMA statement without parameterization. While table names are controlled internally, this pattern could lead to SQL injection if the source of table names changes.",
+      "file": "src/services/database.ts",
+      "line": 370,
+      "recommendation": "Use a whitelist of allowed table names and validate against it, or use parameterized queries where possible. Avoid string interpolation for SQL statements."
+    },
+    {
+      "severity": "low",
+      "category": "A04:2021 - Insecure Design",
+      "title": "Weak Share Code Generation",
+      "description": "The trip sharing feature uses Math.random() for generating share codes, which is not cryptographically secure. This could potentially allow an attacker to predict share codes.",
+      "file": "src/services/tripSharingService.ts",
+      "line": 53,
+      "recommendation": "When implementing the backend, use a cryptographically secure random number generator (crypto.getRandomValues or backend equivalent) for share code generation."
+    },
+    {
+      "severity": "low",
+      "category": "A09:2021 - Security Logging and Monitoring Failures",
+      "title": "Excessive Console Logging in Production",
+      "description": "Multiple files contain console.log, console.warn, and console.error statements that will execute in production builds. This could leak sensitive information to device logs.",
+      "file": "src/services/locationService.ts",
+      "line": 135,
+      "recommendation": "Implement a logging wrapper that suppresses logs in production builds, or use babel-plugin-transform-remove-console to strip console statements in release builds."
+    },
+    {
+      "severity": "low",
+      "category": "A06:2021 - Vulnerable and Outdated Components",
+      "title": "React Native Version Potentially Outdated",
+      "description": "The app uses React Native 0.72.17 which may have known security vulnerabilities. Newer versions often contain security patches.",
+      "file": "package.json",
+      "line": 24,
+      "recommendation": "Regularly update React Native and its dependencies to the latest stable versions. Review release notes for security-related fixes."
+    },
+    {
+      "severity": "info",
+      "category": "A05:2021 - Security Misconfiguration",
+      "title": "Debug Mode Settings Visible",
+      "description": "The purchaseService enables DEBUG log level when __DEV__ is true. Ensure this is properly stripped in production builds.",
+      "file": "src/services/purchaseService.ts",
+      "line": 39,
+      "recommendation": "Verify that __DEV__ checks properly disable debug features in production builds."
+    },
+    {
+      "severity": "info",
+      "category": "Best Practice",
+      "title": "XML Schema References Use HTTP",
+      "description": "GPX export uses HTTP (not HTTPS) URLs for XML schema references. While this is standard for GPX format and doesn't transmit data, it's noted for completeness.",
+      "file": "src/services/exportService.ts",
+      "line": 121,
+      "recommendation": "This is standard GPX format and not a security concern for data in transit, but note that GPX schemas use HTTP URLs by convention."
+    },
+    {
+      "severity": "info",
+      "category": "Best Practice",
+      "title": "Proper SQL Parameterization Used",
+      "description": "The database layer correctly uses parameterized queries (executeQuery, executeStatement) with params arrays, preventing SQL injection in most operations.",
+      "file": "src/services/database.ts",
+      "line": 454,
+      "recommendation": "Continue using parameterized queries for all database operations."
+    }
+  ],
+  "error": null,
+  "static_prompt": "You are Unity's static analysis mode. Perform a thorough security review of the codebase.\n\n## Target\nRepository: /Users/elmo.asmussen/Projects/HelmLog\n\n## Analysis Scope: quick\n\n## Instructions\n1. Scan for OWASP Top 10 vulnerabilities\n2. Check authentication and authorization patterns\n3. Look for injection vulnerabilities (SQL, XSS, Command)\n4. Review secrets and sensitive data handling\n5. Check dependency vulnerabilities (if package files exist)\n6. Review API security (if applicable)\n7. Check for insecure configurations\n\n## Output Format\nReturn findings as a JSON array:\n```json\n{\n  \"findings\": [\n    {\n      \"severity\": \"critical|high|medium|low|info\",\n      \"category\": \"OWASP category or custom\",\n      \"title\": \"Brief title\",\n      \"description\": \"Detailed description\",\n      \"file\": \"path/to/file.py\",\n      \"line\": 42,\n      \"recommendation\": \"How to fix\"\n    }\n  ],\n  \"summary\": {\n    \"critical\": 0,\n    \"high\": 0,\n    \"medium\": 0,\n    \"low\": 0,\n    \"info\": 0\n  }\n}\n```\n\nAnalyze the codebase now:",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 3,
+    "low": 3,
+    "info": 3
+  }
+}

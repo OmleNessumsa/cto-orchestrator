@@ -1,0 +1,19 @@
+{
+  "id": "PROM-023",
+  "title": "Add stream-json output for real-time agent progress",
+  "category": "tooling",
+  "source": "Claude Code CLI --output-format stream-json",
+  "description": "Use --output-format stream-json instead of plain text capture. Enables real-time progress streaming without waiting for full subprocess completion.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/roro_events.py"
+  ],
+  "proposed_changes": "Change subprocess.run() to Popen() with --output-format stream-json. Read stdout line-by-line parsing JSON events. Emit incremental progress events via roro. Add rate limiter.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.735769+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

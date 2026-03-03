@@ -1,0 +1,19 @@
+{
+  "id": "PROM-012",
+  "title": "XML-structured agent prompts with role/goal/constraints contract",
+  "category": "prompt-engineering",
+  "source": "Anthropic 2025-2026 best practices \u2014 XML-tagged structured prompts improve accuracy 30%",
+  "description": "Refactor flat prose AGENT_PROMPTS into XML-tagged templates with explicit sections: identity, goal, constraints, context, uncertainty handling, output contract.",
+  "impact_score": 9,
+  "risk_score": 2,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "references/prompts.md"
+  ],
+  "proposed_changes": "Restructure AGENT_PROMPTS into XML sections: <agent_identity>, <goal>, <constraints>, <context>, <uncertainty_policy>, <output_format>. Separate Rick personality from operational instructions.",
+  "status": "applied",
+  "created_at": "2026-03-01T08:55:17.734055+00:00",
+  "applied_at": "2026-03-01T09:17:16.309297+00:00",
+  "rollback_snapshot": ".cto/prometheus/snapshots/snap-PROM-017-snap-PROM-017-20260301T090713"
+}

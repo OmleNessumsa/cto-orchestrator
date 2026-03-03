@@ -1,0 +1,9 @@
+{
+  "id": "DEMO-007",
+  "title": "Security audit before launch",
+  "type": "task",
+  "status": "in_progress",
+  "priority": "high",
+  "assigned_agent": "security-morty",
+  "updated_at": "2026-02-15T18:38:19.654369+00:00"
+}

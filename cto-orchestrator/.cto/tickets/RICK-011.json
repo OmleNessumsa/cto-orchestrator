@@ -1,0 +1,32 @@
+{
+  "id": "RICK-011",
+  "title": "Implement Glassmorphism Card Component Library",
+  "description": "Create reusable React card components with glassmorphism effect: semi-transparent backgrounds with blur, subtle borders, and glow effects on hover/focus. Build variants: TicketCard, AgentCard, StatCard, PanelCard. Include entrance animations and micro-interactions.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-002",
+  "dependencies": [
+    "RICK-009"
+  ],
+  "acceptance_criteria": [
+    "Base GlassCard component with backdrop-blur-md and bg-white/10",
+    "Border uses gradient with portal-green accent",
+    "Hover state adds glow shadow and slight scale transform",
+    "Focus state shows visible ring for accessibility",
+    "TicketCard displays title, status badge, priority indicator, complexity chip",
+    "AgentCard shows avatar, name, status indicator, current task",
+    "Entrance animation uses framer-motion or CSS keyframes"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.937511+00:00",
+  "updated_at": "2026-02-13T14:39:10.682815+00:00",
+  "completed_at": "2026-02-13T14:39:10.682653+00:00",
+  "agent_output": "Implemented GlassCard component library with variants: default, portal, meeseeks, warning, success, error. Includes StatCard, InfoCard, AgentStatusCard, and EmptyState components.",
+  "review_notes": null,
+  "files_touched": []
+}

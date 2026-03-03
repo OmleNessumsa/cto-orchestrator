@@ -1,0 +1,43 @@
+{
+  "id": "TEAM-001",
+  "parent_ticket": "RT-020",
+  "template": "fullstack-team",
+  "status": "blocked",
+  "members": [
+    {
+      "role": "architect-morty",
+      "focus": "architecture and interfaces",
+      "assignment": "RT-020-A",
+      "status": "working",
+      "started_at": "2026-02-14T20:31:40.739204+00:00",
+      "completed_at": null,
+      "output_summary": null
+    },
+    {
+      "role": "backend-morty",
+      "focus": "backend implementation",
+      "assignment": "RT-020-B",
+      "status": "blocked",
+      "started_at": null,
+      "completed_at": "2026-02-14T20:42:10.901667+00:00",
+      "output_summary": "Wubba lubba dub dub, Rick! Backend integration is DONE. Here's what I built:"
+    },
+    {
+      "role": "frontend-morty",
+      "focus": "frontend implementation",
+      "assignment": "RT-020-C",
+      "status": "blocked",
+      "started_at": null,
+      "completed_at": "2026-02-14T20:41:23.059055+00:00",
+      "output_summary": "I've completed the frontend implementation for RT-020 (Claude Tool Usage Parsing). The system is fully wired:\n\n1. **Integration Layer**: ShellSession now feeds all terminal output to ClaudeOutputParse"
+    }
+  ],
+  "coordination": {
+    "mode": "mixed",
+    "lead": "architect-morty"
+  },
+  "created_at": "2026-02-14T20:31:40.688454+00:00",
+  "started_at": "2026-02-14T20:31:40.739209+00:00",
+  "completed_at": null,
+  "files_reserved": {}
+}

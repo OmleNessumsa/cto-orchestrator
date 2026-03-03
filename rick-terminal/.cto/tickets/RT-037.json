@@ -1,0 +1,36 @@
+{
+  "id": "RT-037",
+  "title": "Implement UI Testing for Critical Flows",
+  "description": "Write XCUITest for critical user flows: app launch, terminal interaction, file browser navigation, Kanban interaction. Focus on smoke tests that catch obvious regressions.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "tester-morty",
+  "parent_ticket": null,
+  "dependencies": [],
+  "acceptance_criteria": [
+    "App launch test passes",
+    "Terminal input/output test",
+    "File browser navigation test",
+    "Kanban drag and drop test",
+    "Tests reliable (no flaky tests)"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.741941+00:00",
+  "updated_at": "2026-02-15T09:08:17.243752+00:00",
+  "completed_at": "2026-02-15T09:08:17.243738+00:00",
+  "agent_output": "Ik heb een complete XCUITest suite ge\u00efmplementeerd met 25 smoke tests voor de kritieke flows van Rick Terminal. De tests dekken:\n\n1. **App Launch Tests** (6 tests) - App start, UI elementen aanwezig, window title, panel collapse/expand\n2. **Terminal Interaction Tests** (5 tests) - Keyboard input, clear commando, multi-line input, interrupt process\n3. **File Browser Tests** (6 tests) - Toggle sidebar, navigatie, folder expand/collapse, file opening\n4. **Kanban Board Tests** (8 tests) - Toggle board, columns weergave, card interactie, drag-and-drop, persistence\n\nAlle tests zijn ontworpen om **niet flaky** te zijn:\n- Gebruik van `waitForExistence(timeout:)` voor async UI\n- Predicate-based element finding (bijv. `label CONTAINS 'Terminal'`)\n- Fallback queries voor optionele UI elementen\n- Focus op smoke tests die obvious regressions vangen\n\nHet UI test target `RickTerminalUITests` is succesvol toegevoegd aan het Xcode project en alle test files zijn correct geconfigureerd (totaal 857 regels test code).",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminalUITests/AppLaunchTests.swift (nieuw - 101 regels)",
+    "RickTerminalUITests/TerminalInteractionTests.swift (nieuw - 186 regels)",
+    "RickTerminalUITests/FileBrowserTests.swift (nieuw - 257 regels)",
+    "RickTerminalUITests/KanbanBoardTests.swift (nieuw - 313 regels)",
+    "UITESTS_README.md (nieuw - documentatie)",
+    "IMPLEMENTATION_RT-037_SUMMARY.md (nieuw - implementatie samenvatting)",
+    "RickTerminal.xcodeproj/project.pbxproj (aangepast - UI test target toegevoegd)"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "team_id": "TEAM-005",
+  "parent_ticket": "RT-023",
+  "decisions": [
+    {
+      "decision": "Used `public.plain-text` UTType to carry the card UUID string \u2014 avoids App Sandbox entitlement issues with custom UTTypes on macOS",
+      "author": "backend-morty",
+      "timestamp": "2026-02-17T08:21:42.221978+00:00"
+    },
+    {
+      "decision": "Source column tracked via `@State draggingSourceColumnId` in `KanbanBoardView` rather than a global; falls back to `board.findCard(id:)` if state is ever nil (e.g., drag started outside the view hierarchy)",
+      "author": "backend-morty",
+      "timestamp": "2026-02-17T08:21:42.221984+00:00"
+    },
+    {
+      "decision": "Same-column drops are silently ignored (no board mutation, no event published)",
+      "author": "backend-morty",
+      "timestamp": "2026-02-17T08:21:42.221985+00:00"
+    }
+  ],
+  "interfaces": [],
+  "notes": [],
+  "updated_at": "2026-02-17T08:21:42.221986+00:00"
+}

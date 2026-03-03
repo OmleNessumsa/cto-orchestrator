@@ -1,0 +1,20 @@
+{
+  "id": "PROM-007",
+  "title": "Add Agent Card discovery protocol (A2A-inspired)",
+  "category": "agent-patterns",
+  "source": "Google A2A protocol v0.3 \u2014 Agent Cards for capability discovery",
+  "description": "Replace hardcoded AGENT_PROMPTS and auto_select_agent() with JSON agent cards declaring capabilities, input/output schemas, and constraints. Makes agent selection dynamic and extensible.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/team.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Create agents/ directory with JSON agent cards. Replace AGENT_PROMPTS/AGENT_MODELS with load_agent_card(). Replace auto_select_agent() with match_agent_cards() scoring against card capabilities. Replace TEAM_TEMPLATES with template files referencing cards.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.732302+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

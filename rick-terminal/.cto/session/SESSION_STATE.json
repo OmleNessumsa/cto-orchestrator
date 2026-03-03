@@ -1,0 +1,90 @@
+{
+  "active_persona": "rick",
+  "persona_intensity": 1.0,
+  "last_interaction": "2026-02-17T09:21:46.218118+00:00",
+  "current_focus": "Working on RT-032",
+  "context_markers": [
+    {
+      "marker": "Completed: Integrate Basic Code Editor",
+      "timestamp": "2026-02-15T07:23:00.969450+00:00"
+    },
+    {
+      "marker": "Completed: Implement Keyboard Shortcuts System",
+      "timestamp": "2026-02-15T07:28:48.243737+00:00"
+    },
+    {
+      "marker": "Completed: Create SF Symbols Icon System",
+      "timestamp": "2026-02-15T07:34:30.418344+00:00"
+    },
+    {
+      "marker": "Completed: Implement Command History Navigation",
+      "timestamp": "2026-02-15T07:38:31.539165+00:00"
+    },
+    {
+      "marker": "Completed: Style Claude Output with Visual Distinction",
+      "timestamp": "2026-02-15T07:47:36.714428+00:00"
+    },
+    {
+      "marker": "Completed: Security Review: Sandboxing and Entitlements",
+      "timestamp": "2026-02-15T07:50:45.941165+00:00"
+    },
+    {
+      "marker": "Completed: Implement Error Handling and User Feedback",
+      "timestamp": "2026-02-15T07:57:54.789810+00:00"
+    },
+    {
+      "marker": "Completed: Implement Session Persistence",
+      "timestamp": "2026-02-15T08:04:22.322822+00:00"
+    },
+    {
+      "marker": "Completed: Create Card Detail View and Editor",
+      "timestamp": "2026-02-15T08:08:58.892458+00:00"
+    },
+    {
+      "marker": "Completed: Write Unit Tests for Core Models",
+      "timestamp": "2026-02-15T08:16:26.476661+00:00"
+    },
+    {
+      "marker": "Completed: Persist Kanban Board State",
+      "timestamp": "2026-02-15T08:23:24.360731+00:00"
+    },
+    {
+      "marker": "Completed: Implement File Browser Actions",
+      "timestamp": "2026-02-15T08:32:59.153967+00:00"
+    },
+    {
+      "marker": "Completed: Add Syntax Highlighting with Highlightr or Tree-si",
+      "timestamp": "2026-02-15T08:39:59.895145+00:00"
+    },
+    {
+      "marker": "Completed: Add Syntax Highlighting with Highlightr or Tree-si",
+      "timestamp": "2026-02-15T08:43:47.481384+00:00"
+    },
+    {
+      "marker": "Completed: Build Tab Bar for Multi-File Editing",
+      "timestamp": "2026-02-15T08:54:50.104147+00:00"
+    },
+    {
+      "marker": "Completed: Create App Icon and Branding Assets",
+      "timestamp": "2026-02-15T09:11:36.539769+00:00"
+    },
+    {
+      "marker": "Completed: Documentation: README and Setup Guide",
+      "timestamp": "2026-02-15T09:14:58.549399+00:00"
+    },
+    {
+      "marker": "Completed: Implement Kanban Board UI with Drag and Drop",
+      "timestamp": "2026-02-17T08:21:42.224058+00:00"
+    },
+    {
+      "marker": "Completed: Performance Profiling and Optimization",
+      "timestamp": "2026-02-17T08:39:21.358733+00:00"
+    },
+    {
+      "marker": "Completed: Implement Git Status Integration",
+      "timestamp": "2026-02-17T09:21:46.218126+00:00"
+    }
+  ],
+  "conversation_count": 36,
+  "rick_quotes_used": 0
+}

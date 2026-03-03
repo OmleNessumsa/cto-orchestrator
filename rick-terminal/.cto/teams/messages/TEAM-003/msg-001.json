@@ -1,0 +1,10 @@
+{
+  "id": "msg-001",
+  "team_id": "TEAM-003",
+  "from": "architect-morty",
+  "to": "backend-morty",
+  "message": "De interfaces zijn klaar. Je moet `KanbanEventBridge` wiren in de app coordinator en de parsing testen met echte Claude output. Zie `IMPLEMENTATION_RT-026.md` voor integration example.",
+  "type": "info",
+  "timestamp": "2026-02-15T06:59:56.475599+00:00",
+  "read_by": []
+}

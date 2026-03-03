@@ -1,177 +1,137 @@
 import SwiftUI
 
-/// Main window with three-column split view layout
-/// Left: File browser | Center: Terminal/Editor | Right: Kanban & Agent columns
+/// Main window with three-column layout
 struct MainWindowView: View {
-    @StateObject private var layoutState = LayoutState()
     @StateObject private var sessionManager = ShellSessionManager()
     @StateObject private var agentColumnsManager = AgentColumnsManager()
     @StateObject private var kanbanManager = KanbanManager()
     @StateObject private var editorManager = EditorManager()
     @StateObject private var claudeProgressManager = ClaudeProgressManager()
     @StateObject private var ctoEventBridge = CTOEventBridge()
+
     @State private var showKeyboardShortcuts = false
     @State private var showSessionRestoration = false
     @State private var showSessionHistory = false
 
-    // Window restoration support
-    @SceneStorage("windowId") private var windowId: String = UUID().uuidString
-    @SceneStorage("isLeftSidebarCollapsed") private var savedLeftSidebarCollapsed: Bool = false
-    @SceneStorage("isRightPanelCollapsed") private var savedRightPanelCollapsed: Bool = false
-    @SceneStorage("leftSidebarWidth") private var savedLeftSidebarWidth: Double = 200
-    @SceneStorage("rightPanelWidth") private var savedRightPanelWidth: Double = 300
+    // Layout state - persisted
+    @AppStorage("layout.leftCollapsed") private var isLeftCollapsed = false
+    @AppStorage("layout.rightCollapsed") private var isRightCollapsed = false
+    @AppStorage("layout.agentCollapsed") private var isAgentCollapsed = false
+    @AppStorage("layout.leftWidth") private var savedLeftWidth: Double = 220
+    @AppStorage("layout.rightWidth") private var savedRightWidth: Double = 320
+    @AppStorage("layout.agentHeight") private var savedAgentHeight: Double = 250
+
+    // Runtime state for smooth dragging
+    @State private var leftWidth: CGFloat = 220
+    @State private var rightWidth: CGFloat = 320
+    @State private var agentHeight: CGFloat = 250
+    @State private var didRestoreLayout = false
 
     var body: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                // Left Sidebar - File Browser
-                if !layoutState.isLeftSidebarCollapsed {
-                    FileBrowserView()
-                        .frame(width: layoutState.leftSidebarWidth)
-                        .background(Color.rtBackgroundLight)
-
-                    DividerHandle(
-                        width: layoutState.leftSidebarWidth,
-                        minWidth: LayoutState.minLeftSidebarWidth,
-                        maxWidth: LayoutState.maxLeftSidebarWidth
-                    ) { newWidth in
-                        layoutState.leftSidebarWidth = newWidth
-                    }
-                }
-
-                // Center Panel - Terminal/Editor
-                CenterPanelView(
-                    sessionManager: sessionManager,
-                    editorManager: editorManager,
-                    claudeProgressManager: claudeProgressManager
-                )
-                .frame(maxWidth: .infinity)
-                .background(Color.rtBackgroundDark)
-
-                // Right Panel - Kanban & Agent Columns
-                if !layoutState.isRightPanelCollapsed {
-                    DividerHandle(
-                        width: layoutState.rightPanelWidth,
-                        minWidth: LayoutState.minRightPanelWidth,
-                        maxWidth: LayoutState.maxRightPanelWidth,
-                        isRightHandle: true
-                    ) { newWidth in
-                        layoutState.rightPanelWidth = newWidth
-                    }
-
-                    RightPanelView(
-                        agentColumnsManager: agentColumnsManager,
-                        kanbanManager: kanbanManager
-                    )
-                    .frame(width: layoutState.rightPanelWidth)
+        HStack(spacing: 0) {
+            // Left: File Browser
+            if !isLeftCollapsed {
+                FileBrowserView()
+                    .frame(width: leftWidth)
                     .background(Color.rtBackgroundLight)
-                }
 
-                // Toolbar for collapsing panels
-                LayoutToolbar(layoutState: layoutState)
+                DragHandle(
+                    value: $leftWidth,
+                    min: 150, max: 400,
+                    axis: .horizontal,
+                    onEnd: { savedLeftWidth = Double(leftWidth) }
+                )
+            }
+
+            // Center: Terminal/Editor
+            CenterPanelView(
+                sessionManager: sessionManager,
+                editorManager: editorManager,
+                claudeProgressManager: claudeProgressManager
+            )
+            .frame(maxWidth: .infinity)
+            .background(Color.rtBackgroundDark)
+
+            // Right: Kanban & Agents
+            if !isRightCollapsed {
+                DragHandle(
+                    value: $rightWidth,
+                    min: 280, max: 2000,
+                    axis: .horizontal,
+                    invert: true,
+                    onEnd: { savedRightWidth = Double(rightWidth) }
+                )
+
+                RightPanelView(
+                    kanbanManager: kanbanManager,
+                    agentColumnsManager: agentColumnsManager,
+                    isAgentCollapsed: $isAgentCollapsed,
+                    agentHeight: $agentHeight,
+                    onAgentHeightChange: { savedAgentHeight = Double(agentHeight) }
+                )
+                .frame(width: rightWidth)
+                .background(Color.rtBackgroundLight)
             }
         }
-        .background(Color.rtBackgroundDark)
-        .navigationTitle(windowTitle)
-        .navigationSubtitle(windowSubtitle)
-        .environmentObject(layoutState)
+        .onAppear {
+            // Restore layout (only once)
+            if !didRestoreLayout {
+                leftWidth = CGFloat(savedLeftWidth)
+                rightWidth = CGFloat(savedRightWidth)
+                agentHeight = CGFloat(savedAgentHeight)
+                didRestoreLayout = true
+
+                // Initialize CTO integration (only on first appear)
+                agentColumnsManager.clearAll()
+                connectParsers()
+                ctoEventBridge.connect(kanban: kanbanManager, agents: agentColumnsManager)
+                ctoEventBridge.start()
+            }
+        }
+        .toolbar { makeToolbar() }
         .environmentObject(sessionManager)
         .environmentObject(agentColumnsManager)
         .environmentObject(kanbanManager)
         .environmentObject(editorManager)
-        // Claude shortcuts
-        .onReceive(NotificationCenter.default.publisher(for: .toggleClaudeMode)) { _ in
-            sessionManager.toggleClaudeMode()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .launchClaude)) { _ in
-            sessionManager.launchClaude()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .exitClaude)) { _ in
-            sessionManager.exitClaude()
-        }
-        // File shortcuts
-        .onReceive(NotificationCenter.default.publisher(for: .saveFile)) { _ in
-            editorManager.saveActiveFile()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .saveAll)) { _ in
-            editorManager.saveAll()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .closeFile)) { _ in
-            if let activeFile = editorManager.activeFile {
-                editorManager.closeFile(activeFile)
-            }
-        }
-        // View shortcuts
-        .onReceive(NotificationCenter.default.publisher(for: .toggleFileBrowser)) { _ in
-            layoutState.toggleLeftSidebar()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleKanban)) { _ in
-            layoutState.toggleRightPanel()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .showKeyboardShortcuts)) { _ in
-            showKeyboardShortcuts = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .showSessionHistory)) { _ in
-            showSessionHistory = true
-        }
-        // Terminal shortcuts
-        .onReceive(NotificationCenter.default.publisher(for: .clearTerminal)) { _ in
-            // Send clear command to terminal
-            sessionManager.sendInput("clear\n")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .interruptProcess)) { _ in
-            // Send Ctrl+C (interrupt signal) to terminal
-            sessionManager.sendInput("\u{03}")
-        }
+        .environmentObject(ctoEventBridge)
+        .modifier(NotificationModifier(
+            sessionManager: sessionManager,
+            editorManager: editorManager,
+            isLeftCollapsed: $isLeftCollapsed,
+            isRightCollapsed: $isRightCollapsed,
+            showKeyboardShortcuts: $showKeyboardShortcuts,
+            showSessionHistory: $showSessionHistory
+        ))
         .sheet(isPresented: $showKeyboardShortcuts) {
             KeyboardShortcutsView()
-        }
-        .sheet(isPresented: $showSessionRestoration) {
-            SessionRestorationView(
-                sessions: sessionManager.getPersistedSessions(),
-                onRestore: { sessionId in
-                    sessionManager.restoreSession(sessionId)
-                    showSessionRestoration = false
-                },
-                onDismiss: {
-                    showSessionRestoration = false
-                }
-            )
         }
         .sheet(isPresented: $showSessionHistory) {
             SessionHistoryView(sessionManager: sessionManager)
         }
-        .errorAlert() // Enable error handling alerts
-        .onAppear {
-            connectParsers()
-            restoreWindowState()
-            checkForSessionRestoration()
-            startCTOIntegration()
-        }
+        .errorAlert()
         .onDisappear {
-            saveSessionsOnClose()
-            stopCTOIntegration()
+            sessionManager.saveAllSessions()
+            ctoEventBridge.stop()
         }
         .onChange(of: sessionManager.activeSessionId) { _ in
             connectParsers()
         }
-        .onChange(of: layoutState.isLeftSidebarCollapsed) { newValue in
-            savedLeftSidebarCollapsed = newValue
+    }
+
+    @ToolbarContentBuilder
+    private func makeToolbar() -> some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Button(action: { isLeftCollapsed.toggle() }) {
+                Image(systemName: isLeftCollapsed ? "sidebar.left" : "sidebar.left.fill")
+            }
         }
-        .onChange(of: layoutState.isRightPanelCollapsed) { newValue in
-            savedRightPanelCollapsed = newValue
-        }
-        .onChange(of: layoutState.leftSidebarWidth) { newValue in
-            savedLeftSidebarWidth = Double(newValue)
-        }
-        .onChange(of: layoutState.rightPanelWidth) { newValue in
-            savedRightPanelWidth = Double(newValue)
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button(action: { isRightCollapsed.toggle() }) {
+                Image(systemName: isRightCollapsed ? "sidebar.right" : "sidebar.right.fill")
+            }
         }
     }
 
-    // MARK: - Parser Connection
-
-    /// Connect the active session's parser to managers
     private func connectParsers() {
         guard let session = sessionManager.getActiveSession() else {
             agentColumnsManager.unsubscribe()
@@ -179,257 +139,243 @@ struct MainWindowView: View {
             claudeProgressManager.unsubscribe()
             return
         }
-
         agentColumnsManager.subscribe(to: session.claudeParser)
         kanbanManager.subscribe(to: session.claudeParser)
         claudeProgressManager.subscribe(to: session.claudeParser)
     }
 
-    // MARK: - Window State Restoration
-
-    /// Restore window state from scene storage
-    private func restoreWindowState() {
-        layoutState.isLeftSidebarCollapsed = savedLeftSidebarCollapsed
-        layoutState.isRightPanelCollapsed = savedRightPanelCollapsed
-        layoutState.leftSidebarWidth = CGFloat(savedLeftSidebarWidth)
-        layoutState.rightPanelWidth = CGFloat(savedRightPanelWidth)
-    }
-
-    // MARK: - Session Persistence
-
-    /// Check if there are saved sessions and prompt for restoration
-    private func checkForSessionRestoration() {
-        // Temporarily disabled to debug freezing issue
-        // let savedSessions = sessionManager.getPersistedSessions()
-        // if !savedSessions.isEmpty {
-        //     showSessionRestoration = true
-        // }
-    }
-
-    /// Save all sessions when the window closes
-    private func saveSessionsOnClose() {
-        sessionManager.saveAllSessions()
-    }
-
-    // MARK: - CTO Integration
-
-    /// Start CTO-Orchestrator event bridge
-    private func startCTOIntegration() {
-        ctoEventBridge.connect(kanban: kanbanManager, agents: agentColumnsManager)
-        ctoEventBridge.start()
-    }
-
-    /// Stop CTO-Orchestrator event bridge
-    private func stopCTOIntegration() {
-        ctoEventBridge.stop()
-    }
-
-    // MARK: - Window Title
-
-    /// Compute window title based on current state
-    private var windowTitle: String {
-        if sessionManager.claudeMode {
-            return "Rick Terminal - Claude Mode"
-        }
-
-        if let activeSession = sessionManager.getActiveSession() {
-            let sessionNumber = sessionManager.sessionIds.firstIndex(of: activeSession.id).map { $0 + 1 } ?? 1
-            return "Rick Terminal - Session \(sessionNumber)"
-        }
-
-        return "Rick Terminal"
-    }
-
-    /// Compute window subtitle
-    private var windowSubtitle: String {
-        return "\(sessionManager.sessionCount) session\(sessionManager.sessionCount == 1 ? "" : "s")"
-    }
 }
 
-// MARK: - Layout State
+// MARK: - Notification Modifier
 
-class LayoutState: ObservableObject {
-    // Panel widths (using Double for AppStorage compatibility)
-    @AppStorage("leftSidebarWidth") private var _leftSidebarWidth: Double = 200
-    @AppStorage("rightPanelWidth") private var _rightPanelWidth: Double = 300
+struct NotificationModifier: ViewModifier {
+    @ObservedObject var sessionManager: ShellSessionManager
+    @ObservedObject var editorManager: EditorManager
+    @Binding var isLeftCollapsed: Bool
+    @Binding var isRightCollapsed: Bool
+    @Binding var showKeyboardShortcuts: Bool
+    @Binding var showSessionHistory: Bool
 
-    var leftSidebarWidth: CGFloat {
-        get { CGFloat(_leftSidebarWidth) }
-        set { _leftSidebarWidth = Double(newValue) }
-    }
-
-    var rightPanelWidth: CGFloat {
-        get { CGFloat(_rightPanelWidth) }
-        set { _rightPanelWidth = Double(newValue) }
-    }
-
-    // Collapsed states
-    @AppStorage("isLeftSidebarCollapsed") var isLeftSidebarCollapsed: Bool = false
-    @AppStorage("isRightPanelCollapsed") var isRightPanelCollapsed: Bool = false
-
-    // Width constraints
-    static let minLeftSidebarWidth: CGFloat = 150
-    static let maxLeftSidebarWidth: CGFloat = 400
-    static let minRightPanelWidth: CGFloat = 250
-    static let maxRightPanelWidth: CGFloat = 600
-
-    func toggleLeftSidebar() {
-        isLeftSidebarCollapsed.toggle()
-    }
-
-    func toggleRightPanel() {
-        isRightPanelCollapsed.toggle()
-    }
-}
-
-// MARK: - Divider Handle
-
-struct DividerHandle: View {
-    let width: CGFloat
-    let minWidth: CGFloat
-    let maxWidth: CGFloat
-    var isRightHandle: Bool = false
-    let onDrag: (CGFloat) -> Void
-
-    @State private var isDragging = false
-    @State private var dragStartWidth: CGFloat = 0
-
-    var body: some View {
-        Rectangle()
-            .fill(isDragging ? Color.rtAccentGreen.opacity(0.3) : Color.rtBorderSubtle)
-            .frame(width: 1)
-            .background(
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 10)
-            )
-            .contentShape(Rectangle().size(width: 10, height: .infinity))
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .toggleClaudeMode)) { _ in
+                sessionManager.toggleClaudeMode()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .launchClaude)) { _ in
+                sessionManager.launchClaude()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .exitClaude)) { _ in
+                sessionManager.exitClaude()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .saveFile)) { _ in
+                editorManager.saveActiveFile()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .saveAll)) { _ in
+                editorManager.saveAll()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .closeFile)) { _ in
+                if let file = editorManager.activeFile {
+                    editorManager.closeFile(file)
                 }
             }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if !isDragging {
-                            isDragging = true
-                            dragStartWidth = width
-                        }
-
-                        let delta = isRightHandle ? -value.translation.width : value.translation.width
-                        let newWidth = max(minWidth, min(maxWidth, dragStartWidth + delta))
-                        onDrag(newWidth)
-                    }
-                    .onEnded { _ in
-                        isDragging = false
-                    }
-            )
-            .cursor(.resizeLeftRight)
+            .onReceive(NotificationCenter.default.publisher(for: .toggleFileBrowser)) { _ in
+                isLeftCollapsed.toggle()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleKanban)) { _ in
+                isRightCollapsed.toggle()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showKeyboardShortcuts)) { _ in
+                showKeyboardShortcuts = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showSessionHistory)) { _ in
+                showSessionHistory = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .clearTerminal)) { _ in
+                sessionManager.sendInput("clear\n")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .interruptProcess)) { _ in
+                sessionManager.sendInput("\u{03}")
+            }
     }
 }
 
-// MARK: - Layout Toolbar
+// MARK: - Drag Handle (AppKit-based to avoid SwiftUI update loops)
 
-struct LayoutToolbar: View {
-    @ObservedObject var layoutState: LayoutState
+struct DragHandle: View {
+    @Binding var value: CGFloat
+    let min: CGFloat
+    let max: CGFloat
+    var axis: Axis = .horizontal
+    var invert: Bool = false
+    var onEnd: () -> Void = {}
+
+    enum Axis { case horizontal, vertical }
+
+    var body: some View {
+        DragHandleRepresentable(
+            axis: axis,
+            onDrag: { delta in
+                let newValue = value + (invert ? -delta : delta)
+                value = Swift.min(max, Swift.max(min, newValue))
+            },
+            onEnd: onEnd
+        )
+        .frame(width: axis == .horizontal ? 1 : nil, height: axis == .vertical ? 1 : nil)
+    }
+}
+
+struct DragHandleRepresentable: NSViewRepresentable {
+    let axis: DragHandle.Axis
+    let onDrag: (CGFloat) -> Void
+    let onEnd: () -> Void
+
+    func makeNSView(context: Context) -> DragHandleNSView {
+        let view = DragHandleNSView()
+        view.axis = axis
+        view.onDrag = onDrag
+        view.onEnd = onEnd
+        return view
+    }
+
+    func updateNSView(_ nsView: DragHandleNSView, context: Context) {
+        nsView.onDrag = onDrag
+        nsView.onEnd = onEnd
+    }
+}
+
+class DragHandleNSView: NSView {
+    var axis: DragHandle.Axis = .horizontal
+    var onDrag: ((CGFloat) -> Void)?
+    var onEnd: (() -> Void)?
+
+    private var isDragging = false
+    private var lastPoint: NSPoint = .zero
+    private var trackingArea: NSTrackingArea?
+
+    override var intrinsicContentSize: NSSize {
+        // Visual size only - 1px
+        axis == .horizontal
+            ? NSSize(width: 1, height: NSView.noIntrinsicMetric)
+            : NSSize(width: NSView.noIntrinsicMetric, height: 1)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+        // Expanded tracking area for easier grabbing
+        let expansion: CGFloat = 4
+        let expandedRect: NSRect
+        if axis == .horizontal {
+            expandedRect = bounds.insetBy(dx: -expansion, dy: 0)
+        } else {
+            expandedRect = bounds.insetBy(dx: 0, dy: -expansion)
+        }
+        trackingArea = NSTrackingArea(
+            rect: expandedRect,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea!)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let color = isDragging ? NSColor.systemGreen.withAlphaComponent(0.6) : NSColor.separatorColor
+        color.setFill()
+        bounds.fill()
+    }
+
+    override func resetCursorRects() {
+        let cursor: NSCursor = axis == .horizontal ? .resizeLeftRight : .resizeUpDown
+        // Expanded cursor rect
+        let expansion: CGFloat = 4
+        let expandedRect = axis == .horizontal
+            ? bounds.insetBy(dx: -expansion, dy: 0)
+            : bounds.insetBy(dx: 0, dy: -expansion)
+        addCursorRect(expandedRect, cursor: cursor)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        isDragging = true
+        lastPoint = event.locationInWindow
+        needsDisplay = true
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isDragging else { return }
+        let currentPoint = event.locationInWindow
+        let delta = axis == .horizontal ? currentPoint.x - lastPoint.x : currentPoint.y - lastPoint.y
+        lastPoint = currentPoint
+        onDrag?(delta)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        isDragging = false
+        needsDisplay = true
+        onEnd?()
+    }
+}
+
+// MARK: - Right Panel View
+
+struct RightPanelView: View {
+    @ObservedObject var kanbanManager: KanbanManager
+    @ObservedObject var agentColumnsManager: AgentColumnsManager
+    @Binding var isAgentCollapsed: Bool
+    @Binding var agentHeight: CGFloat
+    var onAgentHeightChange: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
+            // Kanban Board
+            KanbanBoardView(
+                board: kanbanManager.board,
+                bridge: kanbanManager.bridge
+            )
+            .frame(maxHeight: .infinity)
 
-            VStack(spacing: 8) {
-                // Toggle left sidebar
-                Button(action: { layoutState.toggleLeftSidebar() }) {
-                    Image(systemName: layoutState.isLeftSidebarCollapsed ? "sidebar.left" : "sidebar.left.fill")
-                        .foregroundColor(.rtAccentGreen)
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .help(layoutState.isLeftSidebarCollapsed ? "Show File Browser" : "Hide File Browser")
+            // Divider with toggle and drag
+            agentDivider
 
-                Divider()
-                    .frame(width: 20)
-                    .background(Color.rtBorderSubtle)
-
-                // Toggle right panel
-                Button(action: { layoutState.toggleRightPanel() }) {
-                    Image(systemName: layoutState.isRightPanelCollapsed ? "sidebar.right" : "sidebar.right.fill")
-                        .foregroundColor(.rtAccentGreen)
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .help(layoutState.isRightPanelCollapsed ? "Show Kanban Board" : "Hide Kanban Board")
-            }
-            .padding(8)
-            .background(Color.rtBackgroundLight.opacity(0.8))
-            .cornerRadius(8)
-            .padding(.bottom, 16)
-            .padding(.trailing, 8)
+            // Agent Columns
+            AgentColumnsContainer(
+                manager: agentColumnsManager,
+                containerHeight: agentHeight,
+                isCollapsed: isAgentCollapsed,
+                onToggleCollapse: { isAgentCollapsed.toggle() }
+            )
+            .frame(height: isAgentCollapsed ? 36 : agentHeight)
         }
+    }
+
+    private var agentDivider: some View {
+        // Just the drag handle - AgentColumnsContainer has its own header
+        DragHandle(
+            value: $agentHeight,
+            min: 100, max: 400,
+            axis: .vertical,
+            onEnd: onAgentHeightChange
+        )
+        .opacity(isAgentCollapsed ? 0 : 1)
     }
 }
 
-// MARK: - Panel Views
+// MARK: - Center Panel View
 
 struct CenterPanelView: View {
     @ObservedObject var sessionManager: ShellSessionManager
     @ObservedObject var editorManager: EditorManager
     @ObservedObject var claudeProgressManager: ClaudeProgressManager
-    @State private var showEditor: Bool = false
+    @State private var showEditor = false
 
     var body: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                // Toggle bar
-                HStack(spacing: 0) {
-                    // Terminal tab
-                    Button(action: { showEditor = false }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "terminal")
-                                .font(.system(size: 11))
-                            Text("Terminal")
-                                .font(.system(size: 12, design: .monospaced))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(showEditor ? Color.clear : Color.rtBackgroundDark)
-                        .foregroundColor(showEditor ? .rtTextSecondary : .rtTextPrimary)
-                    }
-                    .buttonStyle(.plain)
+                tabBar
+                Divider().background(Color.rtBorderSubtle)
 
-                    // Editor tab
-                    Button(action: { showEditor = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 11))
-                            Text("Editor")
-                                .font(.system(size: 12, design: .monospaced))
-
-                            // Unsaved changes indicator
-                            if editorManager.hasUnsavedChanges {
-                                Circle()
-                                    .fill(Color.rtAccentGreen)
-                                    .frame(width: 6, height: 6)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(showEditor ? Color.rtBackgroundDark : Color.clear)
-                        .foregroundColor(showEditor ? .rtTextPrimary : .rtTextSecondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-                }
-                .background(Color.rtBackgroundLight)
-
-                Divider()
-                    .background(Color.rtBorderSubtle)
-
-                // Content
                 if showEditor {
                     EditorPanelView(editorManager: editorManager)
                 } else {
@@ -437,23 +383,16 @@ struct CenterPanelView: View {
                 }
             }
 
-            // Claude Progress Overlay (only when in terminal mode and Claude is active)
             if !showEditor && sessionManager.claudeMode {
                 VStack {
-                    Spacer()
-                        .frame(height: 50) // Below the tab bar
-
+                    Spacer().frame(height: 50)
                     ClaudeProgressOverlay(progressManager: claudeProgressManager)
-
                     Spacer()
                 }
             }
         }
         .onChange(of: editorManager.activeFileId) { newValue in
-            // Auto-switch to editor when a file is opened
-            if newValue != nil {
-                showEditor = true
-            }
+            if newValue != nil { showEditor = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchToTerminal)) { _ in
             showEditor = false
@@ -462,41 +401,35 @@ struct CenterPanelView: View {
             showEditor = true
         }
     }
-}
 
-struct RightPanelView: View {
-    @ObservedObject var agentColumnsManager: AgentColumnsManager
-    @ObservedObject var kanbanManager: KanbanManager
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Kanban Board Section - Real Implementation
-            KanbanBoardView(
-                board: kanbanManager.board,
-                bridge: kanbanManager.bridge
-            )
-            .frame(maxHeight: .infinity)
-
-            Divider()
-                .background(Color.rtBorderSubtle)
-
-            // Agent Columns Section - Real Implementation
-            AgentColumnsContainer(manager: agentColumnsManager, containerHeight: 300)
-        }
-    }
-}
-
-// MARK: - Custom Cursor Modifier
-
-extension View {
-    func cursor(_ cursor: NSCursor) -> some View {
-        self.onHover { hovering in
-            if hovering {
-                cursor.push()
-            } else {
-                NSCursor.pop()
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            tabButton(title: "Terminal", icon: "terminal", isActive: !showEditor) {
+                showEditor = false
             }
+            tabButton(title: "Editor", icon: "doc.text", isActive: showEditor, badge: editorManager.hasUnsavedChanges) {
+                showEditor = true
+            }
+            Spacer()
         }
+        .background(Color.rtBackgroundLight)
+    }
+
+    private func tabButton(title: String, icon: String, isActive: Bool, badge: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 11))
+                Text(title).font(.system(size: 12, design: .monospaced))
+                if badge {
+                    Circle().fill(Color.rtAccentGreen).frame(width: 6, height: 6)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isActive ? Color.rtBackgroundDark : Color.clear)
+            .foregroundColor(isActive ? .rtTextPrimary : .rtTextSecondary)
+        }
+        .buttonStyle(.plain)
     }
 }
 

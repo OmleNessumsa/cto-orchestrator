@@ -1,0 +1,28 @@
+{
+  "id": "RICK-004",
+  "title": "Initialize Tauri 2.0 Project Structure",
+  "description": "Create the base Tauri 2.0 project with proper directory structure. Set up the Rust backend in src-tauri/, React frontend in src/, and configure Cargo.toml and package.json with all required dependencies. Include tauri-plugin-sql for SQLite, tauri-plugin-shell for subprocess management, and tauri-plugin-websocket for real-time communication.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "npm create tauri-app completes successfully with React + TypeScript template",
+    "Cargo.toml includes tauri 2.0, tauri-plugin-sql, tauri-plugin-shell, tauri-plugin-websocket",
+    "package.json includes react 18+, typescript 5+, tailwindcss 3+, @tauri-apps/api 2+",
+    "Project structure follows Tauri 2.0 conventions with src-tauri/ and src/ directories",
+    "npm run tauri dev launches application window without errors"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.601270+00:00",
+  "updated_at": "2026-02-13T14:06:23.886740+00:00",
+  "completed_at": "2026-02-13T14:06:23.886600+00:00",
+  "agent_output": "Tauri 2.0 project initialized with React TypeScript, Tailwind CSS, and all required dependencies. IPC bridge implemented.",
+  "review_notes": null,
+  "files_touched": []
+}

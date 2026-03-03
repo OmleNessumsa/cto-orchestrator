@@ -1,0 +1,10 @@
+{
+  "id": "msg-001",
+  "team_id": "TEAM-002",
+  "from": "architect-morty",
+  "to": "backend-morty",
+  "message": "Architecture and interfaces complete. `AgentColumnsManager` is ready for integration - it subscribes to `ClaudeOutputParser.eventPublisher` and handles all Task tool events automatically. Wire it up in `ShellSessionManager` or wherever the parser instance lives.",
+  "type": "info",
+  "timestamp": "2026-02-15T06:52:01.349677+00:00",
+  "read_by": []
+}

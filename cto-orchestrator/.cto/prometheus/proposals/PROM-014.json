@@ -1,0 +1,18 @@
+{
+  "id": "PROM-014",
+  "title": "Effort-scaling instructions to match task complexity",
+  "category": "prompt-engineering",
+  "source": "Anthropic multi-agent research system engineering blog",
+  "description": "Pass ticket complexity (XS-XL) to agent prompts with calibrated effort guidance. Currently all agents get identical instructions regardless of task size.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add COMPLEXITY_GUIDANCE dict mapping XS-XL to specific effort rules (files to touch, test requirements, analysis depth). Inject into prompt based on ticket estimated_complexity.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.734333+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

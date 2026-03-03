@@ -1,0 +1,37 @@
+{
+  "id": "RT-013",
+  "title": "Configure Terminal Appearance and Fonts",
+  "description": "Set up terminal appearance: custom background color (#0D1010), foreground text (#ffffff), configure a good monospace font (SF Mono or Menlo), cursor style, and ANSI color palette that matches the Rick Terminal theme. Make these configurable.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-002",
+  "dependencies": [
+    "RT-012",
+    "RT-008"
+  ],
+  "acceptance_criteria": [
+    "Terminal uses theme background color",
+    "Text is clearly readable in theme colors",
+    "Monospace font renders crisply",
+    "Cursor is visible and styled appropriately",
+    "ANSI colors map to theme palette",
+    "Font size adjustable with Cmd+/Cmd-"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.555122+00:00",
+  "updated_at": "2026-02-14T20:44:55.369860+00:00",
+  "completed_at": "2026-02-14T20:44:55.369839+00:00",
+  "agent_output": "Terminal appearance volledig geconfigureerd met:\n\n1. **TerminalSettings.swift** - Centralized settings manager:\n   - SF Mono / Menlo font selection (default 13pt, adjustable 8-36pt)\n   - Background color (#0D1010) and foreground (#FFFFFF) from Rick Terminal theme\n   - ANSI color palette (16 colors) matching theme colors\n   - Cursor color (green accent)\n   - Font size shortcuts: Cmd+ / Cmd- / Cmd+0\n\n2. **TerminalView.swift** - Enhanced terminal with appearance:\n   - Integrated TerminalSettings\n   - ANSI color configuration\n   - Font rendering with SF Mono/Menlo\n   - Font size keyboard shortcuts in event monitoring\n   - Proper foreground/background colors\n\n3. **RickTerminalApp.swift** - App-level integration:\n   - TerminalSettings injected via @StateObject\n   - View menu with font size controls\n   - Settings distributed to view hierarchy\n\n4. **ContentView.swift** - Simplified for terminal focus:\n   - Using theme colors (rtBackgroundDark)\n   - Ready for actual TerminalView integration",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/TerminalSettings.swift",
+    "RickTerminal/TerminalView.swift",
+    "RickTerminal/RickTerminalApp.swift",
+    "RickTerminal/ContentView.swift"
+  ]
+}

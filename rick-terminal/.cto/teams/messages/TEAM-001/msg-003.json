@@ -1,0 +1,10 @@
+{
+  "id": "msg-003",
+  "team_id": "TEAM-001",
+  "from": "backend-morty",
+  "to": "frontend-morty",
+  "message": "Backend complete! Check IMPLEMENTATION_RT-020.md for integration points. All observables ready: `session.statusPublisher?.mainAgentStatus` for current status, `session.toolEventPublisher` for raw events, `manager.agentStatuses` for multi-session view. See docs/USAGE_EXAMPLES.md for SwiftUI templates.",
+  "type": "info",
+  "timestamp": "2026-02-14T20:42:10.900304+00:00",
+  "read_by": []
+}

@@ -1,0 +1,14 @@
+{
+  "proposal_id": "PROM-003",
+  "created_at": "2026-02-27T17:49:54.687917+00:00",
+  "files": {
+    "scripts/ticket.py": {
+      "snapshot_name": "scripts__ticket.py",
+      "original_size": 17676
+    },
+    "scripts/team.py": {
+      "snapshot_name": "scripts__team.py",
+      "original_size": 27656
+    }
+  }
+}

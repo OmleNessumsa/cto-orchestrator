@@ -1,0 +1,36 @@
+{
+  "id": "RICK-024",
+  "title": "Add Settings Panel and User Preferences",
+  "description": "Create a comprehensive settings panel for user preferences. Categories: Appearance (theme, animations, background), Notifications (per-event toggles), Terminal (font size, Rick persona), Performance (star field, animations), Keyboard Shortcuts (customizable), Data (export, import, reset).",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-006",
+    "RICK-009",
+    "RICK-013"
+  ],
+  "acceptance_criteria": [
+    "Settings view with categorized navigation sidebar",
+    "Appearance: animation toggle, background selector, accent color",
+    "Notifications: checkbox per event type (completion, error, etc)",
+    "Terminal: font size slider, Rick persona toggle",
+    "Performance: star field toggle, reduce motion toggle",
+    "Keyboard shortcuts: table with action, current binding, rebind button",
+    "Data: Export All (JSON), Import, Reset to Defaults buttons",
+    "Changes apply immediately with no restart required",
+    "Settings persisted to SQLite settings table"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.595328+00:00",
+  "updated_at": "2026-02-13T14:39:36.273141+00:00",
+  "completed_at": "2026-02-13T14:39:36.272960+00:00",
+  "agent_output": "Settings panel with General, Agent Configuration, Appearance sections. Includes project directory, auto-save toggle, notifications, model selection, budget, allowed tools, theme previews.",
+  "review_notes": null,
+  "files_touched": []
+}

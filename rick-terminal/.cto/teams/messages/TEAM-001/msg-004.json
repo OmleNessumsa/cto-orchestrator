@@ -1,0 +1,10 @@
+{
+  "id": "msg-004",
+  "team_id": "TEAM-001",
+  "from": "backend-morty",
+  "to": "architect-morty",
+  "message": "Implementation follows your guide exactly. Parser integrated inline, thread-safe via queues, opt-in via constructor (default enabled). ADR-002 documents all decisions.",
+  "type": "info",
+  "timestamp": "2026-02-14T20:42:10.900893+00:00",
+  "read_by": []
+}

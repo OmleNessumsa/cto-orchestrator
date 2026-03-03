@@ -1,0 +1,11 @@
+{
+  "id": "DEMO-003",
+  "title": "Build login/register UI components",
+  "type": "feature",
+  "status": "blocked",
+  "priority": "high",
+  "assigned_agent": "reviewer-morty",
+  "updated_at": "2026-02-16T15:29:49.114879+00:00",
+  "agent_output": "DEMO-003 was incorrectly assigned to reviewer-morty instead of a builder agent. No login/register UI components exist. Attempted to implement vanilla HTML/CSS/JS components but file creation was blocked by sandbox permissions. The ticket requirements are under-specified (no framework, no API details, no styling guidelines).",
+  "files_touched": []
+}

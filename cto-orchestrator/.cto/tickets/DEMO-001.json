@@ -1,0 +1,9 @@
+{
+  "id": "DEMO-001",
+  "title": "Setup project architecture",
+  "type": "epic",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "architect-morty",
+  "created_at": "2026-02-12T10:00:00Z"
+}

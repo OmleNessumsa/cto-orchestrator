@@ -1,0 +1,10 @@
+{
+  "id": "msg-001",
+  "team_id": "TEAM-005",
+  "from": "backend-morty",
+  "to": "frontend-morty",
+  "message": "Drag-and-drop is fully wired. `KanbanColumnView` now accepts `onDrop` and `onDragStarted` callbacks \u2014 pass them through from `KanbanBoardView` which owns the state. The `isDropTargeted` highlight and empty-state \"Drop here\" UI are already in `KanbanColumnView`. No API changes needed from your side.",
+  "type": "info",
+  "timestamp": "2026-02-17T08:21:42.221487+00:00",
+  "read_by": []
+}

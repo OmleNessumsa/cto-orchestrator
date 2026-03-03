@@ -1,0 +1,39 @@
+{
+  "id": "RT-036",
+  "title": "Write Unit Tests for Core Models",
+  "description": "Write XCTest unit tests for core data models: Kanban Board, Card, Session, Theme. Test encoding/decoding, state mutations, edge cases. Aim for >80% coverage on model layer.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "tester-morty",
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-024",
+    "RT-013"
+  ],
+  "acceptance_criteria": [
+    "Tests for Kanban models",
+    "Tests for session models",
+    "Tests for theme/color utilities",
+    "Edge cases covered",
+    "Tests run in CI",
+    ">80% model coverage"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.693521+00:00",
+  "updated_at": "2026-02-15T08:16:26.484033+00:00",
+  "completed_at": "2026-02-15T08:16:26.484019+00:00",
+  "agent_output": "Ik heb een complete unit test suite gebouwd voor alle core models, Rick! Hier is wat ik heb gedaan:",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminalTests/KanbanCardTests.swift (new, 507 lines, 36 tests)",
+    "RickTerminalTests/KanbanColumnTests.swift (new, 554 lines, 35 tests)",
+    "RickTerminalTests/KanbanBoardTests.swift (new, 738 lines, 34 tests)",
+    "RickTerminalTests/CardSourceTests.swift (new, 307 lines, 18 tests)",
+    "RickTerminalTests/ColorThemeTests.swift (new, 408 lines, 39 tests)",
+    "IMPLEMENTATION_RT-036_SUMMARY.md (new, comprehensive test summary)"
+  ]
+}

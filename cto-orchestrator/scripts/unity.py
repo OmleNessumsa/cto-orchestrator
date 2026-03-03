@@ -22,11 +22,39 @@ NEW: Greenlight iOS Compliance Scanning
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+# Import security utilities
+try:
+    from security_utils import (
+        sanitize_prompt_content,
+        validate_safe_path,
+        validate_url,
+    )
+except ImportError:
+    def sanitize_prompt_content(content):
+        return (content or "")[:10000].replace('\x00', '')
+
+    def validate_safe_path(base, user_path):
+        full = (base / user_path).resolve()
+        if not str(full).startswith(str(base.resolve())):
+            raise ValueError("Path traversal detected")
+        return full
+
+    def validate_url(url, require_https=False):
+        if not url:
+            return False
+        pattern = re.compile(r'^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/[^\s]*)?$')
+        if not pattern.match(url):
+            return False
+        if require_https and not url.startswith('https://'):
+            return False
+        return True
 
 
 def find_cto_root(start: Optional[str] = None) -> Path:

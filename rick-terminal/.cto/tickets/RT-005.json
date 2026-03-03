@@ -1,0 +1,30 @@
+{
+  "id": "RT-005",
+  "title": "EPIC: IDE Features & File Management",
+  "description": "Implement the IDE components: file explorer, code editor with syntax highlighting, git integration, and multi-tab support. These are the tools that make Rick Terminal more than just a pretty terminal.",
+  "type": "epic",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-001"
+  ],
+  "acceptance_criteria": [
+    "File browser navigates filesystem correctly",
+    "Code editor opens and edits files",
+    "Syntax highlighting for common languages",
+    "Git status displayed in file browser",
+    "Multiple tabs can be opened and managed"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.189259+00:00",
+  "updated_at": "2026-02-17T09:55:54.808187+00:00",
+  "completed_at": null,
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

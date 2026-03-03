@@ -1,0 +1,35 @@
+{
+  "id": "RT-038",
+  "title": "Security Review: Sandboxing and Entitlements",
+  "description": "Review and configure app sandboxing. Request only necessary entitlements: file system access, network (for Claude), shell execution. Ensure no unnecessary permissions. Document security model for App Store review.",
+  "type": "spike",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "architect-morty",
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-013",
+    "RT-019"
+  ],
+  "acceptance_criteria": [
+    "Minimum required entitlements identified",
+    "Sandbox configuration tested",
+    "File access scoped appropriately",
+    "Network access restricted as needed",
+    "Security documentation written"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.788696+00:00",
+  "updated_at": "2026-02-15T07:50:45.949021+00:00",
+  "completed_at": "2026-02-15T07:50:45.949007+00:00",
+  "agent_output": "Volledige security review en sandbox configuratie uitgevoerd voor App Store compliance:\n\n1. **Entitlements geanalyseerd**: De originele entitlements waren te restrictief (alleen `app-sandbox` en `files.user-selected.read-only`) voor een terminal app die shell processen moet spawnen en met Claude CLI moet communiceren.\n\n2. **Minimum entitlements geconfigureerd**:\n   - `network.client` - Outbound HTTPS voor Claude CLI \u2192 Anthropic API\n   - `files.user-selected.read-write` - Open/Save dialogs\n   - Home directory read (temporary exception) - Shell init files (.zshrc, .bashrc)\n   - Home directory write (scoped) - Shell history, app state\n   - System paths read-only - /usr/local/bin, /opt/homebrew/bin voor tool discovery\n   - `allow-unsigned-executable-memory` - PTY/posix_spawn voor shell processen\n   - `disable-library-validation` - Shell plugins (Oh My Zsh, etc.)\n   - Application groups - UserDefaults persistence\n\n3. **Security documentatie geschreven**: Uitgebreide `SECURITY_MODEL.md` voor App Store review met:\n   - Entitlement justifications tabel\n   - Data flow architectuur diagram\n   - Privacy policy (geen data collectie)\n   - Vergelijking met andere terminal apps\n\n4. **ADR-005 aangemaakt**: Architectuur beslissing gedocumenteerd met alternatieven en rationale.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/RickTerminal.entitlements",
+    "docs/SECURITY_MODEL.md",
+    "docs/adr/ADR-005-app-sandbox-security-model.md"
+  ]
+}

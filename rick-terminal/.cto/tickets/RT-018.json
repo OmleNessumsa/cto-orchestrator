@@ -1,0 +1,38 @@
+{
+  "id": "RT-018",
+  "title": "Implement Claude Auto-Launch on Terminal Start",
+  "description": "When a new terminal session starts, automatically launch Claude CLI in interactive mode. Make this optional/configurable. Handle the case where user wants a plain shell sometimes. Add a keyboard shortcut to toggle Claude mode.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-003",
+  "dependencies": [
+    "RT-013"
+  ],
+  "acceptance_criteria": [
+    "Claude launches automatically on terminal start (if enabled)",
+    "Option to start plain shell instead",
+    "Keyboard shortcut to launch Claude in existing shell",
+    "Claude session state maintained",
+    "Clean exit when terminal closes"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.797837+00:00",
+  "updated_at": "2026-02-15T06:43:19.601102+00:00",
+  "completed_at": "2026-02-15T06:43:19.601085+00:00",
+  "agent_output": "Implemented complete Claude CLI auto-launch functionality:\n\n1. **Auto-Launch Configuration**: Added `claudeAutoLaunch` and `claudeAutoLaunchPrompt` settings stored in UserDefaults via @AppStorage in TerminalSettings.swift:114-117\n\n2. **Session Management**: Extended ShellSessionManager with Claude integration methods:\n   - `launchClaude()`: Sends \"claude\\n\" to active session\n   - `exitClaude()`: Sends \"exit\\n\" to exit Claude\n   - `toggleClaudeMode()`: Toggles between Claude and plain shell\n   - `handleAutoLaunchIfNeeded()`: Checks settings and auto-launches with 0.5s delay\n\n3. **Auto-Launch Trigger**: Modified ContentView.swift:149 to call auto-launch after initial session creation\n\n4. **Keyboard Shortcuts**: Added Claude menu in RickTerminalApp.swift with three shortcuts:\n   - \u2318\u21e7C: Toggle Claude Mode\n   - \u2318\u21e7L: Launch Claude CLI\n   - \u2318\u21e7E: Exit Claude CLI\n   \n   Implemented via NotificationCenter for loose coupling between menu and session manager\n\n5. **Settings UI**: Enhanced ClaudeSettingsView.swift with:\n   - Auto-launch toggle section\n   - Keyboard shortcuts display\n   - Increased window height (550\u2192700) to accommodate new sections\n\n6. **State Management**: Centralized ShellSessionManager in MainWindowView, added `claudeMode` published property to track current state, and connected notification listeners\n\nAll acceptance criteria met. Build succeeded with no errors. Ready for manual testing.",
+  "review_notes": null,
+  "files_touched": [
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/TerminalSettings.swift",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/ShellSessionManager.swift",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/ContentView.swift",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/RickTerminalApp.swift",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/MainWindowView.swift",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/RickTerminal/ClaudeSettingsView.swift",
+    "/Users/elmo.asmussen/Projects/CTO/rick-terminal/IMPLEMENTATION_RT-018.md"
+  ]
+}

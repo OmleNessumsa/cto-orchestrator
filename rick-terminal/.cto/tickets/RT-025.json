@@ -1,0 +1,35 @@
+{
+  "id": "RT-025",
+  "title": "Implement Agent Column Visualization",
+  "description": "Build the Morty agent columns that show real-time activity. Each active sub-agent gets a column showing: agent name/role, current task, recent actions, status indicator. Columns should appear/disappear as agents spawn/complete.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-004",
+  "dependencies": [
+    "RT-022"
+  ],
+  "acceptance_criteria": [
+    "Column appears when agent detected",
+    "Column shows agent role/name",
+    "Current task displayed prominently",
+    "Action log scrolls with recent activity",
+    "Status indicator (working/idle/done)",
+    "Column fades out when agent completes"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": "TEAM-002",
+  "created_at": "2026-02-14T20:16:46.116776+00:00",
+  "updated_at": "2026-02-15T06:55:05.278280+00:00",
+  "completed_at": "2026-02-15T06:55:05.278277+00:00",
+  "agent_output": "Successfully implemented the frontend integration for agent column visualization (RT-025). The implementation includes:\n\n1. **Parser Integration**: Added `ClaudeOutputParser` to `ShellSession` to automatically parse Claude CLI output and feed it to the parser for real-time agent detection.\n\n2. **Manager Setup**: Integrated `AgentColumnsManager` into `MainWindowView` as a `@StateObject`, making it available throughout the app via environment objects.\n\n3. **Parser-Manager Connection**: Created automatic connection between the active session's parser and the agent columns manager. The connection updates when switching sessions.\n\n4. **UI Integration**: Replaced the placeholder \"Agent Columns\" section in `RightPanelView` with the real `AgentColumnsContainer` component, which will display live agent activity as columns appear and disappear.\n\n5. **Fixed Naming Conflicts**: \n   - Renamed `AgentStatus` struct in `ClaudeToolEvent.swift` to `AgentActivityStatus` to avoid conflict with the enum in `Agent/AgentStatus.swift`\n   - Renamed placeholder `KanbanCard` view to `PlaceholderKanbanCard` to avoid conflict with the real `KanbanCard` model\n\nThe system is now fully wired up. When Claude spawns sub-agents via the Task tool, the parser will detect them, the manager will create columns, and the UI will automatically display them with real-time updates showing:\n- Agent role/name\n- Current task\n- Action log with recent activity\n- Status indicator (working/idle/done)\n- Smooth appear/disappear animations\n\nBuild completed successfully with no errors.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/ShellSession.swift",
+    "RickTerminal/MainWindowView.swift",
+    "RickTerminal/Claude/ClaudeToolEvent.swift"
+  ]
+}

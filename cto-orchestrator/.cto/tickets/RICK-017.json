@@ -1,0 +1,36 @@
+{
+  "id": "RICK-017",
+  "title": "Build Integrated Terminal with Rick Persona",
+  "description": "Create an embedded terminal view using xterm.js or similar. Support running shell commands and claude CLI commands directly. Implement Rick persona mode where terminal output is occasionally interjected with Rick comments and *burp* annotations. Include command history, auto-complete, and theming.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-007",
+    "RICK-009",
+    "RICK-013"
+  ],
+  "acceptance_criteria": [
+    "xterm.js terminal embedded in Terminal view with proper sizing",
+    "Terminal theme matches RickTerminal dark theme with portal-green text",
+    "Commands execute via Tauri shell plugin with proper PTY handling",
+    "Command history persists and navigable with up/down arrows",
+    "Tab auto-complete for file paths and common commands",
+    "Rick persona mode injects comments on command completion",
+    "Comments include *burp*, science references, Morty insults",
+    "Toggle to disable Rick persona for professional mode",
+    "Copy/paste works with Cmd/Ctrl+C/V"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.235165+00:00",
+  "updated_at": "2026-02-13T14:29:58.509393+00:00",
+  "completed_at": "2026-02-13T14:29:58.509231+00:00",
+  "agent_output": "Enhanced terminal with 15+ commands, command history, Rick persona responses, session management, and ASCII visualizations.",
+  "review_notes": null,
+  "files_touched": []
+}

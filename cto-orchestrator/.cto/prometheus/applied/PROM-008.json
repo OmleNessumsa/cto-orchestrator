@@ -1,0 +1,19 @@
+{
+  "id": "PROM-008",
+  "title": "Implement LangGraph-style stateful sprint graph",
+  "category": "agent-patterns",
+  "source": "LangGraph supervisor pattern \u2014 stateful graphs with conditional routing",
+  "description": "Replace flat while-loop sprint with a directed graph where nodes are agents and edges carry predicates on shared state, enabling dynamic replanning based on agent outputs.",
+  "impact_score": 9,
+  "risk_score": 5,
+  "effort_score": 7,
+  "target_files": [
+    "scripts/orchestrate.py",
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add SprintGraph class with nodes (agent executions) and conditional edges. Add SharedSprintState that accumulates across delegations. Replace flat sprint loop with graph.execute(). Add --graph flag for opt-in.",
+  "status": "applied",
+  "created_at": "2026-03-01T08:55:17.732992+00:00",
+  "applied_at": "2026-03-01T19:59:10.728579+00:00",
+  "rollback_snapshot": null
+}

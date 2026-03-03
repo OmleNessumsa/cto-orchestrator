@@ -1,0 +1,9 @@
+{"timestamp": "2026-02-16T14:36:18.644167+00:00", "ticket_id": null, "agent": "rick", "action": "started", "message": "Sprint started (max 50 iterations, teams=on)", "files_changed": []}
+{"timestamp": "2026-02-16T14:36:18.702852+00:00", "ticket_id": "DEMO-006", "agent": "devops-morty", "action": "started", "message": "Delegated to @devops-morty (model: sonnet)", "files_changed": []}
+{"timestamp": "2026-02-16T14:41:06.318136+00:00", "ticket_id": "RICK-032", "agent": "frontend-morty", "action": "started", "message": "Delegated to @frontend-morty (model: sonnet)", "files_changed": []}
+{"timestamp": "2026-02-16T15:28:08.832374+00:00", "ticket_id": null, "agent": "rick", "action": "started", "message": "Sprint started (max 1 iterations, teams=on)", "files_changed": []}
+{"timestamp": "2026-02-16T15:28:08.893877+00:00", "ticket_id": "DEMO-003", "agent": "reviewer-morty", "action": "started", "message": "Delegated to @reviewer-morty (model: sonnet)", "files_changed": []}
+{"timestamp": "2026-02-16T15:29:49.115516+00:00", "ticket_id": "DEMO-003", "agent": "reviewer-morty", "action": "blocked", "message": "DEMO-003 was incorrectly assigned to reviewer-morty instead of a builder agent. No login/register UI components exist. Attempted to implement vanilla HTML/CSS/JS components but file creation was block", "files_changed": []}
+{"timestamp": "2026-02-16T15:29:49.138865+00:00", "ticket_id": null, "agent": "rick", "action": "completed", "message": "Sprint finished: 30/39 tickets done", "files_changed": []}
+{"timestamp": "2026-02-16T17:39:44.675898+00:00", "ticket_id": null, "agent": "rick", "action": "started", "message": "Sprint started (max 1 iterations, teams=on)", "files_changed": []}
+{"timestamp": "2026-02-16T17:39:44.685364+00:00", "ticket_id": null, "agent": "rick", "action": "completed", "message": "Sprint finished: 30/39 tickets done", "files_changed": []}

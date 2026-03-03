@@ -1,0 +1,295 @@
+[
+  {
+    "timestamp": "2026-02-27T15:49:55.722650+00:00",
+    "proposal_id": "PROM-001",
+    "action": "applied",
+    "title": "Add structured output parsing to delegation prompts",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-02-27T15:53:04.692657+00:00",
+    "proposal_id": "PROM-001",
+    "action": "rolled_back",
+    "files_restored": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-02-27T16:17:33.586178+00:00",
+    "proposal_id": "PROM-002",
+    "action": "created",
+    "title": "Add --output-format json and --json-schema for structured agent responses",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-02-27T16:17:33.587250+00:00",
+    "proposal_id": "PROM-003",
+    "action": "created",
+    "title": "Build MCP server for ticket system to replace subprocess chaining",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-02-27T16:17:33.588281+00:00",
+    "proposal_id": "PROM-004",
+    "action": "created",
+    "title": "Add --max-turns and --max-budget-usd cost controls to agent delegation",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-02-27T16:17:33.589225+00:00",
+    "proposal_id": "PROM-005",
+    "action": "created",
+    "title": "Add Claude Code hooks for automatic session tracking and task validation",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-02-27T16:17:33.589784+00:00",
+    "proposal_id": "PROM-006",
+    "action": "created",
+    "title": "Add --resume and --session-id for checkpoint/recovery of failed agents",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-02-27T17:48:38.718147+00:00",
+    "proposal_id": "PROM-002",
+    "action": "applied",
+    "title": "Add --output-format json and --json-schema for structured agent responses",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-02-27T17:51:22.346409+00:00",
+    "proposal_id": "PROM-003",
+    "action": "applied",
+    "title": "Build MCP server for ticket system to replace subprocess chaining",
+    "target_files": [
+      "scripts/mcp_tickets.py",
+      "scripts/ticket.py",
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-02-27T17:52:52.000393+00:00",
+    "proposal_id": "PROM-006",
+    "action": "applied",
+    "title": "Add --resume and --session-id for checkpoint/recovery of failed agents",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-02-27T17:54:54.110376+00:00",
+    "proposal_id": "PROM-004",
+    "action": "applied",
+    "title": "Add --max-turns and --max-budget-usd cost controls to agent delegation",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-02-27T18:36:52.502691+00:00",
+    "proposal_id": "PROM-005",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.732977+00:00",
+    "proposal_id": "PROM-007",
+    "action": "created",
+    "title": "Add Agent Card discovery protocol (A2A-inspired)",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.733179+00:00",
+    "proposal_id": "PROM-008",
+    "action": "created",
+    "title": "Implement LangGraph-style stateful sprint graph",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.733422+00:00",
+    "proposal_id": "PROM-009",
+    "action": "created",
+    "title": "Add Pydantic structured output validation for agent responses",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.733666+00:00",
+    "proposal_id": "PROM-010",
+    "action": "created",
+    "title": "Add MCP tool server for cross-agent shared workspace",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.734049+00:00",
+    "proposal_id": "PROM-011",
+    "action": "created",
+    "title": "Add bounded delegation with cost tracking and quality gates",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.734203+00:00",
+    "proposal_id": "PROM-012",
+    "action": "created",
+    "title": "XML-structured agent prompts with role/goal/constraints contract",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.734330+00:00",
+    "proposal_id": "PROM-013",
+    "action": "created",
+    "title": "Layered chain-of-thought reasoning for complex tickets",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.734476+00:00",
+    "proposal_id": "PROM-014",
+    "action": "created",
+    "title": "Effort-scaling instructions to match task complexity",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.734597+00:00",
+    "proposal_id": "PROM-015",
+    "action": "created",
+    "title": "Structured JSON output contract for agent reports",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.734834+00:00",
+    "proposal_id": "PROM-016",
+    "action": "created",
+    "title": "Subagent delegation context with objective-format-tools-boundaries",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735078+00:00",
+    "proposal_id": "PROM-017",
+    "action": "created",
+    "title": "Implement prompt boundary delimiters and sandwich defense",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735229+00:00",
+    "proposal_id": "PROM-018",
+    "action": "created",
+    "title": "Enforce Least-Agency with output validation and tool guardrails",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735354+00:00",
+    "proposal_id": "PROM-019",
+    "action": "created",
+    "title": "Add SSRF prevention and webhook endpoint validation",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735477+00:00",
+    "proposal_id": "PROM-020",
+    "action": "created",
+    "title": "Secure inter-agent communication and memory integrity",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735636+00:00",
+    "proposal_id": "PROM-021",
+    "action": "created",
+    "title": "Add dependency integrity verification and supply chain hardening",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735765+00:00",
+    "proposal_id": "PROM-022",
+    "action": "created",
+    "title": "Migrate delegation from claude -p to Claude Agent SDK",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735885+00:00",
+    "proposal_id": "PROM-023",
+    "action": "created",
+    "title": "Add stream-json output for real-time agent progress",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.735984+00:00",
+    "proposal_id": "PROM-024",
+    "action": "created",
+    "title": "Implement Builder-Validator pattern with tool restrictions",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-03-01T08:55:17.736104+00:00",
+    "proposal_id": "PROM-025",
+    "action": "created",
+    "title": "Use Haiku 4.5 for smart ticket routing and triage",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-03-01T09:17:16.309297+00:00",
+    "proposal_id": "PROM-017",
+    "action": "applied",
+    "title": "Implement prompt boundary delimiters and sandwich defense",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-03-01T09:17:16.309297+00:00",
+    "proposal_id": "PROM-012",
+    "action": "applied",
+    "title": "XML-structured agent prompts with role/goal/constraints contract",
+    "target_files": [
+      "scripts/delegate.py",
+      "references/prompts.md"
+    ]
+  },
+  {
+    "timestamp": "2026-03-01T09:17:16.309297+00:00",
+    "proposal_id": "PROM-009",
+    "action": "applied",
+    "title": "Add Pydantic structured output validation for agent responses",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-03-01T19:58:54.856083+00:00",
+    "proposal_id": "PROM-008",
+    "action": "applied",
+    "title": "Implement LangGraph-style stateful sprint graph",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-03-01T19:58:54.856083+00:00",
+    "proposal_id": "PROM-013",
+    "action": "applied",
+    "title": "Layered chain-of-thought reasoning for complex tickets",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-03-01T19:58:54.856083+00:00",
+    "proposal_id": "PROM-018",
+    "action": "applied",
+    "title": "Enforce Least-Agency with output validation and tool guardrails",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py"
+    ]
+  }
+]

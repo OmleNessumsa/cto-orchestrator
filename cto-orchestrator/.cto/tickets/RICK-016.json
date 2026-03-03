@@ -1,0 +1,37 @@
+{
+  "id": "RICK-016",
+  "title": "Create Real-Time Morty Tracking Dashboard",
+  "description": "Build the Agent Monitor view showing all active claude subprocess agents in real-time. Display grid of AgentCards with: agent name/ID, current ticket title, status (spawning/working/idle/error), elapsed time, stdout preview. Include master controls: pause all, resume all, terminate all. Show aggregate stats.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-007",
+    "RICK-008",
+    "RICK-011",
+    "RICK-013"
+  ],
+  "acceptance_criteria": [
+    "Grid layout displays all active agents as AgentCards",
+    "Cards update in real-time via WebSocket events",
+    "Status indicators: green dot (working), yellow (idle), red (error)",
+    "Elapsed time updates every second for working agents",
+    "stdout preview shows last 3 lines of output, scrollable",
+    "Click card opens full output modal with copy button",
+    "Header shows aggregate: X active, Y completed, Z errors",
+    "Master controls: Pause All, Resume All, Terminate All buttons",
+    "Portal animation plays when new agent spawns"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.188628+00:00",
+  "updated_at": "2026-02-13T14:24:16.955389+00:00",
+  "completed_at": "2026-02-13T14:24:16.955243+00:00",
+  "agent_output": "Real-time Morty tracking with enhanced agent cards showing current tool, last output, and session detail panel with event log.",
+  "review_notes": null,
+  "files_touched": []
+}

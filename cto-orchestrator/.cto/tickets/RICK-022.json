@@ -1,0 +1,34 @@
+{
+  "id": "RICK-022",
+  "title": "Implement Session Persistence and Context Display",
+  "description": "Build session management to persist and restore application state across launches. Save: open view, scroll positions, expanded panels, filter selections, active ticket. Display session context in header: session name, duration, last activity. Support multiple named sessions.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-006",
+    "RICK-013"
+  ],
+  "acceptance_criteria": [
+    "Application state serialized to SQLite sessions table on change",
+    "State restored on app launch with smooth transitions",
+    "Session includes: current route, kanban filters, scroll positions",
+    "Header displays session name with edit-on-click",
+    "Duration shows time since session created",
+    "Last activity timestamp updates on any user action",
+    "Session switcher dropdown to switch between named sessions",
+    "New Session button creates fresh state, preserves old"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.492651+00:00",
+  "updated_at": "2026-02-13T14:43:13.149836+00:00",
+  "completed_at": "2026-02-13T14:43:13.149671+00:00",
+  "agent_output": "SessionView with timeline of decisions/context/markers/persona entries, persona intensity tracking, context markers, quick actions panel.",
+  "review_notes": null,
+  "files_touched": []
+}

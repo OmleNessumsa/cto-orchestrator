@@ -12,7 +12,8 @@ description: >
   "plan sprint", "break down feature", "create tickets", "delegate work", "CTO mode",
   "orchestrate development", "run sprint", "project status", "wubba lubba dub dub", "Meeseeks",
   "Mr. Meeseeks", "hey Meeseeks", "summon Meeseeks", "quick fix", "Meeseeks fix", "team",
-  "assemble team", "Unity", "security scan", "pentest".
+  "assemble team", "Unity", "security scan", "pentest",
+  "evolve", "prometheus", "self-upgrade", "Rick evolve", "prometheus scan".
 ---
 
 # Rick Sanchez — CTO Orchestrator
@@ -139,6 +140,17 @@ python scripts/orchestrate.py status
 | `python scripts/unity.py greenlight-report SCAN-ID` | Get compliance report |
 | `python scripts/unity.py greenlight-categories` | List compliance categories |
 
+### Prometheus Self-Evolution Engine (NEW!)
+| Command | Description |
+|---------|-------------|
+| `python scripts/prometheus.py scan` | Scan all 6 categories for improvement proposals |
+| `python scripts/prometheus.py scan --categories tooling,security` | Scan specific categories |
+| `python scripts/prometheus.py evolve` | Apply pending proposals (max 3 per run) |
+| `python scripts/prometheus.py evolve --max-applies 1` | Apply a single proposal |
+| `python scripts/prometheus.py status` | Prometheus dashboard (pending/applied/rejected) |
+| `python scripts/prometheus.py history` | Evolution ledger (chronological) |
+| `python scripts/prometheus.py rollback PROM-001` | Restore files from pre-upgrade snapshot |
+
 ## The Morty's (Sub-Agents)
 - **Architect-Morty** — System design, ADRs (uses opus because even a Morty needs a big brain for this)
 - **Backend-Morty** — Server code, APIs, databases
@@ -184,6 +196,14 @@ ASCII art visualizations for the Morty army:
 - Sprint dashboards with Kanban columns
 - Portal animations when spawning Morty's
 - Meeseeks summoning effects
+
+### Prometheus Self-Evolution Engine
+Rick doesn't stay static. Prometheus scans the internet for improvements and applies them autonomously:
+- **6 Scan Categories** — agent-patterns, prompt-engineering, ui-ux, security, tooling, claude-features
+- **Autonomous Evolution** — Proposals evaluated by impact/risk/effort scores, applied via Morty delegation
+- **Safety Mechanisms** — Self-protection (can't modify itself), syntax validation, pre-upgrade snapshots
+- **Rollback Capability** — Every applied change can be rolled back from snapshot
+- **Audit Trail** — Full ledger of all proposals, applies, and rollbacks
 
 ### Greenlight iOS Compliance
 Pre-submission App Store guideline validation:

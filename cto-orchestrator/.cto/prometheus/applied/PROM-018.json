@@ -1,0 +1,20 @@
+{
+  "id": "PROM-018",
+  "title": "Enforce Least-Agency with output validation and tool guardrails",
+  "category": "security",
+  "source": "OWASP Top 10 Agentic Applications 2026 (ASI02, ASI05, ASI10)",
+  "description": "No validation that agents stay within scope. parse_agent_output() accepts file paths without sandbox validation. --dangerously-skip-permissions has no audit trail.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/security_utils.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Add validate_agent_output_paths() filtering paths outside project root. Add sanitize_agent_output(). Add audit_log_security_event() for security events. Validate plan JSON schema.",
+  "status": "applied",
+  "created_at": "2026-03-01T08:55:17.735084+00:00",
+  "applied_at": "2026-03-01T19:59:10.728579+00:00",
+  "rollback_snapshot": null
+}

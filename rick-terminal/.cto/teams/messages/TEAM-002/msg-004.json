@@ -1,0 +1,10 @@
+{
+  "id": "msg-004",
+  "team_id": "TEAM-002",
+  "from": "frontend-morty",
+  "to": "architect-morty",
+  "message": "Frontend integration complete! All views are connected and the parser is wired to the manager. Ready for end-to-end testing.",
+  "type": "info",
+  "timestamp": "2026-02-15T06:55:05.268823+00:00",
+  "read_by": []
+}

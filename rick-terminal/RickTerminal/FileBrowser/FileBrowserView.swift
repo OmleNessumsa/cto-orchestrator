@@ -3,8 +3,10 @@ import SwiftUI
 /// File browser sidebar with tree view
 struct FileBrowserView: View {
     @StateObject private var fileTreeManager = FileTreeManager()
+    @ObservedObject private var gitStatusManager = GitStatusManager.shared
     @EnvironmentObject private var sessionManager: ShellSessionManager
     @EnvironmentObject private var editorManager: EditorManager
+    @EnvironmentObject private var ctoEventBridge: CTOEventBridge
 
     @State private var showNewFileSheet = false
     @State private var showNewFolderSheet = false
@@ -49,6 +51,15 @@ struct FileBrowserView: View {
             fileTreeManager.onDeleteRequested = { node in
                 triggerDeleteNode = node
             }
+
+            // Start git status auto-refresh
+            gitStatusManager.startAutoRefresh(for: fileTreeManager.currentDirectory)
+        }
+        .onDisappear {
+            gitStatusManager.stopAutoRefresh()
+        }
+        .onChange(of: fileTreeManager.currentDirectory) { newDir in
+            gitStatusManager.startAutoRefresh(for: newDir)
         }
         .sheet(isPresented: $showNewFileSheet) {
             newItemSheet(title: "New File", placeholder: "Untitled.txt") { name in
@@ -96,6 +107,10 @@ struct FileBrowserView: View {
             if let selected = fileTreeManager.selectedNode {
                 fileTreeManager.revealInFinder(selected)
             }
+        }
+        // Refresh git status after file operations
+        .onReceive(NotificationCenter.default.publisher(for: .gitStatusRefreshNeeded)) { _ in
+            gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
         }
     }
 
@@ -147,7 +162,10 @@ struct FileBrowserView: View {
                 .help(fileTreeManager.showHidden ? "Hide hidden files" : "Show hidden files")
 
                 // Reload button
-                Button(action: { fileTreeManager.reload() }) {
+                Button(action: {
+                    fileTreeManager.reload()
+                    gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
+                }) {
                     Image(systemName: "arrow.clockwise")
                         .foregroundColor(.rtAccentGreen)
                         .font(.system(size: 12))
@@ -167,6 +185,9 @@ struct FileBrowserView: View {
             .padding(8)
             .background(Color.rtBackgroundDark.opacity(0.5))
 
+            // Git status bar: branch + uncommitted count
+            gitStatusBar
+
             // Current directory path
             Text(fileTreeManager.currentDirectory.path)
                 .font(.system(size: 9, design: .monospaced))
@@ -177,6 +198,47 @@ struct FileBrowserView: View {
                 .padding(.vertical, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.rtBackgroundSecondary.opacity(0.3))
+        }
+    }
+
+    /// Git branch + uncommitted changes badge
+    @ViewBuilder
+    private var gitStatusBar: some View {
+        if let repo = gitStatusManager.repository(containing: fileTreeManager.currentDirectory) {
+            HStack(spacing: 6) {
+                // Branch icon + name
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 9))
+                    .foregroundColor(.rtAccentGreen)
+
+                Text(repo.branch)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.rtAccentGreen)
+
+                Spacer()
+
+                // Uncommitted changes count
+                if repo.uncommittedCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 6))
+                            .foregroundColor(Color(hex: "FF9F40"))
+                        Text("\(repo.uncommittedCount)")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(Color(hex: "FF9F40"))
+                    }
+                }
+
+                // Refreshing spinner
+                if gitStatusManager.isRefreshing {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .frame(width: 10, height: 10)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.rtBackgroundDark.opacity(0.3))
         }
     }
 
@@ -262,8 +324,12 @@ struct FileBrowserView: View {
         guard let session = sessionManager.getActiveSession() else { return }
         session.sendInput("cd \"\(url.path)\" && clear\n")
 
-        // 3. Check if this is a CTO project and auto-launch Claude
+        // 3. Check if this is a CTO project
         if isCTOProject(url) {
+            // Load tickets from .cto/tickets/ into Kanban board
+            ctoEventBridge.loadProjectTickets(from: url)
+
+            // Auto-launch Claude with skill
             launchClaudeWithSkill(session: session)
         }
     }
@@ -306,10 +372,12 @@ struct FileBrowserView: View {
 
     private func createNewFile(name: String) {
         errorMessage = fileTreeManager.createFile(in: fileTreeManager.selectedNode, name: name)
+        gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
     }
 
     private func createNewFolder(name: String) {
         errorMessage = fileTreeManager.createDirectory(in: fileTreeManager.selectedNode, name: name)
+        gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
     }
 
     // MARK: - Helper Views
@@ -406,6 +474,7 @@ struct FileTreeView: View {
 struct FileTreeItemView: View {
     @ObservedObject var node: FileNode
     @ObservedObject var fileTreeManager: FileTreeManager
+    @ObservedObject private var gitStatusManager = GitStatusManager.shared
     let level: Int
     @Binding var triggerRenameNode: FileNode?
     @Binding var triggerDeleteNode: FileNode?
@@ -415,6 +484,30 @@ struct FileTreeItemView: View {
     @State private var renamingText = ""
     @State private var showDeleteConfirmation = false
     @State private var errorMessage: String?
+
+    private var gitStatus: GitFileStatus {
+        gitStatusManager.status(for: node.url.path)
+    }
+
+    private var nameColor: Color {
+        if fileTreeManager.selectedNode?.id == node.id {
+            return .rtAccentGreen
+        }
+        if node.isHidden {
+            return .rtTextSecondary.opacity(0.6)
+        }
+        // Apply git status color when not selected
+        switch gitStatus {
+        case .clean:      return .rtTextPrimary
+        case .modified:   return Color(hex: "FF9F40")
+        case .added:      return Color(hex: "7FFC50")
+        case .deleted:    return Color(hex: "FF5555")
+        case .renamed:    return Color(hex: "FF9F40")
+        case .untracked:  return .rtTextSecondary
+        case .ignored:    return .rtTextDisabled
+        case .conflicted: return Color(hex: "FF5555")
+        }
+    }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -452,15 +545,22 @@ struct FileTreeItemView: View {
             } else {
                 Text(node.name)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(
-                        fileTreeManager.selectedNode?.id == node.id
-                            ? .rtAccentGreen
-                            : (node.isHidden ? .rtTextSecondary.opacity(0.6) : .rtTextPrimary)
-                    )
+                    .foregroundColor(nameColor)
                     .lineLimit(1)
             }
 
             Spacer()
+
+            // Git status badge
+            if !isRenaming, let badge = gitStatus.badge {
+                Text(badge)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color(hex: gitStatus.colorHex))
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 1)
+                    .background(Color(hex: gitStatus.colorHex).opacity(0.15))
+                    .cornerRadius(3)
+            }
         }
         .padding(.leading, CGFloat(level * 16 + 4))
         .padding(.vertical, 3)
@@ -626,14 +726,17 @@ struct FileTreeItemView: View {
 
         errorMessage = fileTreeManager.rename(node, to: renamingText)
         cancelRename()
+        gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
     }
 
     private func performDelete() {
         errorMessage = fileTreeManager.delete(node)
+        gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
     }
 
     private func performDuplicate() {
         errorMessage = fileTreeManager.duplicate(node)
+        gitStatusManager.refresh(for: fileTreeManager.currentDirectory)
     }
 }
 
@@ -643,6 +746,8 @@ struct FileBrowserView_Previews: PreviewProvider {
     static var previews: some View {
         FileBrowserView()
             .environmentObject(ShellSessionManager())
+            .environmentObject(EditorManager())
+            .environmentObject(CTOEventBridge())
             .frame(width: 250, height: 600)
             .background(Color.rtBackgroundLight)
     }

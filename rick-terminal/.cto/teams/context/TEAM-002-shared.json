@@ -1,0 +1,54 @@
+{
+  "team_id": "TEAM-002",
+  "parent_ticket": "RT-025",
+  "decisions": [
+    {
+      "decision": "Used `ObservableObject` pattern (like `KanbanBoard`) for reactive UI updates",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:52:01.350226+00:00"
+    },
+    {
+      "decision": "Capped action log at 50 entries to bound memory",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:52:01.350231+00:00"
+    },
+    {
+      "decision": "2-second fade delay for completed columns (configurable)",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:52:01.350232+00:00"
+    },
+    {
+      "decision": "Rick & Morty themed naming (\"Architect Morty\", \"Backend Morty\", etc.)",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:52:01.350233+00:00"
+    },
+    {
+      "decision": "Role-specific colors: architect=purple, backend=blue, frontend=orange, explorer=cyan",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T06:52:01.350234+00:00"
+    },
+    {
+      "decision": "Renamed `AgentStatus` (ClaudeToolEvent) to `AgentActivityStatus` to avoid enum conflict",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T06:55:05.269298+00:00"
+    },
+    {
+      "decision": "Renamed placeholder `KanbanCard` view to `PlaceholderKanbanCard` for clarity",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T06:55:05.269304+00:00"
+    },
+    {
+      "decision": "Used `@StateObject` for manager to ensure single source of truth",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T06:55:05.269305+00:00"
+    },
+    {
+      "decision": "Connected parser automatically on session change for seamless switching",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T06:55:05.269306+00:00"
+    }
+  ],
+  "interfaces": [],
+  "notes": [],
+  "updated_at": "2026-02-15T06:55:05.269309+00:00"
+}

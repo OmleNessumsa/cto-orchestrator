@@ -1,0 +1,29 @@
+{
+  "id": "RT-008",
+  "title": "Build Main Window Layout with Split View Architecture",
+  "description": "Create the main window structure using NavigationSplitView or HSplitView. The layout needs: left sidebar for file browser, center main area for terminal/editor, right panel for Kanban board and agent columns. Make panels resizable and collapsible.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Three-column layout renders correctly",
+    "Panels are resizable with drag handles",
+    "Sidebar can be collapsed/expanded",
+    "Right panel can be collapsed/expanded",
+    "Layout persists across app restarts",
+    "Minimum widths prevent UI from breaking"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.327137+00:00",
+  "updated_at": "2026-02-15T13:05:57.137348+00:00",
+  "completed_at": "2026-02-15T13:05:57.137214+00:00",
+  "agent_output": "Build compilation errors fixed: RTIcon duplicate raw values, ErrorAlertView onChange, Color.rtTextDisabled, FileBrowserView ViewBuilder limit. App compiles successfully.",
+  "review_notes": null,
+  "files_touched": []
+}

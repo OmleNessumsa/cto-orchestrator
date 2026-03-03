@@ -1,0 +1,33 @@
+{
+  "id": "RICK-012",
+  "title": "Create Portal Swirl Animation System",
+  "description": "Build the signature Rick portal animation for agent spawning events. Use SVG or Canvas to render a green swirling vortex that expands, swirls, and collapses. Trigger on spawn_agent events. Include sound effect hook (optional, disabled by default). This is the visual proof that interdimensional genius is at work.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-002",
+  "dependencies": [
+    "RICK-009",
+    "RICK-011"
+  ],
+  "acceptance_criteria": [
+    "SVG-based portal animation with rotating gradient spirals",
+    "Animation sequence: expand (0.3s) \u2192 swirl (1s) \u2192 collapse (0.3s)",
+    "Portal renders centered on spawn location in Agent Monitor view",
+    "Portal green color (#39ff14) with radial gradient fade",
+    "Animation triggered via custom event or React context",
+    "Reduced-motion media query disables animation for accessibility",
+    "Optional audio hook for portal sound (user configurable)"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.987170+00:00",
+  "updated_at": "2026-02-13T14:41:25.851655+00:00",
+  "completed_at": "2026-02-13T14:41:25.851526+00:00",
+  "agent_output": "Implemented Portal Swirl Animation System with CSS keyframes: portal-spin, portal-pulse, portal-open, portal-close, portal-swirl-bg, portal-ripple. Portal.tsx component with Portal, PortalMini, PortalSpawn, and PortalButton.",
+  "review_notes": null,
+  "files_touched": []
+}

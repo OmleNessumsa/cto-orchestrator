@@ -1,0 +1,28 @@
+{
+  "id": "RT-001",
+  "title": "EPIC: Core Application Foundation & Architecture",
+  "description": "Set up the foundational macOS application architecture using Swift and SwiftUI. This includes the main app structure, window management, theming system, and core navigation. This is the skeleton upon which everything else hangs, Morty. Don't screw it up.",
+  "type": "epic",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Xcode project created with proper bundle identifiers",
+    "SwiftUI app lifecycle configured correctly",
+    "Multi-window support enabled for macOS",
+    "Theme system with Rick Terminal color palette implemented",
+    "Basic app launches without crashes"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:44.997647+00:00",
+  "updated_at": "2026-02-15T13:06:30.744428+00:00",
+  "completed_at": "2026-02-15T13:06:30.744314+00:00",
+  "agent_output": "EPIC completed: Core application foundation built with terminal, file browser, editor, Kanban board, agent columns, keyboard shortcuts, preferences, error handling. App compiles and runs successfully.",
+  "review_notes": null,
+  "files_touched": []
+}

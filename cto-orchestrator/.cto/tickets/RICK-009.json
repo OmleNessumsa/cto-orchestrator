@@ -1,0 +1,31 @@
+{
+  "id": "RICK-009",
+  "title": "Create Design Token System and Theme Provider",
+  "description": "Implement a comprehensive design token system in Tailwind CSS config and React context. Define all colors (portal-green: #39ff14, meeseeks-cyan: #5bcefa, rick-blue: #a8d8ea, morty-yellow: #f0e14a, backgrounds, borders), spacing scales, typography (monospace for code, sans for UI), shadows with glow effects, and animation timing functions. Create ThemeProvider React component.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-002",
+  "dependencies": [
+    "RICK-004"
+  ],
+  "acceptance_criteria": [
+    "tailwind.config.js extends theme with all custom colors",
+    "CSS custom properties defined for dynamic theming",
+    "ThemeProvider context provides theme values to all components",
+    "Typography scale includes Inter for UI, JetBrains Mono for code",
+    "Shadow utilities include glow-green, glow-cyan, glow-blue variants",
+    "Animation utilities include portal-spin, star-twinkle, pulse-glow"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.842700+00:00",
+  "updated_at": "2026-02-13T14:06:23.935814+00:00",
+  "completed_at": "2026-02-13T14:06:23.935662+00:00",
+  "agent_output": "Design tokens implemented in index.css with all landing page colors, animations, and component styles.",
+  "review_notes": null,
+  "files_touched": []
+}

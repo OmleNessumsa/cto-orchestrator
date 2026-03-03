@@ -1,0 +1,37 @@
+{
+  "id": "RT-022",
+  "title": "Build Kanban Board Data Model",
+  "description": "Create the data model for the Kanban board: Board, Column, Card structs. Implement Codable for persistence, Identifiable for SwiftUI lists. Support card properties like title, description, status, labels, and timestamps. Use observable patterns for real-time updates.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "architect-morty",
+  "parent_ticket": "RT-004",
+  "dependencies": [
+    "RT-007"
+  ],
+  "acceptance_criteria": [
+    "Board model with columns array",
+    "Column model with cards array",
+    "Card model with all needed properties",
+    "Models are Codable for JSON persistence",
+    "Observable/Published for SwiftUI binding",
+    "Thread-safe updates"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.979174+00:00",
+  "updated_at": "2026-02-15T06:46:29.182580+00:00",
+  "completed_at": "2026-02-15T06:46:29.182563+00:00",
+  "agent_output": "Implemented complete Kanban board data model following existing project patterns. Created three core models: `KanbanCard` (struct with title, description, status, labels, priority, timestamps, assignee, ticketRef), `KanbanColumn` (struct with cards array and WIP limits), and `KanbanBoard` (ObservableObject class with thread-safe mutations via serial DispatchQueue). All structs are Codable for JSON persistence. Board exposes `@Published columns` for SwiftUI binding and a Combine `cardEvents` publisher for fine-grained event tracking. Thread safety achieved through serial queue + main thread dispatch pattern matching ShellSession.swift conventions.",
+  "review_notes": null,
+  "files_touched": [
+    "docs/adr/ADR-002-kanban-board-data-model.md",
+    "RickTerminal/Kanban/KanbanCard.swift",
+    "RickTerminal/Kanban/KanbanColumn.swift",
+    "RickTerminal/Kanban/KanbanBoard.swift",
+    "IMPLEMENTATION_RT-022.md"
+  ]
+}

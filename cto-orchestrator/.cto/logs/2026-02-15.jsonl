@@ -1,0 +1,2 @@
+{"timestamp": "2026-02-15T18:38:19.607106+00:00", "ticket_id": null, "agent": "rick", "action": "started", "message": "Sprint started (max 50 iterations, teams=on)", "files_changed": []}
+{"timestamp": "2026-02-15T18:38:19.655228+00:00", "ticket_id": "DEMO-007", "agent": "security-morty", "action": "started", "message": "Delegated to @security-morty (model: opus)", "files_changed": []}

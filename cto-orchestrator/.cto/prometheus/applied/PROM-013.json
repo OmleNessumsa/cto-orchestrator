@@ -1,0 +1,19 @@
+{
+  "id": "PROM-013",
+  "title": "Layered chain-of-thought reasoning for complex tickets",
+  "category": "prompt-engineering",
+  "source": "arXiv 2501.18645 \u2014 Layered-CoT for multi-agent systems",
+  "description": "Add mandatory think-then-act reasoning protocol: ANALYZE -> PLAN -> VERIFY -> EXECUTE. Reduces hallucinated file paths, missed acceptance criteria, and scope creep.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "references/prompts.md"
+  ],
+  "proposed_changes": "Add <reasoning_protocol> section with 4 layers. For opus-level agents add Layer 3b RISK CHECK. Insert between ticket context and Rick watching section.",
+  "status": "applied",
+  "created_at": "2026-03-01T08:55:17.734208+00:00",
+  "applied_at": "2026-03-01T19:59:10.728579+00:00",
+  "rollback_snapshot": null
+}

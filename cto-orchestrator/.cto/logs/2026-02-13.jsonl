@@ -1,0 +1,2 @@
+{"timestamp":"2026-02-13T13:37:35.632155+00:00","ticket_id":null,"agent":"rick","action":"created","message":"*Burrrp* Project 'RickTerminal' initialized. Wubba lubba dub dub!","files_changed":[".cto/config.json"]}
+{"timestamp": "2026-02-13T13:40:46.901287+00:00", "ticket_id": null, "agent": "rick", "action": "decision", "message": "Generated project plan with 30 tickets", "files_changed": []}

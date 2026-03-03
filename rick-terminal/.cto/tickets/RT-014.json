@@ -1,0 +1,36 @@
+{
+  "id": "RT-014",
+  "title": "Implement Command History Navigation",
+  "description": "Ensure command history works correctly with up/down arrow keys. This should work through the shell's built-in history, but verify it functions within SwiftTerm. Also implement Cmd+K to clear terminal and consider adding a searchable history panel.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-002",
+  "dependencies": [
+    "RT-013"
+  ],
+  "acceptance_criteria": [
+    "Up arrow recalls previous command",
+    "Down arrow moves forward in history",
+    "History persists across sessions",
+    "Cmd+K clears terminal screen",
+    "Ctrl+R history search works"
+  ],
+  "estimated_complexity": "S",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.606485+00:00",
+  "updated_at": "2026-02-15T07:38:31.547034+00:00",
+  "completed_at": "2026-02-15T07:38:31.547017+00:00",
+  "agent_output": "Volledig ge\u00efmplementeerde command history navigatie voor Rick Terminal. De implementatie werkt via de standaard shell mechanismen (zsh/bash) zonder custom code te schrijven voor history management.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Keyboard/KeyboardShortcutManager.swift",
+    "RickTerminal/RickTerminalApp.swift",
+    "RickTerminal/MainWindowView.swift",
+    "IMPLEMENTATION_RT-014.md",
+    "IMPLEMENTATION_RT-014_SUMMARY.md"
+  ]
+}

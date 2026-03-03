@@ -1,0 +1,8 @@
+{
+  "id": "DEMO-005",
+  "title": "Write E2E tests for auth flow",
+  "type": "task",
+  "status": "testing",
+  "priority": "medium",
+  "assigned_agent": "tester-morty"
+}

@@ -1,0 +1,49 @@
+{
+  "team_id": "TEAM-004",
+  "parent_ticket": "RT-031",
+  "decisions": [
+    {
+      "decision": "HighlightSwift geselecteerd boven tree-sitter (eenvoudiger, voldoende voor read-only display)",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T08:39:59.893848+00:00"
+    },
+    {
+      "decision": "Hybrid approach: HighlightSwift primary, regex fallback",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T08:39:59.893854+00:00"
+    },
+    {
+      "decision": "Theme colors gedefinieerd in SyntaxTheme.rickTerminal",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T08:39:59.893855+00:00"
+    },
+    {
+      "decision": "20 talen ondersteund",
+      "author": "architect-morty",
+      "timestamp": "2026-02-15T08:39:59.893856+00:00"
+    },
+    {
+      "decision": "Added `import AppKit` to ANSIStyler for SyntaxHighlightingService type support",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T08:43:47.479330+00:00"
+    },
+    {
+      "decision": "Removed invalid `anchorsMatchLines` option from regex replacements (not available in NSString.CompareOptions)",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T08:43:47.479334+00:00"
+    },
+    {
+      "decision": "Used synchronous highlighting (`highlightSync`) for current use cases - async available for future optimization",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T08:43:47.479336+00:00"
+    },
+    {
+      "decision": "Visual indicators (\u2713/\u26a1) implemented in language labels to show users which highlighting engine was used",
+      "author": "frontend-morty",
+      "timestamp": "2026-02-15T08:43:47.479337+00:00"
+    }
+  ],
+  "interfaces": [],
+  "notes": [],
+  "updated_at": "2026-02-15T08:43:47.479338+00:00"
+}

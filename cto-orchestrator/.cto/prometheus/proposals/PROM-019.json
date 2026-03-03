@@ -1,0 +1,19 @@
+{
+  "id": "PROM-019",
+  "title": "Add SSRF prevention and webhook endpoint validation",
+  "category": "security",
+  "source": "OWASP LLM06 Excessive Agency + AI Agent Security Cheat Sheet",
+  "description": "SSRF prevention in security_utils.py is commented out. Roro webhook endpoints from env vars have no private IP validation. URL validation regex is overly permissive.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/security_utils.py",
+    "scripts/roro_events.py"
+  ],
+  "proposed_changes": "Uncomment and enhance SSRF prevention with private IP deny-list. Add validate_webhook_endpoint(). Apply in roro_events.py before HTTP requests.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.735233+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

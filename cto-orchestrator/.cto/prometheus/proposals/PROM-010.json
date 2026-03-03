@@ -1,0 +1,20 @@
+{
+  "id": "PROM-010",
+  "title": "Add MCP tool server for cross-agent shared workspace",
+  "category": "agent-patterns",
+  "source": "MCP Specification 2025-11-25 \u2014 shared workspace protocol for multi-agent orchestration",
+  "description": "Expose CTO Orchestrator internal state (tickets, team context, decisions) as MCP tool server. Agents pull context they need via MCP calls instead of bloated prompt injection.",
+  "impact_score": 8,
+  "risk_score": 4,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/team.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Create cto_mcp_server.py exposing tools: get_ticket, get_team_context, send_team_message, reserve_files, get_adrs. Pass --mcp-config to claude -p. Reduce prompt size dramatically.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.733437+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

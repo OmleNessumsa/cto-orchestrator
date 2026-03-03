@@ -1,0 +1,38 @@
+{
+  "id": "RT-035",
+  "title": "Create Preferences/Settings Window",
+  "description": "Build a native macOS preferences window using Settings scene or custom window. Include sections for: General, Appearance, Terminal, Claude Integration, Keyboard Shortcuts. Use proper macOS settings UI patterns.",
+  "type": "feature",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Cmd+, opens preferences",
+    "Multiple sections with sidebar",
+    "Settings persist to UserDefaults",
+    "Native macOS appearance",
+    "Changes apply immediately where possible"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.646733+00:00",
+  "updated_at": "2026-02-15T09:00:43.927171+00:00",
+  "completed_at": "2026-02-15T09:00:43.927157+00:00",
+  "agent_output": "I've built a complete native macOS preferences window for Rick Terminal with sidebar navigation and 5 sections:\n\n1. **General** - Startup behavior, session restoration, default working directory, confirmations\n2. **Appearance** - Theme selection, accent colors, window opacity, animations\n3. **Terminal** - Font size, cursor style, scrollback, bell settings, ANSI color palette\n4. **Claude Integration** - CLI path detection, auto-launch settings (refactored from ClaudeSettingsView)\n5. **Keyboard Shortcuts** - Searchable, filterable list of all shortcuts grouped by category\n\nThe window opens with Cmd+, (macOS standard), uses NavigationSplitView for proper sidebar navigation, integrates with existing TerminalSettings and KeyboardShortcutManager, persists all settings to UserDefaults with @AppStorage, and follows Rick Terminal's color theme throughout.\n\nAll acceptance criteria met: \u2705 Cmd+, shortcut \u2705 Multiple sections with sidebar \u2705 Settings persistence \u2705 Native macOS appearance \u2705 Immediate application of changes where possible.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Preferences/PreferencesView.swift (created)",
+    "RickTerminal/Preferences/GeneralPreferencesView.swift (created)",
+    "RickTerminal/Preferences/AppearancePreferencesView.swift (created)",
+    "RickTerminal/Preferences/TerminalPreferencesView.swift (created)",
+    "RickTerminal/Preferences/ClaudeIntegrationPreferencesView.swift (created)",
+    "RickTerminal/Preferences/KeyboardShortcutsPreferencesView.swift (created)",
+    "RickTerminal/RickTerminalApp.swift (modified)",
+    "add_preferences_to_xcode.sh (created)",
+    "IMPLEMENTATION_RT-035.md (created)"
+  ]
+}

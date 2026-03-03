@@ -1,0 +1,30 @@
+{
+  "id": "RICK-002",
+  "title": "EPIC: Visual Interface & Rick Aesthetic System",
+  "description": "Implement the complete visual design system including dark theme, portal green accents, glassmorphism effects, star field background, and all animations. This is what separates us from those primitive Earth IDEs. We're building something that looks like it came from Dimension C-137's finest labs.",
+  "type": "epic",
+  "status": "backlog",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [
+    "RICK-001"
+  ],
+  "acceptance_criteria": [
+    "Dark theme with portal green (#39ff14) accents applied globally",
+    "Glassmorphism cards with glow effects render smoothly at 60fps",
+    "Animated star field background runs without performance degradation",
+    "Portal swirl animations trigger on agent spawn events",
+    "Meeseeks cyan (#5bcefa), Rick blue (#a8d8ea), and Morty yellow (#f0e14a) colors integrated into component library"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.500732+00:00",
+  "updated_at": "2026-02-13T13:40:45.500881+00:00",
+  "completed_at": null,
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

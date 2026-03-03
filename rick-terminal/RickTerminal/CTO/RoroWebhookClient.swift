@@ -59,8 +59,8 @@ final class RoroWebhookClient: ObservableObject {
 
     /// Start listening for webhook events
     func start() {
-        guard !isListening else {
-            print("[RoroWebhookClient] Already listening")
+        guard !isListening && listener == nil else {
+            NSLog("[RoroWebhookClient] ⏭ Already listening or starting, skipping")
             return
         }
 
@@ -81,7 +81,7 @@ final class RoroWebhookClient: ObservableObject {
             }
 
             listener?.start(queue: listenerQueue)
-            print("[RoroWebhookClient] Starting listener on port \(listenPort)")
+            NSLog("[RoroWebhookClient] 🎧 Starting listener on port %d", listenPort)
 
         } catch {
             DispatchQueue.main.async {
@@ -108,19 +108,19 @@ final class RoroWebhookClient: ObservableObject {
         case .ready:
             isListening = true
             lastError = nil
-            print("[RoroWebhookClient] Listening on port \(listenPort)")
+            NSLog("[RoroWebhookClient] ✅ Listening on port %d", listenPort)
 
         case .failed(let error):
             isListening = false
             lastError = "Listener failed: \(error.localizedDescription)"
-            print("[RoroWebhookClient] Failed: \(error)")
+            NSLog("[RoroWebhookClient] ❌ Failed: %@", String(describing: error))
 
         case .cancelled:
             isListening = false
-            print("[RoroWebhookClient] Cancelled")
+            NSLog("[RoroWebhookClient] ⏹ Cancelled")
 
         case .waiting(let error):
-            print("[RoroWebhookClient] Waiting: \(error)")
+            NSLog("[RoroWebhookClient] ⏳ Waiting: %@", String(describing: error))
 
         default:
             break
@@ -179,18 +179,36 @@ final class RoroWebhookClient: ObservableObject {
         do {
             let event = try jsonDecoder.decode(CTOEvent.self, from: jsonData)
 
+            // Debug: write to file
+            let debugMsg = "[\(Date())] Received: \(event.eventType) agent=\(event.data.agent ?? "nil")\n"
+            if let data = debugMsg.data(using: .utf8) {
+                let debugFile = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("rick_webhook_debug.log")
+                if FileManager.default.fileExists(atPath: debugFile.path) {
+                    if let handle = try? FileHandle(forWritingTo: debugFile) {
+                        handle.seekToEndOfFile()
+                        handle.write(data)
+                        handle.closeFile()
+                    }
+                } else {
+                    try? data.write(to: debugFile)
+                }
+            }
+
             // Emit event on main thread
             DispatchQueue.main.async {
                 self.eventCount += 1
                 self.eventSubject.send(event)
             }
 
-            print("[RoroWebhookClient] Received event: \(event.eventType)")
             sendResponse(connection: connection, status: 200, body: "OK")
 
         } catch {
-            print("[RoroWebhookClient] Parse error: \(error)")
-            print("[RoroWebhookClient] Raw body: \(bodyString)")
+            // Debug: write error to file
+            let debugMsg = "[\(Date())] ERROR: \(error)\nBody: \(bodyString)\n"
+            if let data = debugMsg.data(using: .utf8) {
+                let debugFile = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("rick_webhook_debug.log")
+                try? data.write(to: debugFile)
+            }
             sendResponse(connection: connection, status: 400, body: "Parse error: \(error.localizedDescription)")
         }
     }

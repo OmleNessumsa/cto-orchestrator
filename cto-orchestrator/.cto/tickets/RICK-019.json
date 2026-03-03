@@ -1,0 +1,35 @@
+{
+  "id": "RICK-019",
+  "title": "Build Team Collaboration View",
+  "description": "Create a view showing parallel Morty team work streams. Display swimlanes per team/agent with their assigned tickets flowing through. Show real-time progress indicators, blocking dependencies highlighted, and inter-team handoff visualization. Support team creation and agent assignment.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-006",
+    "RICK-014",
+    "RICK-016"
+  ],
+  "acceptance_criteria": [
+    "Swimlane view with horizontal lanes per team",
+    "Tickets flow left-to-right through status stages",
+    "Active ticket highlighted with glow effect",
+    "Blocking dependencies shown as red connection lines",
+    "Handoff arrows show when ticket moves between teams",
+    "Team header shows member count and combined velocity",
+    "Right-click context menu to reassign ticket to team",
+    "Create Team modal with name, color, and member selection"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.331761+00:00",
+  "updated_at": "2026-02-13T14:41:26.843900+00:00",
+  "completed_at": "2026-02-13T14:41:26.843734+00:00",
+  "agent_output": "Built TeamView with team list, member status grid, team communication panel, and CreateTeamModal. Supports fullstack-team, api-team, security-team, devops-team templates.",
+  "review_notes": null,
+  "files_touched": []
+}

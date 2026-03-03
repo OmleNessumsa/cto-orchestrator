@@ -1,0 +1,41 @@
+{
+  "id": "RT-030",
+  "title": "Integrate Basic Code Editor",
+  "description": "Implement a code editor view for displaying and editing files. Start simple - a TextEditor or custom view with monospace font. Handle file loading, saving, and unsaved changes indicator. This is MVP - syntax highlighting comes later.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-005",
+  "dependencies": [
+    "RT-009"
+  ],
+  "acceptance_criteria": [
+    "Files open in editor view",
+    "Text editing works correctly",
+    "Cmd+S saves file",
+    "Unsaved changes indicator (dot in tab)",
+    "Warn before closing unsaved file",
+    "Line numbers displayed"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.348708+00:00",
+  "updated_at": "2026-02-15T07:23:00.977508+00:00",
+  "completed_at": "2026-02-15T07:23:00.977490+00:00",
+  "agent_output": "Ik heb een volledig functionele code editor ge\u00efntegreerd in Rick Terminal met de volgende features:\n\n1. **EditorFile & EditorManager**: State management voor open bestanden met tracking van unsaved changes\n2. **CodeEditorView**: Monospace text editor met line numbers die synchroon scrollen met de tekst\n3. **EditorPanelView**: Tab-based interface voor meerdere open bestanden met:\n   - Visuele indicator (groene dot) voor unsaved changes in tabs\n   - Warning dialog bij sluiten van onopgeslagen bestanden met opties: Cancel, Don't Save, Save\n   - Empty state wanneer geen bestand open is\n4. **CenterPanelView**: Toggle tussen Terminal en Editor views met indicator voor unsaved changes\n5. **Cmd+S keyboard shortcut**: Slaat actief bestand op via NotificationCenter pattern\n6. **FileBrowser integratie**: Dubbelklik op tekstbestanden opent ze automatisch in de editor\n   - Ondersteunt 30+ bestandsextensies (.swift, .py, .js, .ts, .md, .json, etc.)\n   - Non-tekstbestanden openen nog steeds in system default app\n7. **Auto-switch**: Editor panel wordt automatisch actief wanneer een bestand wordt geopend\n\nAlle acceptatiecriteria zijn ge\u00efmplementeerd:\n- \u2705 Files open in editor view\n- \u2705 Text editing works correctly  \n- \u2705 Cmd+S saves file\n- \u2705 Unsaved changes indicator (dot in tab)\n- \u2705 Warn before closing unsaved file\n- \u2705 Line numbers displayed\n\nDe code volgt bestaande Rick Terminal patronen:\n- Gebruikt rtBackgroundDark, rtAccentGreen en andere theme colors\n- Monospace fonts (.system(design: .monospaced))\n- ObservableObject pattern voor state management\n- EnvironmentObject voor cross-view communicatie\n\nProject build succesvol (BUILD SUCCEEDED).",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Editor/EditorFile.swift (nieuw)",
+    "RickTerminal/Editor/EditorManager.swift (nieuw)",
+    "RickTerminal/Editor/CodeEditorView.swift (nieuw)",
+    "RickTerminal/Editor/EditorPanelView.swift (nieuw)",
+    "RickTerminal/MainWindowView.swift",
+    "RickTerminal/FileBrowser/FileTreeManager.swift",
+    "RickTerminal/FileBrowser/FileBrowserView.swift",
+    "RickTerminal/RickTerminalApp.swift",
+    "RickTerminal.xcodeproj/project.pbxproj"
+  ]
+}

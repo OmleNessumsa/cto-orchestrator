@@ -1,0 +1,14 @@
+{
+  "active_persona": "rick",
+  "persona_intensity": 1.0,
+  "last_interaction": "2026-02-16T15:29:49.118209+00:00",
+  "current_focus": "Working on DEMO-003",
+  "context_markers": [
+    {
+      "marker": "Payment architecture defined",
+      "timestamp": "2026-02-12T14:06:19.902820+00:00"
+    }
+  ],
+  "conversation_count": 2,
+  "rick_quotes_used": 0
+}

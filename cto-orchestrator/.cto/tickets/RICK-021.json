@@ -1,0 +1,36 @@
+{
+  "id": "RICK-021",
+  "title": "Create Unity Security Scan Integration Panel",
+  "description": "Build a dedicated panel for triggering and viewing Unity (Shannon) pentest scans. Display scan configuration options, progress indicator during scan, and results with severity-colored findings. Support exporting scan reports. Integrate with existing Unity CLI or API.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-007",
+    "RICK-013",
+    "RICK-016"
+  ],
+  "acceptance_criteria": [
+    "Unity panel accessible from sidebar with shield icon",
+    "Scan configuration: target selection, scan type dropdown",
+    "Start Scan button triggers Unity subprocess via IPC",
+    "Progress bar shows scan phases with estimated completion",
+    "Results table shows findings with severity (critical/high/medium/low)",
+    "Color coding: red (critical), orange (high), yellow (medium), blue (low)",
+    "Finding detail expands to show description, remediation",
+    "Export button generates PDF or JSON report",
+    "History tab shows past scan results"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.437760+00:00",
+  "updated_at": "2026-02-13T14:43:11.952837+00:00",
+  "completed_at": "2026-02-13T14:43:11.952705+00:00",
+  "agent_output": "UnityPanel with code/live/greenlight scan types, findings display with severity coloring, security score visualization, scan history list.",
+  "review_notes": null,
+  "files_touched": []
+}

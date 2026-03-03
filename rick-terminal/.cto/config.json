@@ -1,0 +1,17 @@
+{
+  "project_name": "rick-terminal",
+  "ticket_prefix": "RT",
+  "next_ticket_number": 43,
+  "created_at": "2026-02-14T20:05:27.893152+00:00",
+  "agents_used": [],
+  "current_sprint": 1,
+  "default_model": "sonnet",
+  "roro": {
+    "enabled": true,
+    "endpoint": "http://localhost:3067/hooks/agent-event",
+    "rick_terminal_endpoint": "http://localhost:3068",
+    "timeout": 2.0,
+    "verbose": true
+  },
+  "next_team_number": 6
+}

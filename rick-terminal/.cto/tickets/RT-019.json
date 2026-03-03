@@ -1,0 +1,40 @@
+{
+  "id": "RT-019",
+  "title": "Style Claude Output with Visual Distinction",
+  "description": "Parse Claude CLI output to apply special styling. Claude's responses should be visually distinct from regular terminal output - perhaps with a subtle background color or left border. Handle markdown rendering if possible, but keep it readable in terminal context.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-003",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Claude responses visually distinct",
+    "Code blocks formatted with syntax highlighting",
+    "Streaming responses render smoothly",
+    "Long responses don't break layout",
+    "User input clearly separated from Claude output"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.843201+00:00",
+  "updated_at": "2026-02-15T07:47:36.722181+00:00",
+  "completed_at": "2026-02-15T07:47:36.722166+00:00",
+  "agent_output": "Implemented a comprehensive Claude CLI output styling system with the following components:\n\n1. **ANSIStyler** (370 lines): Terminal-native ANSI escape code utilities for colors, styles, and Claude-specific formatting. Supports RGB colors from Rick Terminal theme (purple borders, green code, orange errors).\n\n2. **ClaudeOutputFormatter** (250 lines): High-level API for formatting Claude responses with markdown processing, code block highlighting, left border application, and streaming support via StreamFormatter.\n\n3. **ClaudeOutputDetector** (280 lines): Event-based output stream monitor that detects Claude prompts, tool invocations, thinking blocks, and response boundaries using regex patterns and state machine.\n\n4. **MarkdownRenderer** (465 lines): NSAttributedString-based markdown renderer with full support for headers, bold, italic, inline code, code blocks with syntax highlighting (Swift/JS/Python/Rust/Go), lists, blockquotes, and links. Ready for future rich text UI.\n\n5. **ClaudeOutputStyler** (320 lines): Orchestrates detection and NSAttributedString styling, buffers streaming output, detects response boundaries, and classifies output types (text, thinking, tool, code, error).\n\nVisual distinction achieved through:\n- **Purple left border** (`\u258e`) on all Claude responses\n- **Green syntax highlighting** for code blocks with language labels\n- **Markdown rendering** (bold, italic, headers) via ANSI codes\n- **Tool invocations** highlighted in purple\n- **Error messages** in orange\n- **Streaming-compatible** line-by-line processing\n\nAll components are modular, well-documented, and include comprehensive README, usage guide, test script, and DEBUG demo suite. Files are created but need to be manually added to Xcode project target.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Claude/ANSIStyler.swift (created)",
+    "RickTerminal/Claude/ClaudeOutputFormatter.swift (created)",
+    "RickTerminal/Claude/ClaudeOutputDetector.swift (created)",
+    "RickTerminal/Claude/MarkdownRenderer.swift (created)",
+    "RickTerminal/Claude/ClaudeOutputStyler.swift (created)",
+    "RickTerminal/Claude/ClaudeOutputStyling+Demo.swift (created)",
+    "RickTerminal/Claude/README.md (created)",
+    "RickTerminal/RickTerminalViewController.swift (modified)",
+    "IMPLEMENTATION_RT-019_SUMMARY.md (created)",
+    "docs/CLAUDE_OUTPUT_STYLING.md (created)",
+    "scripts/test-claude-styling.swift (created)"
+  ]
+}

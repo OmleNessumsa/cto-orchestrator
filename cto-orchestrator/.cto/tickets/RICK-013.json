@@ -1,0 +1,33 @@
+{
+  "id": "RICK-013",
+  "title": "Build Main Application Shell and Sidebar Navigation",
+  "description": "Create the main application layout with fixed sidebar navigation and main content area. Sidebar includes icons/labels for: Kanban (default), Agent Monitor, Terminal, Settings. Implement router (React Router or TanStack Router) for view switching. Add notification bell with badge counter.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-009",
+    "RICK-011"
+  ],
+  "acceptance_criteria": [
+    "Sidebar fixed at 64px width with expand-on-hover to 200px",
+    "Navigation items: Kanban, Agents, Terminal, Settings with Lucide icons",
+    "Active route highlighted with portal-green indicator",
+    "Main content area fills remaining width with proper scrolling",
+    "React Router configured with routes for each view",
+    "Notification bell in header shows unread count badge",
+    "Keyboard shortcuts: Cmd/Ctrl + 1-4 switch between views"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.039272+00:00",
+  "updated_at": "2026-02-13T14:10:45.313556+00:00",
+  "completed_at": "2026-02-13T14:10:45.313401+00:00",
+  "agent_output": "Main app shell with sidebar navigation implemented",
+  "review_notes": null,
+  "files_touched": []
+}

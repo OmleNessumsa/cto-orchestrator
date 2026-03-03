@@ -1,0 +1,21 @@
+{
+  "id": "PROM-005",
+  "title": "Add Claude Code hooks for automatic session tracking and task validation",
+  "category": "tooling",
+  "source": "https://docs.anthropic.com/en/docs/claude-code/hooks - Claude Code hooks for lifecycle event automation",
+  "description": "The system currently relies on manual roro event emission (roro_events.py) scattered across scripts. Claude Code hooks provide deterministic shell commands that fire at lifecycle points (PreToolUse, PostToolUse, Stop, etc.). Adding hooks would automatically log every tool use, validate task completion at session end, and emit roro events without requiring each script to manually call emit(). This also enables guardrails like preventing file writes to reserved paths during team sessions.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/hooks/post_tool_use.sh",
+    "scripts/hooks/session_stop.sh",
+    ".claude/settings.json"
+  ],
+  "proposed_changes": "1. Create scripts/hooks/post_tool_use.sh that reads the tool use JSON from stdin and emits a cto.tool.used roro event with tool name, file paths, and agent context. 2. Create scripts/hooks/session_stop.sh that validates the agent produced a structured summary (checks for Samenvatting/Summary section or JSON output) and emits cto.agent.completed event. 3. Create scripts/hooks/pre_tool_use.sh for team sessions that checks if a Write/Edit target file is in another agent's reserved files list (from .cto/teams/active/TEAM-*.json) and blocks with an error if so \u2014 replacing the current non-atomic file reservation check in team.py. 4. Register hooks in .claude/settings.json: {\"hooks\": {\"PostToolUse\": [{\"type\": \"command\", \"command\": \"bash scripts/hooks/post_tool_use.sh\"}], \"Stop\": [{\"type\": \"command\", \"command\": \"bash scripts/hooks/session_stop.sh\"}]}}. 5. Pass team context via environment variables (CTO_TEAM_ID, CTO_AGENT_ROLE) when spawning team agents.",
+  "status": "rejected",
+  "created_at": "2026-02-27T16:17:33.588910+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Apply failed: Evolve timed out after 300s"
+}

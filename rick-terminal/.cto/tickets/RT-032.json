@@ -1,0 +1,36 @@
+{
+  "id": "RT-032",
+  "title": "Implement Git Status Integration",
+  "description": "Show git status in the file browser. Use libgit2 wrapper or shell out to git command. Display file status with color coding: modified (yellow), added (green), deleted (red), untracked (grey). Show current branch in toolbar.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "fullstack-morty",
+  "parent_ticket": "RT-005",
+  "dependencies": [
+    "RT-031"
+  ],
+  "acceptance_criteria": [
+    "Git repo detected automatically",
+    "File status colors displayed",
+    "Current branch shown",
+    "Uncommitted changes count shown",
+    "Status updates after git operations",
+    "Works with nested git repos"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.454385+00:00",
+  "updated_at": "2026-02-17T09:31:10.023934+00:00",
+  "completed_at": null,
+  "agent_output": "The core implementation (GitStatusManager, FileBrowserView git UI, FileNode git status property) was already fully implemented by a previous session. This ticket's work was completing the wiring: `GitStatusManager.swift` existed on disk but was missing from the Xcode project \u2014 it would never compile. The `gitStatusRefreshNeeded` notification was referenced but undefined, causing a compile error. Tests were added following the existing `RickTerminalTests/` pattern. Preview crash was fixed as a bonus.",
+  "review_notes": "AGENT FAILURE: Agent timed out after 600s. Consider splitting the ticket.",
+  "files_touched": [
+    "RickTerminal.xcodeproj/project.pbxproj` \u2014 Added `GitStatusManager.swift` in 4 locations: PBXBuildFile entry, PBXFileReference entry, FileBrowser group membership, and Sources build phase",
+    "RickTerminal/Keyboard/KeyboardShortcutManager.swift` \u2014 Added missing `gitStatusRefreshNeeded` notification name that was referenced in `FileBrowserView.swift` but never defined",
+    "RickTerminalTests/GitStatusManagerTests.swift` \u2014 New test file with 18 test cases covering status colors, badges, repository detection, status-for-path, uncommitted count, auto-refresh timer, git command execution, and notification name",
+    "RickTerminal/FileBrowser/FileBrowserView.swift` \u2014 Fixed `FileBrowserView_Previews` to include `EditorManager` and `CTOEventBridge` environment objects (previously would crash Xcode previews)"
+  ]
+}

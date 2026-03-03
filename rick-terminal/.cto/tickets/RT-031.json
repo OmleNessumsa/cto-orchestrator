@@ -1,0 +1,35 @@
+{
+  "id": "RT-031",
+  "title": "Add Syntax Highlighting with Highlightr or Tree-sitter",
+  "description": "Integrate syntax highlighting library. Consider Highlightr (highlight.js wrapper) or tree-sitter-swift for better performance. Support common languages: Swift, Python, JavaScript, TypeScript, JSON, YAML, Markdown. Theme colors should match Rick Terminal palette.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "backend-morty",
+  "parent_ticket": "RT-005",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Syntax highlighting renders correctly",
+    "At least 5 languages supported",
+    "Theme colors consistent with app",
+    "Performance acceptable on large files",
+    "Language auto-detected from extension"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": "TEAM-004",
+  "created_at": "2026-02-14T20:16:46.397548+00:00",
+  "updated_at": "2026-02-17T08:04:41.245059+00:00",
+  "completed_at": null,
+  "agent_output": "Architect-Morty heeft de complete systeemarchitectuur ontworpen voor syntax highlighting (RT-031):\n\n1. **ADR-006 geschreven** - Documenteert de keuze voor HighlightSwift (highlight.js wrapper) boven tree-sitter, met rationale en trade-offs\n2. **Core types gedefinieerd** - `SyntaxLanguage` enum (20 talen), `SyntaxToken`, `HighlightResult`, `SyntaxTheme` met Rick Terminal kleuren\n3. **Protocol ontworpen** - `SyntaxHighlighter` interface voor pluggable engines\n4. **Service ge\u00efmplementeerd** - `SyntaxHighlightingService` singleton met primary/fallback pattern\n5. **Fallback highlighter gebouwd** - Regex-based highlighter die nu al werkt voor alle 20 talen\n6. **Task breakdown gemaakt** - 10 taken voor backend-morty en frontend-morty met duidelijke acceptance criteria\n\nDe FallbackSyntaxHighlighter is direct bruikbaar - backend-morty kan HighlightSwift integreren als primary engine, frontend-morty kan alvast beginnen met de UI integratie.",
+  "review_notes": "AGENT FAILURE: Agent timed out after 600s. Consider splitting the ticket.",
+  "files_touched": [
+    "docs/adr/ADR-006-syntax-highlighting-library.md (NEW)",
+    "RickTerminal/SyntaxHighlighting/SyntaxHighlightingTypes.swift (NEW)",
+    "RickTerminal/SyntaxHighlighting/SyntaxHighlightingService.swift (NEW)",
+    "RickTerminal/SyntaxHighlighting/FallbackSyntaxHighlighter.swift (NEW)",
+    "IMPLEMENTATION_RT-031_TASKS.md (NEW)",
+    "IMPLEMENTATION_RT-031_SUMMARY.md (NEW)"
+  ]
+}

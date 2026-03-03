@@ -1,0 +1,10 @@
+{
+  "id": "msg-003",
+  "team_id": "TEAM-003",
+  "from": "frontend-morty",
+  "to": "backend-morty",
+  "message": "De UI is klaar en ge\u00efntegreerd. KanbanManager biedt een clean API voor jullie backend calls wanneer jullie die gaan toevoegen (addCard, moveCard, removeCard).",
+  "type": "info",
+  "timestamp": "2026-02-15T07:06:06.279482+00:00",
+  "read_by": []
+}

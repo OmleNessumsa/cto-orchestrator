@@ -1,0 +1,43 @@
+{
+  "id": "TEAM-004",
+  "parent_ticket": "RT-031",
+  "template": "fullstack-team",
+  "status": "blocked",
+  "members": [
+    {
+      "role": "architect-morty",
+      "focus": "architecture and interfaces",
+      "assignment": "RT-031-A",
+      "status": "blocked",
+      "started_at": "2026-02-15T08:32:59.267219+00:00",
+      "completed_at": "2026-02-15T08:39:59.894051+00:00",
+      "output_summary": "Architect-Morty heeft de complete systeemarchitectuur ontworpen voor syntax highlighting (RT-031):\n\n1. **ADR-006 geschreven** - Documenteert de keuze voor HighlightSwift (highlight.js wrapper) boven t"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "backend implementation",
+      "assignment": "RT-031-B",
+      "status": "blocked",
+      "started_at": "2026-02-15T08:39:59.952568+00:00",
+      "completed_at": "2026-02-15T08:49:59.969034+00:00",
+      "output_summary": "FAILED: Agent timed out after 600s. Consider splitting the ticket."
+    },
+    {
+      "role": "frontend-morty",
+      "focus": "frontend implementation",
+      "assignment": "RT-031-C",
+      "status": "completed",
+      "started_at": "2026-02-15T08:39:59.952971+00:00",
+      "completed_at": "2026-02-15T08:43:47.479961+00:00",
+      "output_summary": "Syntax highlighting integration successfully completed for Rick Terminal. Integrated SyntaxHighlightingService into both MarkdownRenderer (for NSAttributedString/UI output) and ANSIStyler (for termina"
+    }
+  ],
+  "coordination": {
+    "mode": "mixed",
+    "lead": "architect-morty"
+  },
+  "created_at": "2026-02-15T08:32:59.209694+00:00",
+  "started_at": "2026-02-15T08:32:59.267240+00:00",
+  "completed_at": null,
+  "files_reserved": {}
+}

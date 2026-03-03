@@ -1,0 +1,22 @@
+{
+  "id": "RICK-032",
+  "title": "Test Rick Terminal Integration",
+  "description": "Test event emission naar Rick Terminal",
+  "type": "task",
+  "status": "done",
+  "priority": "low",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": null,
+  "dependencies": [],
+  "acceptance_criteria": [],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-16T14:13:49.422027+00:00",
+  "updated_at": "2026-02-16T14:59:42.485981+00:00",
+  "completed_at": "2026-02-16T14:59:42.485866+00:00",
+  "agent_output": "Rick Terminal integration verified:\n- Webhook endpoint responding on localhost:3068\n- roro_events.py emit() successfully sends to Rick Terminal\n- delegate.py has all 4 delegation events wired up\n- Events: started, completed, failed, timeout all working\nTest passed. Wubba lubba dub dub!",
+  "review_notes": null,
+  "files_touched": []
+}

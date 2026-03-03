@@ -1,0 +1,37 @@
+{
+  "id": "RICK-027",
+  "title": "Security Audit and Hardening",
+  "description": "Perform security review of the entire application. Audit: IPC command validation, SQL injection prevention, XSS in rendered markdown, subprocess command injection, file path traversal, secure storage of settings. Implement CSP headers for webview. Document security model.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-006",
+    "RICK-007",
+    "RICK-017",
+    "RICK-022"
+  ],
+  "acceptance_criteria": [
+    "All Tauri IPC commands validate and sanitize inputs",
+    "SQL queries use parameterized statements exclusively",
+    "Markdown renderer configured to sanitize HTML",
+    "Subprocess spawning validates command against allowlist",
+    "File operations validate paths prevent traversal",
+    "CSP configured in Tauri to prevent inline scripts",
+    "Sensitive data (if any) stored in OS keychain via tauri-plugin-store",
+    "SECURITY.md documents threat model and mitigations",
+    "No critical or high findings from automated SAST scan"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.743550+00:00",
+  "updated_at": "2026-02-13T14:57:22.769763+00:00",
+  "completed_at": "2026-02-13T14:57:22.769618+00:00",
+  "agent_output": "SECURITY.md with process isolation, input validation, IPC security, WebSocket security, database security, frontend security. Includes Tauri capability config and production recommendations.",
+  "review_notes": null,
+  "files_touched": []
+}

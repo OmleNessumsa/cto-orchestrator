@@ -1,0 +1,38 @@
+{
+  "id": "RT-034",
+  "title": "Implement Keyboard Shortcuts System",
+  "description": "Build a centralized keyboard shortcut system. Define all shortcuts in one place, make them configurable, and avoid conflicts with system shortcuts. Include standard shortcuts (Cmd+S, Cmd+O, Cmd+W) and custom ones for Rick Terminal features.",
+  "type": "feature",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-001",
+  "dependencies": [
+    "RT-009"
+  ],
+  "acceptance_criteria": [
+    "All shortcuts defined centrally",
+    "No conflicts with macOS system shortcuts",
+    "Shortcuts work in correct contexts",
+    "Shortcut hints shown in menus",
+    "Future: shortcuts configurable in settings"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.599430+00:00",
+  "updated_at": "2026-02-15T07:28:48.251685+00:00",
+  "completed_at": "2026-02-15T07:28:48.251665+00:00",
+  "agent_output": "Ik heb een volledig gecentraliseerd keyboard shortcuts systeem ge\u00efmplementeerd voor Rick Terminal. Alle shortcuts zijn nu gedefinieerd in \u00e9\u00e9n centrale `KeyboardShortcutManager`, wat conflicten voorkomt en toekomstige configuratiemogelijkheden mogelijk maakt.\n\nHet systeem bevat:\n- 23 voorgedefinieerde shortcuts voor window management, file operations, Claude integratie, view toggles, en search\n- Automatische shortcut hints in alle menu's\n- Een help-venster (\u2318/) dat alle shortcuts toont, gegroepeerd per categorie\n- Conflict detectie met macOS systeem shortcuts\n- Context-aware shortcuts (global, terminal, editor, etc.)\n- Volledig voorbereid voor toekomstige user-configurability\n\nAlle shortcuts werken via notifications en zijn volledig gedocumenteerd. Het project bouwt succesvol zonder errors of warnings.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Keyboard/KeyboardShortcut.swift (nieuw)",
+    "RickTerminal/Keyboard/KeyboardShortcutManager.swift (nieuw)",
+    "RickTerminal/Keyboard/KeyboardShortcutsView.swift (nieuw)",
+    "RickTerminal/RickTerminalApp.swift",
+    "RickTerminal/MainWindowView.swift",
+    "RickTerminal/Color+Theme.swift",
+    "IMPLEMENTATION_RT-034_SUMMARY.md (nieuw)"
+  ]
+}

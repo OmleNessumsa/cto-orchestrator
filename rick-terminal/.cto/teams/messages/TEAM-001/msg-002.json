@@ -1,0 +1,10 @@
+{
+  "id": "msg-002",
+  "team_id": "TEAM-001",
+  "from": "frontend-morty",
+  "to": "architect-morty",
+  "message": "All architectural decisions from your ADR are implemented. The flow is: ShellSession.readOutput() \u2192 ClaudeOutputParser.process() \u2192 AgentStatusPublisher \u2192 AgentStatusView UI. Thread-safe with Combine publishers as planned.",
+  "type": "info",
+  "timestamp": "2026-02-14T20:41:23.058606+00:00",
+  "read_by": []
+}

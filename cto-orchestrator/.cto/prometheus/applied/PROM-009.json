@@ -1,0 +1,20 @@
+{
+  "id": "PROM-009",
+  "title": "Add Pydantic structured output validation for agent responses",
+  "category": "agent-patterns",
+  "source": "CrewAI 2025/2026 best practice \u2014 Pydantic output validation",
+  "description": "Replace fragile regex parsing in parse_agent_output() with Pydantic model validation. Current regex frequently fails; agents could return invalid status values.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/meeseeks.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Add schemas.py with Pydantic BaseModel classes (AgentOutput, MeeseeksOutput, TeamUpdate). Update prompts to output JSON blocks. Try JSON extraction first, fall back to regex.",
+  "status": "applied",
+  "created_at": "2026-03-01T08:55:17.733186+00:00",
+  "applied_at": "2026-03-01T09:17:16.309297+00:00",
+  "rollback_snapshot": ".cto/prometheus/snapshots/snap-PROM-017-snap-PROM-017-20260301T090713"
+}

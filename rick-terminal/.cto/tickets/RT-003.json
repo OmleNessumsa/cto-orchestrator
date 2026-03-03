@@ -1,0 +1,30 @@
+{
+  "id": "RT-003",
+  "title": "EPIC: Claude CLI Integration",
+  "description": "Integrate Claude CLI as the primary AI interface within the terminal. Auto-load on startup, handle streaming responses with proper rendering, and set up the communication layer for real-time status updates to the Kanban board and agent columns.",
+  "type": "epic",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-002"
+  ],
+  "acceptance_criteria": [
+    "Claude CLI auto-launches when terminal starts",
+    "Streaming responses render in real-time",
+    "Claude output properly styled and distinguishable",
+    "Session persistence works across app restarts",
+    "Error states handled gracefully"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.093880+00:00",
+  "updated_at": "2026-02-15T08:04:22.332996+00:00",
+  "completed_at": "2026-02-15T08:04:22.332990+00:00",
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

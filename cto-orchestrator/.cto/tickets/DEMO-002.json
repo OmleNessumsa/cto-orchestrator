@@ -1,0 +1,8 @@
+{
+  "id": "DEMO-002",
+  "title": "Implement user authentication API",
+  "type": "feature",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": "backend-morty"
+}

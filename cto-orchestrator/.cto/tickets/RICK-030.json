@@ -1,0 +1,32 @@
+{
+  "id": "RICK-030",
+  "title": "Create Documentation and User Guide",
+  "description": "Write comprehensive documentation: README with project overview and setup, user guide with screenshots, developer guide for contributing, API documentation for IPC commands, architecture decision records (ADRs) for key choices. Include troubleshooting section.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-029"
+  ],
+  "acceptance_criteria": [
+    "README.md with project description, screenshots, quick start",
+    "docs/user-guide.md covers all features with annotated screenshots",
+    "docs/developer-guide.md explains setup, architecture, contributing",
+    "docs/api.md documents all Tauri IPC commands with examples",
+    "docs/adr/ contains decision records for: Tauri choice, DB schema, IPC protocol",
+    "docs/troubleshooting.md lists common issues and solutions",
+    "Documentation builds with mdBook or similar for web viewing"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.889455+00:00",
+  "updated_at": "2026-02-13T14:53:52.822742+00:00",
+  "completed_at": "2026-02-13T14:53:52.822579+00:00",
+  "agent_output": "Comprehensive README with features, keyboard shortcuts, installation, architecture, tech stack, design system, and CTO Orchestrator integration docs.",
+  "review_notes": null,
+  "files_touched": []
+}

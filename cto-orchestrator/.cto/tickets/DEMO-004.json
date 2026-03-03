@@ -1,0 +1,8 @@
+{
+  "id": "DEMO-004",
+  "title": "Add payment integration",
+  "type": "feature",
+  "status": "in_progress",
+  "priority": "medium",
+  "assigned_agent": "fullstack-morty"
+}

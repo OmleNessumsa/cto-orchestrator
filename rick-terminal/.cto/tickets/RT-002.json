@@ -1,0 +1,31 @@
+{
+  "id": "RT-002",
+  "title": "EPIC: Terminal Emulation System",
+  "description": "Implement a fully functional terminal emulator using SwiftTerm. This is the heart of the application - without a working terminal, we've got nothing. Needs to support ANSI colors, command history, proper shell integration, and streaming output for Claude responses.",
+  "type": "epic",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": null,
+  "dependencies": [
+    "RT-001"
+  ],
+  "acceptance_criteria": [
+    "SwiftTerm integrated and rendering correctly",
+    "Shell sessions spawn and maintain state",
+    "ANSI color codes render properly",
+    "Command history accessible with up/down arrows",
+    "Copy/paste works as expected",
+    "Terminal resizes smoothly"
+  ],
+  "estimated_complexity": "XL",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:45.044706+00:00",
+  "updated_at": "2026-02-15T07:38:31.548813+00:00",
+  "completed_at": "2026-02-15T07:38:31.548810+00:00",
+  "agent_output": null,
+  "review_notes": null,
+  "files_touched": []
+}

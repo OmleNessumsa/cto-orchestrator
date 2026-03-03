@@ -1,0 +1,32 @@
+{
+  "id": "RICK-008",
+  "title": "Implement WebSocket Server for Real-Time Updates",
+  "description": "Create a local WebSocket server in the Rust backend that broadcasts state changes to connected frontend clients. Events include: ticket_updated, agent_spawned, agent_completed, agent_output, session_changed. The frontend subscribes on mount and updates React state accordingly. This gives us that sweet real-time reactivity without polling like some peasant.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-004",
+    "RICK-007"
+  ],
+  "acceptance_criteria": [
+    "WebSocket server starts on app launch at ws://localhost:PORT",
+    "Frontend establishes connection and receives heartbeat",
+    "Server broadcasts JSON events with type and payload fields",
+    "Frontend reconnects automatically if connection drops",
+    "Multiple frontend windows can connect simultaneously",
+    "Events are debounced to prevent flooding (max 60 events/sec)"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.794628+00:00",
+  "updated_at": "2026-02-13T14:56:32.972230+00:00",
+  "completed_at": "2026-02-13T14:56:32.972082+00:00",
+  "agent_output": "WebSocket server on ws://127.0.0.1:9137 with tokio-tungstenite. Supports session events (started/output/tool/completed/error), ticket events, and heartbeat. Broadcast channel for real-time updates.",
+  "review_notes": null,
+  "files_touched": []
+}

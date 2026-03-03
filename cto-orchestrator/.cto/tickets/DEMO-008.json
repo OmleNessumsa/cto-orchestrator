@@ -1,0 +1,9 @@
+{
+  "id": "DEMO-008",
+  "title": "Database connection pool exhausted",
+  "type": "bug",
+  "status": "blocked",
+  "priority": "critical",
+  "assigned_agent": "backend-morty",
+  "review_notes": "Waiting for DevOps to increase pool size"
+}

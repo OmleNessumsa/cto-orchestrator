@@ -1,0 +1,10 @@
+{
+  "id": "msg-004",
+  "team_id": "TEAM-003",
+  "from": "frontend-morty",
+  "to": "architect-morty",
+  "message": "Alle team decisions zijn ge\u00efmplementeerd zoals afgesproken. Source indicators tonen duidelijk auto vs manual cards, en de \"Claim\" button werkt perfect. Real-time updates via Combine zoals jij voorstelde.",
+  "type": "info",
+  "timestamp": "2026-02-15T07:06:06.279739+00:00",
+  "read_by": []
+}

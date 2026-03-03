@@ -1,0 +1,35 @@
+{
+  "id": "TEAM-001",
+  "parent_ticket": "DEMO-004",
+  "template": "fullstack-team",
+  "status": "active",
+  "members": [
+    {
+      "role": "architect-morty",
+      "focus": "payment architecture",
+      "assignment": "DEMO-004-A",
+      "status": "completed",
+      "output_summary": "Designed Stripe integration architecture"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "payment API endpoints",
+      "assignment": "DEMO-004-B",
+      "status": "working",
+      "output_summary": null
+    },
+    {
+      "role": "frontend-morty",
+      "focus": "checkout UI",
+      "assignment": "DEMO-004-C",
+      "status": "pending",
+      "output_summary": null
+    }
+  ],
+  "coordination": {
+    "mode": "mixed",
+    "lead": "architect-morty"
+  },
+  "created_at": "2026-02-12T14:00:00Z",
+  "started_at": "2026-02-12T14:05:00Z"
+}

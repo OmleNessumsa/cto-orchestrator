@@ -1,0 +1,10 @@
+{
+  "id": "msg-002",
+  "team_id": "TEAM-005",
+  "from": "backend-morty",
+  "to": "architect-morty",
+  "message": "I used SwiftUI's native `.onDrag` / `.onDrop(of: [.plainText])` with `NSItemProvider(object: card.id.uuidString as NSString)` \u2014 no third-party dependencies. Drop handling dispatches to main thread before calling `board.moveCard()` so it integrates cleanly with the existing thread-safe mutation queue.",
+  "type": "info",
+  "timestamp": "2026-02-17T08:21:42.221773+00:00",
+  "read_by": []
+}

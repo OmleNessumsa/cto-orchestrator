@@ -24,17 +24,65 @@ from contextlib import contextmanager
 # Try to import urllib.request for HTTP without external dependencies
 import urllib.request
 import urllib.error
+import atexit
+
+
+# ── Thread Tracking (prevents SIGSEGV on exit) ────────────────────────────────
+
+_pending_threads: list[threading.Thread] = []
+_threads_lock = threading.Lock()
+
+
+def flush(timeout: float = 1.0):
+    """Wait for pending event threads to complete.
+
+    Call this before exiting to prevent SIGSEGV from daemon threads
+    being killed mid-request.
+
+    Args:
+        timeout: Max seconds to wait per thread (default: 1.0)
+    """
+    with _threads_lock:
+        threads = _pending_threads.copy()
+        _pending_threads.clear()
+
+    for t in threads:
+        if t.is_alive():
+            t.join(timeout=timeout)
+
+
+def _cleanup_finished_threads():
+    """Remove finished threads from tracking list."""
+    with _threads_lock:
+        _pending_threads[:] = [t for t in _pending_threads if t.is_alive()]
+
+
+def _track_thread(thread: threading.Thread):
+    """Add thread to tracking list."""
+    with _threads_lock:
+        # Cleanup old threads first (keep list small)
+        _pending_threads[:] = [t for t in _pending_threads if t.is_alive()]
+        _pending_threads.append(thread)
+
+
+# Auto-flush on exit to prevent SIGSEGV
+atexit.register(lambda: flush(timeout=0.5))
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 # Default configuration
+# SECURITY NOTE: localhost endpoints use HTTP for development convenience.
+# For production, configure HTTPS endpoints via environment variables:
+#   RORO_ENDPOINT=https://your-roro-server.com/hooks/agent-event
+#   RORO_REQUIRE_HTTPS=true
 DEFAULT_CONFIG = {
     "enabled": True,
-    "endpoint": "http://localhost:3067/hooks/agent-event",
-    "rick_terminal_endpoint": "http://localhost:3068",  # Rick Terminal integration
+    "endpoint": "http://localhost:3067/hooks/agent-event",  # Use HTTPS in production
+    "rick_terminal_endpoint": "http://localhost:3068",  # Use HTTPS in production
     "timeout": 2.0,
     "verbose": False,
+    "require_https": False,  # Set to True in production
 }
 
 # Environment variable overrides
@@ -255,6 +303,17 @@ def emit(
             print(f"[roro] Circuit breaker open, skipping event: {event_type}")
         return
 
+    endpoint = config.get("endpoint", "")
+
+    # SECURITY: Enforce HTTPS in production if require_https is set
+    require_https = config.get("require_https", False) or os.environ.get("RORO_REQUIRE_HTTPS", "").lower() == "true"
+    if require_https and endpoint and not endpoint.startswith("https://"):
+        # Allow localhost for development
+        if "localhost" not in endpoint and "127.0.0.1" not in endpoint:
+            if config.get("verbose"):
+                print(f"[roro] SECURITY: Skipping non-HTTPS endpoint: {endpoint}")
+            return
+
     # Generate agent ID if not provided
     if not agent_id:
         agent_id = get_agent_id(role, team_id)
@@ -268,22 +327,33 @@ def emit(
     }
 
     # Send to roro endpoint in background thread (fire-and-forget)
-    thread = threading.Thread(
-        target=_send_event,
-        args=(config["endpoint"], payload, config["timeout"], config.get("verbose", False)),
-        daemon=True,
-    )
-    thread.start()
+    if endpoint:
+        thread = threading.Thread(
+            target=_send_event,
+            args=(endpoint, payload, config["timeout"], config.get("verbose", False)),
+            daemon=True,
+        )
+        _track_thread(thread)
+        thread.start()
 
     # Also send to Rick Terminal if endpoint is configured
     rick_endpoint = config.get("rick_terminal_endpoint")
     if rick_endpoint:
-        rick_thread = threading.Thread(
-            target=_send_event,
-            args=(rick_endpoint, payload, config["timeout"], config.get("verbose", False)),
-            daemon=True,
-        )
-        rick_thread.start()
+        # Also enforce HTTPS for Rick Terminal endpoint if required
+        if require_https and not rick_endpoint.startswith("https://"):
+            if "localhost" not in rick_endpoint and "127.0.0.1" not in rick_endpoint:
+                if config.get("verbose"):
+                    print(f"[roro] SECURITY: Skipping non-HTTPS Rick endpoint: {rick_endpoint}")
+                rick_endpoint = None
+
+        if rick_endpoint:
+            rick_thread = threading.Thread(
+                target=_send_event,
+                args=(rick_endpoint, payload, config["timeout"], config.get("verbose", False)),
+                daemon=True,
+            )
+            _track_thread(rick_thread)
+            rick_thread.start()
 
 
 # ── Decorator ─────────────────────────────────────────────────────────────────

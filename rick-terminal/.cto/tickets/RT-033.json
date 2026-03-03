@@ -1,0 +1,33 @@
+{
+  "id": "RT-033",
+  "title": "Build Tab Bar for Multi-File Editing",
+  "description": "Implement a tab bar for managing multiple open files. Show file name and unsaved indicator. Support tab reordering via drag, close button on hover, middle-click to close. Remember open tabs across sessions.",
+  "type": "task",
+  "status": "done",
+  "priority": "medium",
+  "assigned_agent": "frontend-morty",
+  "parent_ticket": "RT-005",
+  "dependencies": [],
+  "acceptance_criteria": [
+    "Tabs display for open files",
+    "Clicking tab switches to file",
+    "Close button on tab hover",
+    "Tabs reorderable via drag",
+    "Open tabs restored on launch",
+    "Tab overflow handled gracefully"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-14T20:16:46.548895+00:00",
+  "updated_at": "2026-02-15T08:54:50.111752+00:00",
+  "completed_at": "2026-02-15T08:54:50.111735+00:00",
+  "agent_output": "Implemented a complete tab bar system for multi-file editing with all requested features:\n\n1. **Tab Display & Switching**: Tabs show file names with unsaved indicators (green dots). Clicking switches files instantly.\n\n2. **Hover-Based Close Button**: Close button (x) only appears when hovering over tabs or when tab is active, with smooth 0.15s animation.\n\n3. **Middle-Click Support**: Custom NSViewRepresentable gesture recognizer detects middle mouse button (buttonNumber == 2) to close tabs.\n\n4. **Drag-and-Drop Reordering**: Tabs use onDrag with NSItemProvider and custom TabDropDelegate. Visual feedback shows 50% opacity during drag. Reordering updates immediately.\n\n5. **Session Persistence**: All open tabs saved to UserDefaults on every operation (open, close, reorder, switch). Auto-restores on launch with validation that files still exist.\n\n6. **Graceful Overflow**: Horizontal ScrollView without indicators provides smooth scrolling when many tabs are open.\n\nThe implementation follows existing Rick Terminal patterns, uses theme colors (rtAccentGreen, rtTextPrimary), and integrates seamlessly with the EditorManager. All acceptance criteria met.",
+  "review_notes": null,
+  "files_touched": [
+    "RickTerminal/Editor/EditorManager.swift",
+    "RickTerminal/Editor/EditorPanelView.swift",
+    "IMPLEMENTATION_RT-033_SUMMARY.md"
+  ]
+}

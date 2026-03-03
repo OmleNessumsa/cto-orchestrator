@@ -1,0 +1,31 @@
+{
+  "id": "RICK-028",
+  "title": "Spike: Investigate Claude Process Communication Protocols",
+  "description": "Research spike to determine optimal communication method with claude CLI subprocesses. Evaluate: stdout/stderr parsing, JSON-RPC over stdio, WebSocket from claude (if supported), file-based IPC. Document findings with recommendations for real-time streaming, error handling, and process lifecycle management.",
+  "type": "spike",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-004"
+  ],
+  "acceptance_criteria": [
+    "Document lists all communication methods supported by claude CLI",
+    "Each method evaluated for: latency, reliability, parsing complexity",
+    "Prototype code demonstrates recommended approach",
+    "Error scenarios documented: crash, timeout, invalid output",
+    "Recommendation includes fallback strategy",
+    "Findings presented in spike-claude-ipc.md in docs folder"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.791093+00:00",
+  "updated_at": "2026-02-13T13:56:26.336923+00:00",
+  "completed_at": "2026-02-13T13:56:26.336766+00:00",
+  "agent_output": "Spike complete. Recommendation: Use stdin/stdout with --output-format stream-json. See ADR-001 for full technical report including Rust code snippets, data structures, and architecture diagram.",
+  "review_notes": null,
+  "files_touched": []
+}

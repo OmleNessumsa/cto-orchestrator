@@ -1,0 +1,2 @@
+{"timestamp": "2026-02-12T14:14:05.840941+00:00", "ticket_id": null, "agent": "unity-greenlight", "action": "started", "message": "Greenlight iOS compliance scan started: greenlight-fdac2193", "files_changed": []}
+{"timestamp": "2026-02-12T14:16:28.228441+00:00", "ticket_id": null, "agent": "unity", "action": "started", "message": "Unity pentest started: unity-73b693b9 (mode: static)", "files_changed": []}

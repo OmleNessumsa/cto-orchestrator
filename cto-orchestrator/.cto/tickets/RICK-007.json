@@ -1,0 +1,32 @@
+{
+  "id": "RICK-007",
+  "title": "Build IPC Bridge for Claude Subprocess Management",
+  "description": "Implement the Rust backend functions to spawn, monitor, and terminate claude -p subprocess agents. Use tauri-plugin-shell to manage child processes. Create an IPC protocol for the frontend to request agent spawning, receive stdout/stderr streams, and handle process lifecycle events. This is literally the nervous system connecting Rick's brain to the Morty army.",
+  "type": "task",
+  "status": "done",
+  "priority": "critical",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-004",
+    "RICK-006"
+  ],
+  "acceptance_criteria": [
+    "spawn_agent Tauri command starts claude -p process with given prompt",
+    "stdout and stderr streams are captured and forwarded to frontend via events",
+    "Process PID is tracked and stored in agents table",
+    "kill_agent command terminates process and updates agent status",
+    "list_agents returns all running agent PIDs and their status",
+    "Graceful shutdown terminates all child processes on app quit"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:45.747808+00:00",
+  "updated_at": "2026-02-13T14:06:23.983232+00:00",
+  "completed_at": "2026-02-13T14:06:23.983085+00:00",
+  "agent_output": "IPC bridge implemented in claude_process.rs with full stream-json parsing, session management, and Tauri event forwarding.",
+  "review_notes": null,
+  "files_touched": []
+}

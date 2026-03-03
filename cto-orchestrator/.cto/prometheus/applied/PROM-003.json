@@ -1,0 +1,20 @@
+{
+  "id": "PROM-003",
+  "title": "Build MCP server for ticket system to replace subprocess chaining",
+  "category": "tooling",
+  "source": "https://modelcontextprotocol.io/specification/2025-11-25 - MCP Tools specification with outputSchema support",
+  "description": "orchestrate.py currently calls ticket.py, delegate.py, team.py, and progress.py as separate subprocess.run() calls (lines 124-146), losing type safety, error context, and adding process overhead. An MCP server would expose the ticket system as discoverable tools that Claude can invoke directly, enabling richer context awareness, tool descriptions, and input validation via JSON Schema \u2014 all without subprocess overhead.",
+  "impact_score": 8,
+  "risk_score": 4,
+  "effort_score": 7,
+  "target_files": [
+    "scripts/mcp_tickets.py",
+    "scripts/ticket.py",
+    "scripts/team.py"
+  ],
+  "proposed_changes": "1. Create scripts/mcp_tickets.py as a new MCP server using the Python mcp library (pip install mcp). 2. Expose tools: create_ticket, update_ticket, list_tickets, get_board, assign_agent, update_status \u2014 wrapping existing ticket.py functions. 3. Expose tools: create_team, get_team_status, send_team_message \u2014 wrapping team.py functions. 4. Add MCP resources: project://config (config.json), project://tickets/{id} (individual tickets), project://board (kanban board state). 5. Register as STDIO transport in .claude/settings.json under mcpServers: {\"cto-tickets\": {\"command\": \"python\", \"args\": [\"scripts/mcp_tickets.py\"]}}. 6. Refactor ticket.py and team.py to export their core functions (not just CLI entry points) so the MCP server can import them directly.",
+  "status": "applied",
+  "created_at": "2026-02-27T16:17:33.586655+00:00",
+  "applied_at": "2026-02-27T17:51:22.344988+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-003-20260227T174954"
+}

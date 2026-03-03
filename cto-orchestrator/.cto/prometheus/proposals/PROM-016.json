@@ -1,0 +1,19 @@
+{
+  "id": "PROM-016",
+  "title": "Subagent delegation context with objective-format-tools-boundaries",
+  "category": "prompt-engineering",
+  "source": "Anthropic multi-agent research system \u2014 4 critical subagent components",
+  "description": "Add explicit tool guidance and task boundary sections to agent prompts. Currently agents don't know which tools they can use or what files are off-limits.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "references/prompts.md"
+  ],
+  "proposed_changes": "Add <available_tools> and <task_boundaries> sections to build_prompt(). Include safe-to-modify list from ticket metadata. Add target_files field to ticket schema.",
+  "status": "pending",
+  "created_at": "2026-03-01T08:55:17.734601+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

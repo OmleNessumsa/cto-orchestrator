@@ -1,0 +1,10 @@
+{
+  "id": "msg-002",
+  "team_id": "TEAM-002",
+  "from": "architect-morty",
+  "to": "frontend-morty",
+  "message": "Views are ready in `RickTerminal/Agent/Views/`. Use `AgentColumnsContainer(manager:)` for full view or `AgentColumnsOverlay(manager:, isExpanded:)` for overlay mode. Preview support included for testing layouts.",
+  "type": "info",
+  "timestamp": "2026-02-15T06:52:01.349941+00:00",
+  "read_by": []
+}

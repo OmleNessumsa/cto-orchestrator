@@ -1,0 +1,19 @@
+{
+  "id": "PROM-006",
+  "title": "Add --resume and --session-id for checkpoint/recovery of failed agents",
+  "category": "tooling",
+  "source": "https://docs.anthropic.com/en/docs/claude-code/sdk - Claude Code session management with --resume and --session-id flags",
+  "description": "When an agent times out or crashes (delegate.py line 722), all progress is lost and the ticket is marked blocked. Claude Code supports --session-id (custom session tracking) and --resume SESSION_ID (continue from where it left off). By assigning deterministic session IDs based on ticket+agent and implementing retry-with-resume, the system can recover from transient failures instead of losing all agent work. This is especially valuable for long-running XL tickets and team sprints.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "1. In delegate_to_agent(), generate a deterministic session ID from ticket_id + agent_role + attempt_number: session_id = f'cto-{ticket_id}-{agent_role}-{attempt}'. Add '--session-id', session_id to the cmd list. 2. Store session_id in the ticket JSON under a new 'agent_sessions' field: {agent_role: {session_id: str, started_at: str, status: str}}. 3. Add retry logic: on TimeoutExpired or non-zero exit, check if attempt < max_retries (default 2), then re-invoke with '--resume', session_id and '--continue' flags to pick up where the agent left off. 4. In orchestrate.py run_delegate(), pass session tracking metadata through to delegate.py. 5. Update the sprint loop to check for resumable sessions before starting fresh \u2014 if a ticket has an active session_id from a previous failed attempt, resume it instead of starting over. 6. Add --no-retry flag to delegate CLI for cases where retry is not desired (e.g., dry-run mode).",
+  "status": "applied",
+  "created_at": "2026-02-27T16:17:33.589576+00:00",
+  "applied_at": "2026-02-27T17:52:51.998815+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-006-20260227T175122"
+}

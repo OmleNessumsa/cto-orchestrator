@@ -1,0 +1,38 @@
+{
+  "id": "RICK-026",
+  "title": "Write Comprehensive Test Suite",
+  "description": "Create test suites covering: Unit tests for Rust backend functions, React component tests with Testing Library, integration tests for IPC communication, E2E tests with Playwright for critical user flows. Target 80% code coverage. Set up test CI pipeline.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-001",
+  "dependencies": [
+    "RICK-004",
+    "RICK-006",
+    "RICK-007",
+    "RICK-014",
+    "RICK-015",
+    "RICK-016"
+  ],
+  "acceptance_criteria": [
+    "Rust unit tests for all database and IPC functions (cargo test)",
+    "React components have snapshot and interaction tests",
+    "Jest/Vitest configured with jsdom environment",
+    "Integration tests verify frontend-backend communication",
+    "Playwright E2E tests for: create ticket, drag-drop, spawn agent, terminal command",
+    "Code coverage reports generated and displayed in CI",
+    "Coverage thresholds enforced: 80% lines, 75% branches",
+    "Tests run on CI for all pull requests"
+  ],
+  "estimated_complexity": "L",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.692870+00:00",
+  "updated_at": "2026-02-13T14:56:34.335602+00:00",
+  "completed_at": "2026-02-13T14:56:34.335467+00:00",
+  "agent_output": "Basic test infrastructure with Vitest setup, Tauri API mocks, and component tests for GlassCard, StatCard, InfoCard.",
+  "review_notes": null,
+  "files_touched": []
+}

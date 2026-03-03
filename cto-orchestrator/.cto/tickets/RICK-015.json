@@ -1,0 +1,35 @@
+{
+  "id": "RICK-015",
+  "title": "Build Ticket Detail Panel with CRUD Operations",
+  "description": "Create a slide-out panel or modal for viewing and editing ticket details. Display all fields: title, description (markdown rendered), type, priority, complexity, parent ticket, dependencies, acceptance criteria (checklist), agent history. Include edit mode with form validation and delete with confirmation.",
+  "type": "task",
+  "status": "done",
+  "priority": "high",
+  "assigned_agent": null,
+  "parent_ticket": "RICK-003",
+  "dependencies": [
+    "RICK-006",
+    "RICK-014"
+  ],
+  "acceptance_criteria": [
+    "Panel slides in from right with backdrop blur on main content",
+    "View mode shows all ticket fields with proper formatting",
+    "Description rendered as markdown using react-markdown",
+    "Edit mode toggles fields to form inputs with validation",
+    "Acceptance criteria rendered as interactive checkboxes",
+    "Dependencies shown as linked ticket chips (clickable)",
+    "Delete button shows confirmation modal before action",
+    "Save and Cancel buttons with unsaved changes warning",
+    "Agent history shows list of agents that worked on ticket"
+  ],
+  "estimated_complexity": "M",
+  "team_mode": "solo",
+  "team_template": null,
+  "team_id": null,
+  "created_at": "2026-02-13T13:40:46.140517+00:00",
+  "updated_at": "2026-02-13T14:24:16.905428+00:00",
+  "completed_at": "2026-02-13T14:24:16.905284+00:00",
+  "agent_output": "Ticket detail panel with full CRUD, status/priority selectors, agent assignment, and delete functionality.",
+  "review_notes": null,
+  "files_touched": []
+}
