@@ -537,6 +537,82 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Prometheus Self-Evolution Section */}
+      <section className="py-20 px-4 bg-[var(--space-blue)]/30 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="morty-card rounded-2xl p-8 md:p-12 relative overflow-hidden border-2 border-[var(--morty-yellow)]/30">
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-full bg-[var(--morty-yellow)]/20 flex items-center justify-center text-4xl">
+                  🔥
+                </div>
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold">
+                    <span className="text-[var(--morty-yellow)]">{t.prometheus.title}</span>
+                  </h2>
+                  <p className="text-[var(--morty-yellow)]/60 font-mono text-sm mt-1">
+                    {t.prometheus.tagline}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-lg mb-4 max-w-2xl">
+                {t.prometheus.description}
+              </p>
+              <p className="text-gray-500 mb-8 max-w-2xl">
+                {t.prometheus.how_it_works}
+              </p>
+
+              {/* Prometheus Features */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-[var(--morty-yellow)]/5 border border-[var(--morty-yellow)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🔍</div>
+                  <h4 className="font-bold text-[var(--morty-yellow)] text-sm">{t.prometheus.feature1_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.prometheus.feature1_desc}</p>
+                </div>
+                <div className="bg-[var(--morty-yellow)]/5 border border-[var(--morty-yellow)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <h4 className="font-bold text-[var(--morty-yellow)] text-sm">{t.prometheus.feature2_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.prometheus.feature2_desc}</p>
+                </div>
+                <div className="bg-[var(--morty-yellow)]/5 border border-[var(--morty-yellow)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🔄</div>
+                  <h4 className="font-bold text-[var(--morty-yellow)] text-sm">{t.prometheus.feature3_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.prometheus.feature3_desc}</p>
+                </div>
+                <div className="bg-[var(--morty-yellow)]/5 border border-[var(--morty-yellow)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">📋</div>
+                  <h4 className="font-bold text-[var(--morty-yellow)] text-sm">{t.prometheus.feature4_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.prometheus.feature4_desc}</p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="mb-8 p-4 rounded-xl bg-[var(--morty-yellow)]/5 border border-[var(--morty-yellow)]/20">
+                <p className="text-[var(--morty-yellow)] font-bold text-sm mb-1">{t.prometheus.stats_applied}</p>
+                <p className="text-gray-400 text-xs">{t.prometheus.stats_categories}</p>
+              </div>
+
+              {/* Example commands */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="code-block rounded-lg p-4">
+                  <p className="text-gray-500 text-xs mb-1">Scan for improvements</p>
+                  <code className="text-[var(--morty-yellow)] text-sm">
+                    {t.prometheus.example_scan}
+                  </code>
+                </div>
+                <div className="code-block rounded-lg p-4">
+                  <p className="text-gray-500 text-xs mb-1">Apply top proposals</p>
+                  <code className="text-[var(--morty-yellow)] text-sm">
+                    {t.prometheus.example_evolve}
+                  </code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 px-4 relative">
         <div className="max-w-6xl mx-auto">

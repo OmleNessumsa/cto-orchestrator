@@ -124,6 +124,24 @@
     "feature3_desc": "Statische analyse als Temporal niet beschikbaar",
     "example_command": "python scripts/unity.py scan --repo ."
   },
+  "prometheus": {
+    "title": "Prometheus",
+    "tagline": "Self-Evolution Engine — Rick Upgradet Zichzelf",
+    "description": "Rick staat niet stil. Prometheus scant de nieuwste AI-research, agent-patronen en security-practices — en past verbeteringen autonoom toe. Het systeem evolueert letterlijk zichzelf.",
+    "how_it_works": "Voorstellen worden gescoord op impact, risico en effort. Pre-upgrade snapshots zorgen dat elke wijziging teruggedraaid kan worden. Een volledige audit ledger volgt elke evolutie.",
+    "feature1_title": "6 Scan Categorieën",
+    "feature1_desc": "Agent-patronen, prompts, security, tooling, UI/UX, Claude-features",
+    "feature2_title": "Auto-Apply",
+    "feature2_desc": "High-impact, low-risk voorstellen automatisch toegepast",
+    "feature3_title": "Rollback Veiligheid",
+    "feature3_desc": "Pre-upgrade snapshots voor elke wijziging",
+    "feature4_title": "Audit Ledger",
+    "feature4_desc": "Volledige historie van voorstellen, toepassingen en rollbacks",
+    "stats_applied": "8 voorstellen toegepast",
+    "stats_categories": "Injectie-defensie, XML-prompts, gestructureerde output, sprint-state, CoT-redenering, least-agency validatie",
+    "example_scan": "python scripts/prometheus.py scan",
+    "example_evolve": "python scripts/prometheus.py evolve"
+  },
   "install": {
     "title": "Krijg Rick's Brein",
     "subtitle": "Laten we dit doen. Het kost je 30 seconden. Zelfs Jerry kan dit.",

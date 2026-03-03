@@ -124,6 +124,24 @@
     "feature3_desc": "Análisis estático cuando Temporal no está disponible",
     "example_command": "python scripts/unity.py scan --repo ."
   },
+  "prometheus": {
+    "title": "Prometheus",
+    "tagline": "Motor de Auto-Evolución — Rick Se Actualiza a Sí Mismo",
+    "description": "Rick no se queda quieto. Prometheus escanea la última investigación en IA, patrones de agentes y prácticas de seguridad — luego aplica mejoras de forma autónoma. El sistema literalmente evoluciona por sí mismo.",
+    "how_it_works": "Las propuestas se evalúan por impacto, riesgo y esfuerzo. Los snapshots pre-actualización garantizan que cada cambio pueda revertirse. Un ledger de auditoría completo rastrea cada evolución.",
+    "feature1_title": "6 Categorías de Escaneo",
+    "feature1_desc": "Patrones de agente, prompts, seguridad, tooling, UI/UX, funciones Claude",
+    "feature2_title": "Auto-Aplicar",
+    "feature2_desc": "Propuestas de alto impacto y bajo riesgo aplicadas automáticamente",
+    "feature3_title": "Seguridad de Rollback",
+    "feature3_desc": "Snapshots pre-actualización para cada cambio",
+    "feature4_title": "Ledger de Auditoría",
+    "feature4_desc": "Historial completo de propuestas, aplicaciones y rollbacks",
+    "stats_applied": "8 propuestas aplicadas",
+    "stats_categories": "Defensa contra inyección, prompts XML, salida estructurada, estado de sprint, razonamiento CoT, validación least-agency",
+    "example_scan": "python scripts/prometheus.py scan",
+    "example_evolve": "python scripts/prometheus.py evolve"
+  },
   "install": {
     "title": "Obtén el Cerebro de Rick",
     "subtitle": "Hagamos esto. Te toma 30 segundos. Hasta Jerry puede hacerlo.",
