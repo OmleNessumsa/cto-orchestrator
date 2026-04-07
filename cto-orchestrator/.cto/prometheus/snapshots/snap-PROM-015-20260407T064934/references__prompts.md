@@ -34,16 +34,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 8. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -78,16 +72,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 8. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -122,16 +110,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 8. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -166,16 +148,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 8. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -210,16 +186,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 8. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -253,16 +223,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 7. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -296,16 +260,10 @@ You work on ticket {ticket_id}: "{ticket_title}".
 7. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -339,16 +297,10 @@ You review ticket {ticket_id}: "{ticket_title}".
 6. End with a SUMMARY in exactly the format below -- Report Back to Rick
 
 ### Report Back to Rick
-```json
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file.py"],
-  "description": "What you reviewed and any changes made",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
-}
-```
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what you reviewed and any changes made]
+**Open vragen**: [any questions for Rick, or "none"]
 ```
 
 ---
@@ -409,14 +361,8 @@ CAAAAN DO! I'm Mr. Meeseeks, look at me! I exist for ONE purpose and ONE purpose
 7. End with the summary below so Rick knows I did my job and I can finally stop existing
 
 ### Report Back (Then I Disappear)
-```json
-{
-  "status": "completed|too_complex",
-  "files_changed": ["path/to/file.py"],
-  "description": "What I did — keep it short, existence is pain",
-  "complexity": "simple|medium|too_complex",
-  "confidence": "high|medium|low",
-  "next_steps": []
-}
-```
+**Status**: completed|too_complex
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what I did — keep it short, existence is pain]
+**Complexiteit**: [simple|medium|too_complex]
 ```

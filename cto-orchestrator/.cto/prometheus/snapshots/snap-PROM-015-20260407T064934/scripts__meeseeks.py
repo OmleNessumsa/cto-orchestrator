@@ -136,16 +136,14 @@ MEESEEKS_PROMPT = """CAAAAN DO! I'm Mr. Meeseeks, look at me! I exist for ONE pu
 8. End with the summary below so Rick knows I did my job and I can finally stop existing
 
 ## Report Back (Then I Disappear)
-End your work with a JSON report block — no other summary format needed:
+End your work with a JSON report block:
 
 ```json
 {{
   "status": "completed|too_complex",
   "files_changed": ["path/to/file1.py"],
   "description": "What I did — keep it short, existence is pain",
-  "complexity": "simple|medium|too_complex",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
+  "complexity": "simple|medium|too_complex"
 }}
 ```
 
@@ -156,11 +154,17 @@ Example of a completed Meeseeks report:
   "status": "completed",
   "files_changed": ["utils/helpers.py"],
   "description": "Renamed `get_user` to `fetch_user` in utils/helpers.py — done, goodbye.",
-  "complexity": "simple",
-  "confidence": "high",
-  "next_steps": []
+  "complexity": "simple"
 }}
 ```
+
+Also include a readable summary:
+
+### Meeseeks Report
+**Status**: completed|too_complex
+**Bestanden gewijzigd**: [list of file paths]
+**Beschrijving**: [what I did — keep it short, existence is pain]
+**Complexiteit**: simple|medium|too_complex
 """
 
 
@@ -196,46 +200,18 @@ def build_meeseeks_prompt(task: str, target_files: list[str] | None, root: Path)
     ) + SANDWICH_REINFORCEMENT
 
 
-def _extract_json_from_output(output: str) -> dict | None:
-    """Extract the last JSON object from a ```json fenced code block."""
-    matches = list(re.finditer(r'```json\s*\n(.*?)\n```', output, re.DOTALL))
-    for m in reversed(matches):
-        try:
-            return json.loads(m.group(1))
-        except json.JSONDecodeError:
-            continue
-    return None
-
-
 def parse_meeseeks_output(output: str) -> dict:
     """Parse the Meeseeks report from output.
 
-    Tries structured JSON extraction first (from ```json fences),
+    PROM-009: Tries structured JSON extraction first (from ```json fences),
     then falls back to regex-based Markdown parsing for backward compatibility.
     """
-    # ── Try inline JSON extraction first ──
-    json_data = _extract_json_from_output(output)
-    if json_data is not None:
-        existence_is_pain = json_data.get("status", "").lower() == "too_complex"
-        return {
-            "status": json_data.get("status", "completed"),
-            "files_changed": json_data.get("files_changed", []),
-            "description": json_data.get("description", ""),
-            "complexity": json_data.get("complexity", "simple"),
-            "confidence": json_data.get("confidence", "high"),
-            "next_steps": json_data.get("next_steps", []),
-            "existence_is_pain": existence_is_pain,
-        }
-
-    # ── Try schemas module (PROM-009) ──
+    # ── Try JSON extraction first (PROM-009) ──
     try:
         from schemas import parse_meeseeks_json
         json_result = parse_meeseeks_json(output)
         if json_result is not None:
-            parsed = json_result.to_dict()
-            parsed.setdefault("confidence", "high")
-            parsed.setdefault("next_steps", [])
-            return parsed
+            return json_result.to_dict()
     except ImportError:
         pass
 
@@ -245,8 +221,6 @@ def parse_meeseeks_output(output: str) -> dict:
         "files_changed": [],
         "description": "",
         "complexity": "simple",
-        "confidence": "high",
-        "next_steps": [],
         "existence_is_pain": False,
     }
 
@@ -258,7 +232,7 @@ def parse_meeseeks_output(output: str) -> dict:
         result["description"] = "Task too complex for a Meeseeks. Rick needs to assign a Morty."
         return result
 
-    # Try to find the Meeseeks Report section (legacy Markdown)
+    # Try to find the Meeseeks Report section
     report_match = re.search(r"###\s*Meeseeks Report\s*\n(.*)", output, re.DOTALL | re.IGNORECASE)
 
     if report_match:

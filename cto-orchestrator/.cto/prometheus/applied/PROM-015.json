@@ -13,8 +13,13 @@
     "references/prompts.md"
   ],
   "proposed_changes": "Replace Report Back to Rick section with JSON contract. Rewrite parse_agent_output() to try JSON extraction first via ```json fences, fall back to regex. Add confidence and next_steps fields.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-03-01T08:55:17.734480+00:00",
-  "applied_at": null,
-  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-015-20260321T102438"
+  "applied_at": "2026-04-07T06:53:12.988686+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-015-20260407T064934",
+  "files_actually_changed": [
+    "scripts/meeseeks.py",
+    "references/prompts.md",
+    "scripts/delegate.py"
+  ]
 }

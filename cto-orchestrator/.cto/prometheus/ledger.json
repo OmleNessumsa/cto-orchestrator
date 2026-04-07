@@ -628,5 +628,35 @@
     "target_files": [
       "scripts/delegate.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-07T06:48:29.848590+00:00",
+    "proposal_id": "PROM-038",
+    "action": "applied",
+    "title": "Add structured event payloads with progress percentage to Rick Terminal",
+    "target_files": [
+      "scripts/roro_events.py",
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T06:49:34.623732+00:00",
+    "proposal_id": "PROM-043",
+    "action": "applied",
+    "title": "Sanitize target_files input in meeseeks.py",
+    "target_files": [
+      "scripts/meeseeks.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T06:53:12.990092+00:00",
+    "proposal_id": "PROM-015",
+    "action": "applied",
+    "title": "Structured JSON output contract for agent reports",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "references/prompts.md"
+    ]
   }
 ]

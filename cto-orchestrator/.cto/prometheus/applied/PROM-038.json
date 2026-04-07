@@ -12,8 +12,12 @@
     "scripts/delegate.py"
   ],
   "proposed_changes": "In roro_events.py: (1) Add new event type `cto.morty.delegation.progress` with schema {percentage: 0-100, current_step: str, output_lines: int, elapsed_seconds: float}. (2) Add `emit_progress()` convenience function that rate-limits to max 1 event per 2 seconds to avoid flooding. In delegate.py: (3) While reading claude subprocess stdout, parse output lines and emit progress events every N lines or when detecting phase markers (e.g., 'Reading file', 'Writing file', 'Running tests'). This gives Rick Terminal the data it needs to render per-agent progress bars and live output previews.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:39:45.808930+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-07T06:48:29.847516+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-038-20260407T064617",
+  "files_actually_changed": [
+    "scripts/roro_events.py",
+    "scripts/delegate.py"
+  ]
 }

@@ -356,59 +356,6 @@ def emit(
             rick_thread.start()
 
 
-# ── Progress Event Helpers ────────────────────────────────────────────────────
-
-# Rate limiter state: maps resolved agent_id → last emit timestamp
-_progress_last_emit: dict[str, float] = {}
-_progress_lock = threading.Lock()
-_PROGRESS_MIN_INTERVAL = 2.0  # max 1 progress event per 2 seconds per agent
-
-
-def emit_progress(
-    percentage: float,
-    current_step: str,
-    output_lines: int,
-    elapsed_seconds: float,
-    agent_id: Optional[str] = None,
-    role: str = "rick",
-    team_id: Optional[str] = None,
-):
-    """Emit a cto.morty.delegation.progress event with rate limiting.
-
-    Rate-limited to max 1 event per 2 seconds per agent to avoid flooding.
-
-    Args:
-        percentage: Progress percentage (0-100)
-        current_step: Description of what the agent is currently doing
-        output_lines: Number of output lines produced so far
-        elapsed_seconds: Seconds elapsed since delegation started
-        agent_id: Optional explicit agent ID (overrides role-based generation)
-        role: Agent role for ID generation
-        team_id: Optional team session ID
-    """
-    resolved_id = agent_id or get_agent_id(role, team_id)
-
-    with _progress_lock:
-        last = _progress_last_emit.get(resolved_id, 0.0)
-        now = time.time()
-        if now - last < _PROGRESS_MIN_INTERVAL:
-            return
-        _progress_last_emit[resolved_id] = now
-
-    emit(
-        "cto.morty.delegation.progress",
-        {
-            "percentage": max(0.0, min(100.0, float(percentage))),
-            "current_step": current_step[:200],
-            "output_lines": output_lines,
-            "elapsed_seconds": round(elapsed_seconds, 1),
-        },
-        agent_id=resolved_id,
-        role=role,
-        team_id=team_id,
-    )
-
-
 # ── Decorator ─────────────────────────────────────────────────────────────────
 
 def emit_event(

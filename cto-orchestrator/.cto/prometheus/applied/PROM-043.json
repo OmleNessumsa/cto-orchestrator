@@ -11,8 +11,11 @@
     "scripts/meeseeks.py"
   ],
   "proposed_changes": "1. Import validate_safe_path and sanitize_path_component from security_utils. 2. Before building the prompt, validate each file in target_files: reject entries containing '..', null bytes, or absolute paths outside the project root. Use validate_safe_path(f, base_dir=project_root) for each file. 3. Wrap the files_text block with wrap_untrusted_content(files_text, label='TARGET_FILES') before embedding in the prompt. 4. Add a max file count limit (e.g., 20) to prevent prompt stuffing attacks.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:42:06.106801+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-07T06:49:34.621746+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-043-20260407T064829",
+  "files_actually_changed": [
+    "scripts/meeseeks.py"
+  ]
 }

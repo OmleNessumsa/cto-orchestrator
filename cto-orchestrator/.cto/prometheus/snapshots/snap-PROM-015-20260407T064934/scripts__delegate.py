@@ -708,9 +708,7 @@ EXECUTE: Applied changes to model and generated migration file.
   "status": "completed",
   "files_changed": ["models/user.py", "migrations/versions/0042_add_user_created_at.py"],
   "description": "Added created_at DateTime column to User model with utcnow default and generated the corresponding Alembic migration.",
-  "open_questions": null,
-  "confidence": "high",
-  "next_steps": []
+  "open_questions": null
 }
 ```
 </example>
@@ -727,9 +725,7 @@ EXECUTE: Created helper module and updated all three call sites.
   "status": "completed",
   "files_changed": ["utils/formatting.py", "utils/billing.py", "utils/invoice.py", "api/checkout.py"],
   "description": "Extracted duplicated currency-formatting logic into utils/formatting.py and replaced three call sites with imports.",
-  "open_questions": null,
-  "confidence": "high",
-  "next_steps": []
+  "open_questions": null
 }
 ```
 </example>
@@ -742,62 +738,41 @@ EXECUTE: Created helper module and updated all three call sites.
 </execution_rules>
 
 <output_format>
-End your work with a JSON report block in EXACTLY this format — no other summary format needed:
+End your work with a JSON report block in EXACTLY this format:
 
 ```json
 {
   "status": "completed|needs_review|blocked",
   "files_changed": ["path/to/file1.py", "path/to/file2.py"],
   "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
+  "open_questions": "Any questions for Rick, or null"
 }
 ```
+
+Also include a human-readable summary:
+
+### Samenvatting
+**Status**: completed|needs_review|blocked
+**Bestanden gewijzigd**: [list of file paths, one per line]
+**Beschrijving**: [what you did]
+**Open vragen**: [any questions for Rick, or "none"]
 </output_format>
 """
     return prompt
 
 
-def _extract_json_from_output(output: str) -> Optional[dict]:
-    """Extract the last JSON object from a ```json fenced code block."""
-    matches = list(re.finditer(r'```json\s*\n(.*?)\n```', output, re.DOTALL))
-    for m in reversed(matches):
-        try:
-            return json.loads(m.group(1))
-        except json.JSONDecodeError:
-            continue
-    return None
-
-
 def parse_agent_output(output: str) -> dict:
     """Parse the agent's summary section from output.
 
-    Tries structured JSON extraction first (from ```json fences),
+    PROM-009: Tries structured JSON extraction first (from ```json fences),
     then falls back to regex-based Markdown parsing for backward compatibility.
     """
-    # ── Try inline JSON extraction first ──
-    json_data = _extract_json_from_output(output)
-    if json_data is not None:
-        result = {
-            "status": json_data.get("status", "completed"),
-            "files_changed": json_data.get("files_changed", []),
-            "description": json_data.get("description", ""),
-            "open_questions": json_data.get("open_questions", ""),
-            "confidence": json_data.get("confidence", "high"),
-            "next_steps": json_data.get("next_steps", []),
-        }
-        return sanitize_agent_output(result)
-
-    # ── Try schemas module (PROM-009) ──
+    # ── Try JSON extraction first (PROM-009) ──
     try:
         from schemas import parse_agent_json
         json_result = parse_agent_json(output)
         if json_result is not None:
-            parsed = json_result.to_dict()
-            parsed.setdefault("confidence", "high")
-            parsed.setdefault("next_steps", [])
-            return sanitize_agent_output(parsed)
+            return sanitize_agent_output(json_result.to_dict())
     except ImportError:
         pass
 
@@ -807,13 +782,12 @@ def parse_agent_output(output: str) -> dict:
         "files_changed": [],
         "description": "",
         "open_questions": "",
-        "confidence": "high",
-        "next_steps": [],
     }
 
-    # Try to find the summary section (Dutch or English headers)
+    # Try to find the summary section
     summary_match = re.search(r"###\s*Samenvatting\s*\n(.*)", output, re.DOTALL | re.IGNORECASE)
     if not summary_match:
+        # fallback: try English
         summary_match = re.search(r"###\s*Summary\s*\n(.*)", output, re.DOTALL | re.IGNORECASE)
 
     if summary_match:
@@ -830,6 +804,7 @@ def parse_agent_output(output: str) -> dict:
             files_match = re.search(r"\*\*Files changed\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL | re.IGNORECASE)
         if files_match:
             raw = files_match.group(1).strip()
+            # extract file paths (lines starting with - or just paths)
             files = []
             for line in raw.split("\n"):
                 line = line.strip().lstrip("- ").strip("`").strip()
