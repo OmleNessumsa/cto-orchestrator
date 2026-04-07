@@ -1,0 +1,18 @@
+{
+  "proposal_id": "PROM-053",
+  "created_at": "2026-04-07T06:41:44.082571+00:00",
+  "files": {
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 42797
+    },
+    "scripts/meeseeks.py": {
+      "snapshot_name": "scripts__meeseeks.py",
+      "original_size": 16269
+    },
+    "scripts/schemas.py": {
+      "snapshot_name": "scripts__schemas.py",
+      "original_size": 5733
+    }
+  }
+}

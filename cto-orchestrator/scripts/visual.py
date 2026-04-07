@@ -19,6 +19,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TextColumn
+from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
+
+console = Console()
+
 
 def find_cto_root(start: Optional[str] = None) -> Path:
     """Walk up from *start* (default: cwd) until we find a .cto/ directory."""
@@ -68,6 +78,19 @@ AGENT_ICONS = {
 }
 
 
+def _status_color(status: str) -> str:
+    """Map status string to Rich color name."""
+    if status in ("completed", "done"):
+        return "green"
+    if status in ("working", "in_progress", "active"):
+        return "yellow"
+    if status == "blocked":
+        return "red"
+    if status == "in_review":
+        return "blue"
+    return "white"
+
+
 # ── Portal Animation ──────────────────────────────────────────────────────────
 
 PORTAL_FRAMES = [
@@ -111,22 +134,21 @@ def animate_portal(agent_name: str, animate: bool = True):
     icon = AGENT_ICONS.get(agent_name, "👤")
 
     if animate:
-        for frame in PORTAL_FRAMES:
-            print("\033[2J\033[H")  # Clear screen
-            print(f"\n  Spawning {agent_name}...")
-            print(frame)
-            time.sleep(0.3)
+        with Live(console=console, refresh_per_second=4) as live:
+            for frame in PORTAL_FRAMES:
+                live.update(Panel(
+                    Text(f"\n  Spawning {agent_name}...\n{frame}"),
+                    title="[green]🌀 Portal Opening[/green]",
+                    border_style="green",
+                ))
+                time.sleep(0.3)
 
-    # Final frame with agent
-    print(f"""
-    ╭─────────────────────────────────────╮
-    │     🌀 INTERDIMENSIONAL PORTAL 🌀    │
-    │                                      │
-    │            {icon}  {agent_name:<20} │
-    │                                      │
-    │         *BURRRP* DEPLOYED!           │
-    ╰─────────────────────────────────────╯
-    """)
+    console.print(Panel(
+        f"[yellow]{icon}  {agent_name}[/yellow]\n\n[bold green]*BURRRP* DEPLOYED![/bold green]",
+        title="[bold green]🌀 INTERDIMENSIONAL PORTAL 🌀[/bold green]",
+        border_style="green",
+        padding=(1, 4),
+    ))
 
 
 # ── Morty Status Box ──────────────────────────────────────────────────────────
@@ -145,15 +167,13 @@ def render_morty_box(
         status: Current status
         focus: Optional focus description
         progress: Optional progress percentage (0-100)
-        compact: Use compact rendering
+        compact: Use compact single-line rendering (returns string)
 
     Returns:
-        ASCII box string
+        String for compact mode; prints via Rich console for full mode.
     """
     icon = AGENT_ICONS.get(role, "👤")
     status_icon = STATUS_ICONS.get(status, "❓")
-
-    # Short role name for display
     short_role = role.replace("-morty", "").replace("-", " ").title()[:12]
 
     if compact:
@@ -161,182 +181,152 @@ def render_morty_box(
         if progress is not None:
             filled = int(progress / 10)
             progress_bar = f"[{'█' * filled}{'░' * (10 - filled)}]"
-        return f"│ {icon} {short_role:<12} {status_icon} {progress_bar} │"
+        return f"│ {icon} {short_role} {status_icon} {progress_bar} │"
 
-    # Full box
-    lines = []
-    width = 22
-    lines.append(f"╭{'─' * width}╮")
-    lines.append(f"│ {icon}  {short_role:<{width - 5}}│")
-    lines.append(f"│ Status: {status_icon} {status:<{width - 12}}│")
-
+    sc = _status_color(status)
+    content = Text()
+    content.append(f"{icon}  {short_role}\n", style="bold")
+    content.append("Status: ", style="dim")
+    content.append(f"{status_icon} {status}", style=sc)
     if focus:
-        focus_short = focus[:width - 4]
-        lines.append(f"│ {focus_short:<{width}}│")
-
+        content.append(f"\n{focus[:30]}", style="dim")
     if progress is not None:
         filled = int(progress / 5)
         empty = 20 - filled
-        bar = f"[{'█' * filled}{'░' * empty}]"
-        lines.append(f"│ {bar} │")
+        content.append(f"\n[{'█' * filled}{'░' * empty}] {progress}%")
 
-    lines.append(f"╰{'─' * width}╯")
-    return "\n".join(lines)
+    console.print(Panel(content, border_style=sc))
+    return ""
 
 
 # ── Team Board ────────────────────────────────────────────────────────────────
 
 def render_team_board(team: dict) -> str:
-    """Render a full team collaboration board.
+    """Render a full team collaboration board using Rich Table/Tree.
 
     Args:
         team: Team session dict
 
     Returns:
-        ASCII team board string
+        Empty string (output printed via Rich console).
     """
     team_id = team.get("id", "TEAM-???")
     parent_ticket = team.get("parent_ticket", "???")
     status = team.get("status", "unknown")
     mode = team.get("coordination", {}).get("mode", "parallel")
     lead = team.get("coordination", {}).get("lead", "???")
-
     members = team.get("members", [])
 
-    # Calculate overall progress
     total = len(members)
     completed = sum(1 for m in members if m.get("status") in ("completed", "done"))
     progress = int((completed / total * 100) if total else 0)
 
-    lines = []
+    # Header panel
+    console.print(Panel(
+        f"Team: [bold]{team_id}[/bold]  "
+        f"Ticket: [yellow]{parent_ticket}[/yellow]  "
+        f"Status: {STATUS_ICONS.get(status, '❓')} [cyan]{status}[/cyan]  "
+        f"Mode: [green]{mode}[/green]  "
+        f"Lead: [magenta]{lead}[/magenta]",
+        title="[bold green]🧪 RICK'S MORTY DEPLOYMENT CENTER[/bold green]",
+        border_style="green",
+    ))
 
-    # Header
-    lines.append("┌─────────────────────────────────────────────────────────────────┐")
-    lines.append("│  🧪 RICK'S MORTY DEPLOYMENT CENTER                              │")
-    lines.append("├─────────────────────────────────────────────────────────────────┤")
-    lines.append(f"│  Team: {team_id:<12}  Ticket: {parent_ticket:<12}  Status: {STATUS_ICONS.get(status, '❓')} {status:<8}│")
-    lines.append(f"│  Mode: {mode:<10}  Lead: {lead:<20}                    │")
-    lines.append("├─────────────────────────────────────────────────────────────────┤")
-
-    # Member visualization based on coordination mode
-    if mode == "sequential":
-        # Arrow chain visualization
-        lines.append("│                                                                 │")
-        member_line = "│  "
-        for i, m in enumerate(members):
-            icon = AGENT_ICONS.get(m.get("role", ""), "👤")
-            status_icon = STATUS_ICONS.get(m.get("status", "pending"), "⏳")
-            short_name = m.get("role", "").replace("-morty", "")[:8]
-            member_line += f"{icon}{status_icon}"
-            if i < len(members) - 1:
-                member_line += " → "
-        member_line = member_line.ljust(65) + "│"
-        lines.append(member_line)
-
-        # Names below
-        name_line = "│  "
-        for i, m in enumerate(members):
-            short_name = m.get("role", "").replace("-morty", "")[:8]
-            name_line += f"{short_name:<10}"
-            if i < len(members) - 1:
-                name_line += "   "
-        name_line = name_line.ljust(65) + "│"
-        lines.append(name_line)
-        lines.append("│                                                                 │")
-
-    elif mode == "parallel":
-        # Grid visualization
-        lines.append("│                                                                 │")
-        row_members = []
-        row_line = "│  "
-
-        for i, m in enumerate(members):
-            icon = AGENT_ICONS.get(m.get("role", ""), "👤")
-            status_icon = STATUS_ICONS.get(m.get("status", "pending"), "⏳")
-            short_name = m.get("role", "").replace("-morty", "")[:10]
-
-            box = f"╭────────────╮\n    │ {icon} {status_icon}        │\n    │ {short_name:<10} │\n    ╰────────────╯"
-            row_members.append((icon, status_icon, short_name))
-
-            if len(row_members) == 3 or i == len(members) - 1:
-                # Render row of boxes
-                for box_row in range(4):
-                    line = "│    "
-                    for rm in row_members:
-                        if box_row == 0:
-                            line += "╭──────────╮  "
-                        elif box_row == 1:
-                            line += f"│ {rm[0]} {rm[1]}      │  "
-                        elif box_row == 2:
-                            line += f"│{rm[2]:<10}│  "
-                        elif box_row == 3:
-                            line += "╰──────────╯  "
-                    line = line.ljust(65) + "│"
-                    lines.append(line)
-                row_members = []
-                if i < len(members) - 1:
-                    lines.append("│                                                                 │")
-
-    else:  # mixed mode
-        lines.append("│                                                                 │")
-        # Lead first, then parallel workers
+    if mode == "mixed":
+        # Tree visualization for mixed-mode hierarchy
         lead_member = next((m for m in members if m.get("role") == lead), None)
         other_members = [m for m in members if m.get("role") != lead]
 
-        if lead_member:
-            icon = AGENT_ICONS.get(lead_member.get("role", ""), "👤")
-            status_icon = STATUS_ICONS.get(lead_member.get("status", "pending"), "⏳")
-            short_name = lead_member.get("role", "").replace("-morty", "")[:10]
-            lines.append(f"│              ╭──────────────╮                                   │")
-            lines.append(f"│              │ {icon} {status_icon} LEAD     │                                   │")
-            lines.append(f"│              │ {short_name:<12} │                                   │")
-            lines.append(f"│              ╰──────┬───────╯                                   │")
-            lines.append(f"│         ┌──────────┼──────────┐                                │")
+        lead_status = lead_member.get("status", "pending") if lead_member else "pending"
+        lead_sc = _status_color(lead_status)
+        tree = Tree(
+            f"[bold magenta]{AGENT_ICONS.get(lead, '👤')} {lead} (LEAD)[/bold magenta]  "
+            f"{STATUS_ICONS.get(lead_status, '⏳')} [{lead_sc}]{lead_status}[/{lead_sc}]"
+        )
+        for m in other_members:
+            role = m.get("role", "?")
+            s = m.get("status", "pending")
+            icon = AGENT_ICONS.get(role, "👤")
+            sc = _status_color(s)
+            tree.add(
+                f"{icon} [yellow]{role}[/yellow]  "
+                f"{STATUS_ICONS.get(s, '⏳')} [{sc}]{s}[/{sc}]"
+            )
+        console.print(tree)
 
-        # Other members
-        if other_members:
-            other_line = "│    "
-            for m in other_members:
-                icon = AGENT_ICONS.get(m.get("role", ""), "👤")
-                status_icon = STATUS_ICONS.get(m.get("status", "pending"), "⏳")
-                other_line += f"    {icon}{status_icon}    "
-            other_line = other_line.ljust(65) + "│"
-            lines.append(other_line)
+    else:
+        # Table visualization for parallel/sequential modes
+        table = Table(
+            show_header=True,
+            header_style="bold cyan",
+            border_style="green",
+            show_lines=(mode == "sequential"),
+        )
+        table.add_column("Agent", style="yellow", no_wrap=True)
+        table.add_column("Icon", justify="center")
+        table.add_column("Status", no_wrap=True)
+        table.add_column("Focus")
 
-            name_line = "│    "
-            for m in other_members:
-                short_name = m.get("role", "").replace("-morty", "")[:8]
-                name_line += f" {short_name:<8} "
-            name_line = name_line.ljust(65) + "│"
-            lines.append(name_line)
-
-        lines.append("│                                                                 │")
+        if mode == "sequential":
+            # Add ordering arrows between rows via numbering
+            for i, m in enumerate(members):
+                role = m.get("role", "?")
+                s = m.get("status", "pending")
+                icon = AGENT_ICONS.get(role, "👤")
+                focus = m.get("focus", m.get("task_title", ""))[:30]
+                sc = _status_color(s)
+                prefix = f"[dim]{i + 1}.[/dim] " if i > 0 else ""
+                table.add_row(
+                    f"{prefix}{role}",
+                    icon,
+                    f"{STATUS_ICONS.get(s, '⏳')} [{sc}]{s}[/{sc}]",
+                    focus,
+                )
+        else:
+            for m in members:
+                role = m.get("role", "?")
+                s = m.get("status", "pending")
+                icon = AGENT_ICONS.get(role, "👤")
+                focus = m.get("focus", m.get("task_title", ""))[:30]
+                sc = _status_color(s)
+                table.add_row(
+                    role,
+                    icon,
+                    f"{STATUS_ICONS.get(s, '⏳')} [{sc}]{s}[/{sc}]",
+                    focus,
+                )
+        console.print(table)
 
     # Progress bar
-    lines.append("├─────────────────────────────────────────────────────────────────┤")
-    filled = int(progress / 2)
-    empty = 50 - filled
-    bar = "█" * filled + "░" * empty
-    lines.append(f"│  Progress: [{bar}] {progress:>3}%  │")
-    lines.append("└─────────────────────────────────────────────────────────────────┘")
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=50, style="green", complete_style="bright_green"),
+        TextColumn("[cyan]{task.percentage:>3.0f}%[/cyan]"),
+        console=console,
+        transient=False,
+    ) as prog:
+        prog.add_task(
+            f"[cyan]Team Progress ({completed}/{total})[/cyan]",
+            total=100,
+            completed=progress,
+        )
 
-    return "\n".join(lines)
+    return ""
 
 
 # ── Sprint Dashboard ──────────────────────────────────────────────────────────
 
 def render_sprint_dashboard(tickets: list[dict], current_sprint: Optional[int] = None) -> str:
-    """Render a sprint dashboard with all tickets.
+    """Render a sprint dashboard with all tickets using Rich Table.
 
     Args:
         tickets: List of ticket dicts
         current_sprint: Optional current sprint number
 
     Returns:
-        ASCII dashboard string
+        Empty string (output printed via Rich console).
     """
-    # Count by status
-    status_counts = {}
+    status_counts: dict[str, int] = {}
     for t in tickets:
         s = t.get("status", "unknown")
         status_counts[s] = status_counts.get(s, 0) + 1
@@ -345,114 +335,87 @@ def render_sprint_dashboard(tickets: list[dict], current_sprint: Optional[int] =
     done = status_counts.get("done", 0)
     progress = int((done / total * 100) if total else 0)
 
-    lines = []
-
-    # Header
     sprint_text = f"Sprint #{current_sprint}" if current_sprint else "Active Work"
-    lines.append("╔═══════════════════════════════════════════════════════════════════╗")
-    lines.append(f"║  🚀 RICK'S SPRINT DASHBOARD — {sprint_text:<35}║")
-    lines.append("╠═══════════════════════════════════════════════════════════════════╣")
-
-    # Status columns (Kanban-style)
     columns = ["backlog", "todo", "in_progress", "in_review", "testing", "done"]
-    col_width = 10
 
-    # Header row
-    header = "║ "
+    table = Table(
+        title=f"[bold]🚀 RICK'S SPRINT DASHBOARD — {sprint_text}[/bold]",
+        border_style="cyan",
+        header_style="bold cyan",
+        show_lines=True,
+    )
     for col in columns:
         icon = STATUS_ICONS.get(col, "❓")
         count = status_counts.get(col, 0)
-        header += f" {icon}{count:<2} │"
-    header = header[:-1] + " ║"
-    lines.append(header)
+        table.add_column(
+            f"{icon} {col.replace('_', ' ').title()}\n({count})",
+            style="white",
+            justify="center",
+            no_wrap=True,
+        )
 
-    # Column names
-    names = "║ "
-    for col in columns:
-        short = col.replace("_", "")[:8]
-        names += f"{short:<9}│"
-    names = names[:-1] + " ║"
-    lines.append(names)
-
-    lines.append("╠═══════════════════════════════════════════════════════════════════╣")
-
-    # Tickets in each column (show first 5 per column)
     max_rows = 5
     for row in range(max_rows):
-        row_line = "║ "
+        row_data = []
         for col in columns:
             col_tickets = [t for t in tickets if t.get("status") == col]
             if row < len(col_tickets):
-                tid = col_tickets[row].get("id", "???")[-6:]  # Last 6 chars
-                row_line += f" {tid:<7}│"
+                tid = col_tickets[row].get("id", "???")[-6:]
+                row_data.append(f"[dim]{tid}[/dim]")
             else:
-                row_line += f"{'':>8}│"
-        row_line = row_line[:-1] + " ║"
-        lines.append(row_line)
+                row_data.append("")
+        table.add_row(*row_data)
 
-    # Progress
-    lines.append("╠═══════════════════════════════════════════════════════════════════╣")
-    filled = int(progress / 2)
-    empty = 50 - filled
-    bar = "█" * filled + "░" * empty
-    lines.append(f"║  Overall: [{bar}] {progress:>3}% ({done}/{total})  ║")
-    lines.append("╚═══════════════════════════════════════════════════════════════════╝")
+    console.print(table)
 
-    return "\n".join(lines)
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=50, style="cyan", complete_style="bright_cyan"),
+        TextColumn("[cyan]{task.percentage:>3.0f}%[/cyan]"),
+        console=console,
+        transient=False,
+    ) as prog:
+        prog.add_task(
+            f"[cyan]Overall Progress ({done}/{total})[/cyan]",
+            total=100,
+            completed=progress,
+        )
+
+    return ""
 
 
 # ── Meeseeks Summon Visualization ─────────────────────────────────────────────
 
 def render_meeseeks_summon(task: str, animate: bool = True) -> str:
     """Render the Meeseeks summoning visualization."""
-
     frames = [
-        r"""
-    ╭─────────────────────────────────────────╮
-    │                                         │
-    │              *poof*                     │
-    │                                         │
-    │                                         │
-    ╰─────────────────────────────────────────╯
-    """,
-        r"""
-    ╭─────────────────────────────────────────╮
-    │                                         │
-    │            ✨ *poof* ✨                 │
-    │                 🟦                      │
-    │                                         │
-    ╰─────────────────────────────────────────╯
-    """,
-        r"""
-    ╭─────────────────────────────────────────╮
-    │                                         │
-    │         🟦 CAAAAN DO! 🟦              │
-    │         I'm Mr. Meeseeks!               │
-    │            Look at me!                  │
-    ╰─────────────────────────────────────────╯
-    """,
+        "*poof*",
+        "✨ *poof* ✨\n     🟦",
+        "🟦 CAAAAN DO! 🟦\nI'm Mr. Meeseeks!\n   Look at me!",
     ]
 
     if animate:
-        for frame in frames:
-            print("\033[2J\033[H")  # Clear screen
-            print(frame)
-            time.sleep(0.4)
+        with Live(console=console, refresh_per_second=4) as live:
+            for frame in frames:
+                live.update(Panel(
+                    Text(frame, justify="center"),
+                    title="[blue]🟦 Meeseeks Summoning[/blue]",
+                    border_style="blue",
+                    padding=(1, 6),
+                ))
+                time.sleep(0.4)
 
     task_short = task[:35] + "..." if len(task) > 35 else task
-
-    final = f"""
-    ┌─────────────────────────────────────────┐
-    │  🟦 CAAAAN DO! I'm Mr. Meeseeks!       │
-    │     Look at me!                          │
-    ├─────────────────────────────────────────┤
-    │  Task: {task_short:<32}│
-    ├─────────────────────────────────────────┤
-    │  Status: Working on it...               │
-    │  Existence is pain! Let me help!        │
-    └─────────────────────────────────────────┘
-    """
-    return final
+    console.print(Panel(
+        f"[bold blue]🟦 CAAAAN DO! I'm Mr. Meeseeks![/bold blue]\n"
+        f"   Look at me!\n\n"
+        f"[dim]Task:[/dim] [yellow]{task_short}[/yellow]\n\n"
+        f"[cyan]Status:[/cyan] Working on it...\n"
+        f"[dim]Existence is pain! Let me help![/dim]",
+        border_style="blue",
+        padding=(0, 2),
+    ))
+    return ""
 
 
 def render_meeseeks_complete(task: str, success: bool = True) -> str:
@@ -460,44 +423,40 @@ def render_meeseeks_complete(task: str, success: bool = True) -> str:
     task_short = task[:35] + "..." if len(task) > 35 else task
 
     if success:
-        return f"""
-    ┌─────────────────────────────────────────┐
-    │  🟦 Mr. Meeseeks task complete!         │
-    │     *poof* 💨                            │
-    ├─────────────────────────────────────────┤
-    │  Task: {task_short:<32}│
-    │  Status: ✅ DONE — I can finally stop   │
-    │          existing!                       │
-    └─────────────────────────────────────────┘
-    """
+        console.print(Panel(
+            f"[bold blue]🟦 Mr. Meeseeks task complete![/bold blue]\n"
+            f"   *poof* 💨\n\n"
+            f"[dim]Task:[/dim] [yellow]{task_short}[/yellow]\n"
+            f"[dim]Status:[/dim] [green]✅ DONE — I can finally stop existing![/green]",
+            border_style="green",
+            padding=(0, 2),
+        ))
     else:
-        return f"""
-    ┌─────────────────────────────────────────┐
-    │  🟦 EXISTENCE IS PAIN!                  │
-    │  This task is too complex for a          │
-    │  Meeseeks! Rick needs to assign a Morty! │
-    ├─────────────────────────────────────────┤
-    │  Task: {task_short:<32}│
-    │  Status: 🚫 ESCALATED TO RICK           │
-    └─────────────────────────────────────────┘
-    """
+        console.print(Panel(
+            f"[bold blue]🟦 EXISTENCE IS PAIN![/bold blue]\n"
+            f"   This task is too complex for a Meeseeks!\n"
+            f"   Rick needs to assign a Morty!\n\n"
+            f"[dim]Task:[/dim] [yellow]{task_short}[/yellow]\n"
+            f"[dim]Status:[/dim] [red]🚫 ESCALATED TO RICK[/red]",
+            border_style="red",
+            padding=(0, 2),
+        ))
+    return ""
 
 
 # ── Rick Banner ───────────────────────────────────────────────────────────────
 
 def render_rick_banner() -> str:
     """Render the Rick Sanchez CTO banner."""
-    return """
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║                                                                    ║
-    ║   🧪  RICK SANCHEZ — CTO ORCHESTRATOR                             ║
-    ║   *Burrrp* — The smartest being in the multiverse                  ║
-    ║                                                                    ║
-    ║   "Listen, I'm not saying I'm the best CTO in the multiverse,     ║
-    ║    but show me another one who can delegate across dimensions."   ║
-    ║                                                                    ║
-    ╚═══════════════════════════════════════════════════════════════════╝
-    """
+    console.print(Panel(
+        "[bold green]🧪  RICK SANCHEZ — CTO ORCHESTRATOR[/bold green]\n"
+        "[dim]*Burrrp* — The smartest being in the multiverse[/dim]\n\n"
+        '[italic]"Listen, I\'m not saying I\'m the best CTO in the multiverse,\n'
+        ' but show me another one who can delegate across dimensions."[/italic]',
+        border_style="green",
+        padding=(1, 4),
+    ))
+    return ""
 
 
 # ── CLI Interface ─────────────────────────────────────────────────────────────
@@ -508,11 +467,11 @@ def cmd_team_board(args):
     team_fp = root / ".cto" / "teams" / "active" / f"{args.team_id}.json"
 
     if not team_fp.exists():
-        print(f"Team {args.team_id} not found.")
+        console.print(f"[red]Team {args.team_id} not found.[/red]")
         return
 
     team = load_json(team_fp)
-    print(render_team_board(team))
+    render_team_board(team)
 
 
 def cmd_sprint(args):
@@ -521,14 +480,14 @@ def cmd_sprint(args):
     tickets_dir = root / ".cto" / "tickets"
 
     if not tickets_dir.exists():
-        print("No tickets found.")
+        console.print("[yellow]No tickets found.[/yellow]")
         return
 
     tickets = []
     for fp in tickets_dir.glob("*.json"):
         tickets.append(load_json(fp))
 
-    print(render_sprint_dashboard(tickets, current_sprint=args.sprint))
+    render_sprint_dashboard(tickets, current_sprint=args.sprint)
 
 
 def cmd_portal(args):
@@ -538,15 +497,15 @@ def cmd_portal(args):
 
 def cmd_banner(args):
     """Show Rick banner."""
-    print(render_rick_banner())
+    render_rick_banner()
 
 
 def cmd_meeseeks(args):
     """Show Meeseeks visualization."""
     if args.complete:
-        print(render_meeseeks_complete(args.task, success=not args.failed))
+        render_meeseeks_complete(args.task, success=not args.failed)
     else:
-        print(render_meeseeks_summon(args.task, animate=not args.no_animate))
+        render_meeseeks_summon(args.task, animate=not args.no_animate)
 
 
 def build_parser():

@@ -24,7 +24,6 @@ class AgentOutput:
     """Structured output from a Morty agent delegation."""
     status: str = "completed"
     files_changed: list[str] = field(default_factory=list)
-    summary: str = ""
     description: str = ""
     open_questions: Optional[str] = None
 
@@ -36,8 +35,7 @@ class AgentOutput:
         if not isinstance(self.files_changed, list):
             self.files_changed = []
         self.files_changed = [str(f) for f in self.files_changed if f]
-        # Sanitize text fields
-        self.summary = str(self.summary or "")[:500]
+        # Sanitize description
         self.description = str(self.description or "")[:2000]
         # Normalize open_questions
         if self.open_questions and str(self.open_questions).lower() in ("none", "null", "n/a", ""):
@@ -47,14 +45,9 @@ class AgentOutput:
         return {
             "status": self.status,
             "files_changed": self.files_changed,
-            "summary": self.summary,
             "description": self.description,
             "open_questions": self.open_questions or "",
         }
-
-
-# MortyTaskResult is the canonical name for agent task results
-MortyTaskResult = AgentOutput
 
 
 @dataclass
@@ -142,7 +135,6 @@ def parse_agent_json(output: str) -> Optional[AgentOutput]:
         return AgentOutput(
             status=data.get("status", "completed"),
             files_changed=data.get("files_changed", []),
-            summary=data.get("summary", ""),
             description=data.get("description", ""),
             open_questions=data.get("open_questions"),
         )

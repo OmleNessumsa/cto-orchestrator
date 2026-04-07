@@ -585,5 +585,48 @@
       "scripts/meeseeks.py",
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-07T06:33:11.416402+00:00",
+    "proposal_id": "PROM-048",
+    "action": "applied",
+    "title": "Add MCP server for ticket/team state management",
+    "target_files": [
+      "scripts/mcp_server.py",
+      "scripts/delegate.py",
+      "agents/backend-morty.json",
+      "agents/architect-morty.json"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T06:41:44.081692+00:00",
+    "proposal_id": "PROM-037",
+    "action": "applied",
+    "title": "Replace print-based ASCII rendering with Rich library for terminal UI",
+    "target_files": [
+      "scripts/visual.py",
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T06:43:01.167164+00:00",
+    "proposal_id": "PROM-053",
+    "action": "applied",
+    "title": "Use structured output (JSON mode) for agent responses",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/schemas.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T06:43:37.336707+00:00",
+    "proposal_id": "PROM-032",
+    "action": "applied",
+    "title": "Add few-shot examples to agent output format prompts",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
   }
 ]

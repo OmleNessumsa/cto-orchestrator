@@ -11,8 +11,11 @@
     "scripts/delegate.py"
   ],
   "proposed_changes": "Add a new <examples> XML section between </reasoning_protocol> and <execution_rules> (around line 671) in the prompt assembly. Include 1-2 brief, realistic examples showing: (1) a short ANALYZE/PLAN block, (2) a code change description, (3) the correctly formatted JSON report block. Use <example> and </example> sub-tags. Keep examples short (~15 lines each) to avoid bloating the prompt. Also add a minimal example to the Meeseeks prompt in meeseeks.py after the JSON format specification (line 117) showing a completed simple task report.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:37:05.160896+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-07T06:43:37.334649+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-032-20260407T064301",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

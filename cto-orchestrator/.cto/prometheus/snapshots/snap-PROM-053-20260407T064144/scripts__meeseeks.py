@@ -129,17 +129,6 @@ End your work with a JSON report block:
 }}
 ```
 
-Example of a completed Meeseeks report:
-
-```json
-{{
-  "status": "completed",
-  "files_changed": ["utils/helpers.py"],
-  "description": "Renamed `get_user` to `fetch_user` in utils/helpers.py — done, goodbye.",
-  "complexity": "simple"
-}}
-```
-
 Also include a readable summary:
 
 ### Meeseeks Report

@@ -13,8 +13,13 @@
     "scripts/orchestrate.py"
   ],
   "proposed_changes": "Add `rich` to dependencies. Refactor visual.py to use: (1) `rich.table.Table` for team boards and sprint dashboards instead of manual box-drawing with ljust padding, (2) `rich.progress.Progress` for progress bars instead of manual \u2588/\u2591 construction, (3) `rich.panel.Panel` for agent status boxes with auto-width, (4) `rich.live.Live` context manager for animated portal frames instead of print+sleep+clear-screen, (5) `rich.tree.Tree` for mixed-mode team hierarchy visualization. This fixes the emoji-width alignment bugs (lines 233, 274 where ljust doesn't account for double-width emoji) and adds ANSI color theming (green portal, yellow status, red errors).",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:39:45.806654+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-07T06:41:44.080425+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-037-20260407T063318",
+  "files_actually_changed": [
+    "scripts/visual.py",
+    "scripts/orchestrate.py",
+    "scripts/delegate.py"
+  ]
 }

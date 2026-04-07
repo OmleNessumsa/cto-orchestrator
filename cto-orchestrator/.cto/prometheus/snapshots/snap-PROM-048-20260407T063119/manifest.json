@@ -1,0 +1,18 @@
+{
+  "proposal_id": "PROM-048",
+  "created_at": "2026-04-07T06:31:19.552853+00:00",
+  "files": {
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 42192
+    },
+    "agents/backend-morty.json": {
+      "snapshot_name": "agents__backend-morty.json",
+      "original_size": 623
+    },
+    "agents/architect-morty.json": {
+      "snapshot_name": "agents__architect-morty.json",
+      "original_size": 653
+    }
+  }
+}

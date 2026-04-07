@@ -17,11 +17,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from rich.console import Console
-
-console = Console()
-err_console = Console(stderr=True)
-
 # Import roro event emitter
 try:
     from roro_events import emit, get_agent_id
@@ -98,7 +93,8 @@ except ImportError:
 
     def audit_log_security_event(event_type, details, severity="info", log_dir=None):
         if severity in ("warning", "critical"):
-            err_console.print(f"[red][SECURITY-{severity.upper()}] {event_type}: {details[:200]}[/red]")
+            import sys
+            print(f"[SECURITY-{severity.upper()}] {event_type}: {details[:200]}", file=sys.stderr)
 
     def detect_injection_patterns(text):
         return []
@@ -114,7 +110,7 @@ def find_cto_root(start=None) -> Path:
             return current
         parent = current.parent
         if parent == current:
-            err_console.print("[red]Error: No .cto/ directory found.[/red]")
+            print("Error: No .cto/ directory found.", file=sys.stderr)
             sys.exit(1)
         current = parent
 
@@ -136,7 +132,7 @@ def save_json(fp: Path, data: dict):
 def load_ticket(root: Path, ticket_id: str) -> dict:
     fp = root / ".cto" / "tickets" / f"{ticket_id}.json"
     if not fp.exists():
-        err_console.print(f"[red]Error: Ticket {ticket_id} not found.[/red]")
+        print(f"Error: Ticket {ticket_id} not found.", file=sys.stderr)
         sys.exit(1)
     return load_json(fp)
 
@@ -690,44 +686,6 @@ If extended thinking is not available, follow this fallback sequence:
 Show a brief summary of your approach before diving into implementation — Rick respects agents who think before they code.
 </reasoning_protocol>
 
-<examples>
-<example>
-ANALYZE: Ticket asks to add a `created_at` timestamp field to the User model. The model lives in `models/user.py` and the DB migration folder is `migrations/`.
-PLAN:
-- Add `created_at = Column(DateTime, default=datetime.utcnow)` to `User` in `models/user.py`
-- Generate migration with `alembic revision --autogenerate -m "add_user_created_at"`
-- Verify migration SQL matches expected schema change
-VERIFY: Acceptance criteria require the field to be non-nullable with a server default — covered.
-EXECUTE: Applied changes to model and generated migration file.
-
-```json
-{
-  "status": "completed",
-  "files_changed": ["models/user.py", "migrations/versions/0042_add_user_created_at.py"],
-  "description": "Added created_at DateTime column to User model with utcnow default and generated the corresponding Alembic migration.",
-  "open_questions": null
-}
-```
-</example>
-<example>
-ANALYZE: Ticket asks to extract a `format_currency` helper from three duplicated call sites in `utils/billing.py`, `utils/invoice.py`, and `api/checkout.py`.
-PLAN:
-- Create `utils/formatting.py` with `format_currency(amount, currency="EUR")` function
-- Replace the three inline snippets with imports of the new helper
-VERIFY: All three sites use the same rounding logic — safe to unify.
-EXECUTE: Created helper module and updated all three call sites.
-
-```json
-{
-  "status": "completed",
-  "files_changed": ["utils/formatting.py", "utils/billing.py", "utils/invoice.py", "api/checkout.py"],
-  "description": "Extracted duplicated currency-formatting logic into utils/formatting.py and replaced three call sites with imports.",
-  "open_questions": null
-}
-```
-</example>
-</examples>
-
 <execution_rules>
 - Execute ALL tasks directly. Do NOT ask for permission or confirmation — Rick hates that.
 - Create and modify files as needed. Do NOT just describe what should be done — that's Jerry behavior.
@@ -925,7 +883,7 @@ def cmd_delegate(args):
     try:
         safe_ticket_id = sanitize_ticket_id(args.ticket_id)
     except ValueError as e:
-        err_console.print(f"[red]Error: {e}[/red]")
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     ticket = load_ticket(root, safe_ticket_id)
@@ -938,7 +896,7 @@ def cmd_delegate(args):
         try:
             team_id = sanitize_team_id(args.team_id)
         except ValueError as e:
-            err_console.print(f"[red]Error: Invalid team ID: {e}[/red]")
+            print(f"Error: Invalid team ID: {e}", file=sys.stderr)
             sys.exit(1)
 
     team_msg = f" (team: {team_id})" if team_id else ""
@@ -951,17 +909,17 @@ def cmd_delegate(args):
     except ImportError:
         pass
 
-    console.print(f"[green]*Burrrp* Alright, sending [bold]{agent}[/bold] on a mission — ticket [yellow]{ticket['id']}[/yellow] (model: {model}){team_msg}[/green]")
+    print(f"*Burrrp* Alright, sending {agent} on a mission — ticket {ticket['id']} (model: {model}){team_msg}")
 
     prompt = build_prompt(root, ticket, agent, team_id=team_id)
 
     if args.dry_run:
-        console.print(f"\n[cyan]{'=' * 60}[/cyan]")
-        console.print("[cyan]DRY RUN — Here's what I'd tell the Morty:[/cyan]")
-        console.print(f"[cyan]{'=' * 60}[/cyan]")
-        console.print(prompt)
-        console.print(f"[cyan]{'=' * 60}[/cyan]")
-        console.print(f"\n[dim]Would execute: claude -p --dangerously-skip-permissions --model {model} '<prompt>'[/dim]")
+        print("\n" + "=" * 60)
+        print("DRY RUN — Here's what I'd tell the Morty:")
+        print("=" * 60)
+        print(prompt)
+        print("=" * 60)
+        print(f"\nWould execute: claude -p --dangerously-skip-permissions --model {model} '<prompt>'")
         return
 
     # Update ticket to in_progress
@@ -1017,7 +975,7 @@ def cmd_delegate(args):
         output = delegate_to_agent(prompt, model=model, timeout=args.timeout, thinking_budget=thinking_budget)
     except RuntimeError as e:
         error_msg = str(e)
-        console.print(f"[red]Ugh, {agent} screwed up: {error_msg}[/red]")
+        print(f"Ugh, {agent} screwed up: {error_msg}")
         ticket["status"] = "blocked"
         ticket["review_notes"] = f"AGENT FAILURE: {error_msg}"
         ticket["updated_at"] = now_iso()
@@ -1130,11 +1088,11 @@ def cmd_delegate(args):
         "team_id": team_id,
     }, role=agent, team_id=team_id)
 
-    console.print(f"\n[green]{agent} actually got something done.[/green] Status: [yellow]{agent_status}[/yellow]")
-    console.print(f"[dim]Files changed:[/dim] {', '.join(parsed['files_changed']) or '(none detected)'}")
-    console.print(f"[dim]Description:[/dim] {parsed['description'][:300]}")
+    print(f"\n{agent} actually got something done. Status: {agent_status}")
+    print(f"Files changed: {', '.join(parsed['files_changed']) or '(none detected)'}")
+    print(f"Description: {parsed['description'][:300]}")
     if parsed["open_questions"] and parsed["open_questions"].lower() != "none":
-        console.print(f"[dim]Open questions:[/dim] {parsed['open_questions']}")
+        print(f"Open questions: {parsed['open_questions']}")
 
     # Update session log
     try:

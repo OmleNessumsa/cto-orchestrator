@@ -25,13 +25,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-
-console = Console()
-err_console = Console(stderr=True)
-
 # Import roro event emitter
 try:
     from roro_events import emit, flush as flush_events
@@ -86,7 +79,7 @@ except ImportError:
         pass
     def audit_log_security_event(event_type, details, severity="info", log_dir=None):
         if severity in ("warning", "critical"):
-            err_console.print(f"[red][SECURITY-{severity.upper()}] {event_type}: {details[:200]}[/red]")
+            print(f"[SECURITY-{severity.upper()}] {event_type}: {details[:200]}", file=sys.stderr)
 
 
 # ── Shared helpers (same as other scripts) ──────────────────────────────────
@@ -98,7 +91,7 @@ def find_cto_root(start=None) -> Path:
             return current
         parent = current.parent
         if parent == current:
-            err_console.print("[red]Error: No .cto/ directory found. Run init_project.sh first.[/red]")
+            print("Error: No .cto/ directory found. Run init_project.sh first.", file=sys.stderr)
             sys.exit(1)
         current = parent
 
@@ -459,9 +452,9 @@ def cmd_plan(args):
     prefix = cfg["ticket_prefix"]
     description = args.description
 
-    console.print("[green]*Burrrp* Alright, let me plan this out... this is simple for a genius like me.[/green]")
-    console.print(f"[dim]Project:[/dim] {description[:80]}")
-    console.print("[cyan]Generating architecture plan via claude (architect agent)...[/cyan]")
+    print(f"*Burrrp* Alright, let me plan this out... this is simple for a genius like me.")
+    print(f"Project: {description[:80]}")
+    print("Generating architecture plan via claude (architect agent)...")
 
     safe_description = wrap_untrusted_content(description, label="PROJECT_DESCRIPTION")
 
@@ -512,27 +505,27 @@ Output the JSON array now:"""
     try:
         output = claude_prompt(plan_prompt, model="opus", thinking_budget=15000)
     except RuntimeError as e:
-        console.print(f"[red]Error generating plan: {e}[/red]")
+        print(f"Error generating plan: {e}")
         sys.exit(1)
 
     # Extract JSON from output
     json_match = re.search(r"\[.*\]", output, re.DOTALL)
     if not json_match:
-        console.print("[red]Error: Could not parse plan output as JSON.[/red]")
-        console.print("[dim]Raw output:[/dim]")
-        console.print(output[:2000])
+        print("Error: Could not parse plan output as JSON.")
+        print("Raw output:")
+        print(output[:2000])
         sys.exit(1)
 
     try:
         plan = json.loads(json_match.group(0))
     except json.JSONDecodeError as e:
-        console.print(f"[red]Error parsing JSON: {e}[/red]")
-        console.print("[dim]Raw match:[/dim]")
-        console.print(json_match.group(0)[:2000])
+        print(f"Error parsing JSON: {e}")
+        print("Raw match:")
+        print(json_match.group(0)[:2000])
         sys.exit(1)
 
     if not isinstance(plan, list):
-        console.print("[red]Error: Plan is not a list of tickets.[/red]")
+        print("Error: Plan is not a list of tickets.")
         sys.exit(1)
 
     # Create tickets
@@ -587,10 +580,10 @@ Output the JSON array now:"""
         if id_match:
             tid = id_match.group(1)
             created_ids.append(tid)
-            console.print(f"  [green]Created {tid}:[/green] {title}")
+            print(f"  Created {tid}: {title}")
         else:
             created_ids.append(f"UNKNOWN-{i}")
-            console.print(f"  [yellow]Warning: could not parse ID from:[/yellow] {out}")
+            print(f"  Warning: could not parse ID from: {out}")
 
     # Set all non-epic tickets to "todo"
     for tid in created_ids:
@@ -620,8 +613,8 @@ Output the JSON array now:"""
         "ticket_ids": created_ids,
     }, role="rick")
 
-    console.print(f"\n[bold green]Boom! Plan done. {len(created_ids)} tickets created. Even I'm impressed, and I'm never impressed.[/bold green]")
-    console.print("[dim]Run `python orchestrate.py sprint` to send the Morty's to work.[/dim]")
+    print(f"\nBoom! Plan done. {len(created_ids)} tickets created. Even I'm impressed, and I'm never impressed.")
+    print("Run `python orchestrate.py sprint` to send the Morty's to work.")
 
 
 # ── Shared Sprint State (PROM-008) ──────────────────────────────────────────
@@ -760,7 +753,7 @@ def cmd_sprint(args):
     use_teams = not args.no_teams  # Enable teams by default
 
     team_msg = " (team mode enabled)" if use_teams else " (solo mode)"
-    console.print(f"[bold green]Wubba lubba dub dub! Sending the Morty's to work. (max {max_iterations} adventures){team_msg}[/bold green]")
+    print(f"Wubba lubba dub dub! Sending the Morty's to work. (max {max_iterations} adventures){team_msg}")
     append_log(root, {
         "timestamp": now_iso(),
         "ticket_id": None,
@@ -780,9 +773,9 @@ def cmd_sprint(args):
 
     while iteration < max_iterations:
         iteration += 1
-        console.print(f"\n[cyan]{'═' * 60}[/cyan]")
-        console.print(f"  [bold cyan]Adventure #{iteration}/{max_iterations}[/bold cyan]")
-        console.print(f"[cyan]{'═' * 60}[/cyan]")
+        print(f"\n{'═' * 60}")
+        print(f"  Adventure #{iteration}/{max_iterations}")
+        print(f"{'═' * 60}")
 
         # Emit cto.sprint.iteration.started event
         emit("cto.sprint.iteration.started", {
@@ -799,18 +792,18 @@ def cmd_sprint(args):
             status_counts[s] = status_counts.get(s, 0) + 1
         total = len(tickets)
         done = status_counts.get("done", 0)
-        console.print(f"  [cyan]Progress:[/cyan] {done}/{total} done ({(done/total*100) if total else 0:.0f}%)")
-        console.print(f"  [dim]Statuses:[/dim] {json.dumps(status_counts)}")
+        print(f"  Progress: {done}/{total} done ({(done/total*100) if total else 0:.0f}%)")
+        print(f"  Statuses: {json.dumps(status_counts)}")
 
         # Show active teams
         active_teams = [t for t in all_teams(root) if t["status"] == "active"]
         if active_teams:
-            console.print(f"  [cyan]Active teams:[/cyan] {len(active_teams)}")
+            print(f"  Active teams: {len(active_teams)}")
 
         # Check if all done
         non_epic = [t for t in tickets if t["type"] != "epic"]
         if all(t["status"] == "done" for t in non_epic) and non_epic:
-            console.print("\n  [bold green]Holy crap, the Morty's actually finished everything. I... I need a drink.[/bold green]")
+            print("\n  Holy crap, the Morty's actually finished everything. I... I need a drink.")
             break
 
         # Get actionable tickets
@@ -819,14 +812,14 @@ def cmd_sprint(args):
             # Check if there are in_review or testing tickets to process
             review_tickets = [t for t in tickets if t["status"] == "in_review"]
             if review_tickets:
-                console.print(f"\n  [cyan]No todo tickets, but {len(review_tickets)} in review. Let me see what the Morty's did...[/cyan]")
+                print(f"\n  No todo tickets, but {len(review_tickets)} in review. Let me see what the Morty's did...")
                 for rt in review_tickets[:3]:  # batch review
-                    console.print(f"\n  [dim]Let me see what this Morty did...[/dim] [yellow]{rt['id']}[/yellow]: {rt['title']}")
+                    print(f"\n  Let me see what this Morty did... {rt['id']}: {rt['title']}")
                     try:
                         output = run_delegate(root, rt["id"], agent="reviewer-morty")
-                        console.print(f"  [dim]Review output:[/dim] {output[:200]}")
+                        print(f"  Review output: {output[:200]}")
                     except Exception as e:
-                        console.print(f"  [red]Review failed: {e}[/red]")
+                        print(f"  Review failed: {e}")
                     # Reload ticket after review
                     rt = load_ticket(root, rt["id"])
                     if rt["status"] == "in_review":
@@ -843,29 +836,29 @@ def cmd_sprint(args):
                             "message": f"Reviewed and approved: {rt['title']}",
                             "files_changed": [],
                         })
-                        console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
+                        print(f"  {rt['id']} → done. Good enough. Approved. *burp*")
                 continue
 
             # Check blocked
             blocked = [t for t in tickets if t["status"] == "blocked"]
             in_progress = [t for t in tickets if t["status"] == "in_progress"]
             if blocked and not in_progress:
-                console.print(f"\n  [red]Every Morty is stuck. This is what I get for relying on Morty's. ({len(blocked)} blocked)[/red]")
+                print(f"\n  Every Morty is stuck. This is what I get for relying on Morty's. ({len(blocked)} blocked)")
                 for bt in blocked:
                     note = bt.get("review_notes") or "unknown reason"
-                    console.print(f"    [red]{bt['id']}:[/red] {note[:80]}")
+                    print(f"    {bt['id']}: {note[:80]}")
                 break
             if not in_progress and not blocked:
-                console.print("\n  [dim]Nothing left to do. Go home, Morty's.[/dim]")
+                print("\n  Nothing left to do. Go home, Morty's.")
                 break
             # Some tickets are in_progress from previous iteration
-            console.print("  [dim]Waiting for in-progress tickets to finish...[/dim]")
+            print("  Waiting for in-progress tickets to finish...")
             continue
 
         # Delegate the top candidate
         ticket = candidates[0]
-        console.print(f"\n  [bold yellow]Get in there, Morty![/bold yellow] [yellow]{ticket['id']}[/yellow]: {ticket['title']}")
-        console.print(f"    [dim]Priority:[/dim] {ticket['priority']}, [dim]Complexity:[/dim] {ticket.get('estimated_complexity', '?')}")
+        print(f"\n  Get in there, Morty! {ticket['id']}: {ticket['title']}")
+        print(f"    Priority: {ticket['priority']}, Complexity: {ticket.get('estimated_complexity', '?')}")
 
         # Check if this ticket needs a team
         team_template = None
@@ -879,10 +872,10 @@ def cmd_sprint(args):
 
         if team_template:
             # Team collaboration mode
-            console.print(f"    [green]🤝 Team mode activated! Template: {team_template}[/green]")
+            print(f"    🤝 Team mode activated! Template: {team_template}")
             try:
                 team = spawn_team(root, ticket, team_template)
-                console.print(f"    [green]Team spawned: {team['id']} with {len(team['members'])} members[/green]")
+                print(f"    Team spawned: {team['id']} with {len(team['members'])} members")
 
                 # Emit cto.team.spawned event
                 emit("cto.team.spawned", {
@@ -900,7 +893,7 @@ def cmd_sprint(args):
                 # Check results
                 completed = sum(1 for r in results.values() if r["status"] == "completed")
                 total_members = len(team["members"])
-                console.print(f"    [cyan]Team results: {completed}/{total_members} completed[/cyan]")
+                print(f"    Team results: {completed}/{total_members} completed")
 
                 # Log team activity
                 append_log(root, {
@@ -913,28 +906,28 @@ def cmd_sprint(args):
                 })
 
             except Exception as e:
-                console.print(f"    [red]Team sprint failed: {e}[/red]")
+                print(f"    Team sprint failed: {e}")
                 # Fallback to solo mode
-                console.print("    [yellow]Falling back to solo delegation...[/yellow]")
+                print(f"    Falling back to solo delegation...")
                 try:
                     output = run_delegate(root, ticket["id"], timeout=600)
-                    console.print(f"  [dim]Delegate output (last 300 chars): ...{output[-300:]}[/dim]")
+                    print(f"  Delegate output (last 300 chars): ...{output[-300:]}")
                 except Exception as e2:
-                    console.print(f"  [red]Solo delegation also failed: {e2}[/red]")
+                    print(f"  Solo delegation also failed: {e2}")
         else:
             # Solo mode (original behavior)
             try:
                 output = run_delegate(root, ticket["id"], timeout=600)
-                console.print(f"  [dim]Delegate output (last 300 chars): ...{output[-300:]}[/dim]")
+                print(f"  Delegate output (last 300 chars): ...{output[-300:]}")
             except subprocess.TimeoutExpired:
-                console.print(f"  [red]Delegation timed out for {ticket['id']}[/red]")
+                print(f"  Delegation timed out for {ticket['id']}")
                 t = load_ticket(root, ticket["id"])
                 t["status"] = "blocked"
                 t["review_notes"] = "TIMEOUT: Agent timed out. Consider splitting this ticket."
                 t["updated_at"] = now_iso()
                 save_ticket(root, t)
             except Exception as e:
-                console.print(f"  [red]Delegation error: {e}[/red]")
+                print(f"  Delegation error: {e}")
 
         # Check if ticket ended up in_review — auto-approve for sprint flow
         t = load_ticket(root, ticket["id"])
@@ -952,7 +945,7 @@ def cmd_sprint(args):
                 "message": f"Good enough. Approved. *burp* {t['title']}",
                 "files_changed": t.get("files_touched", []),
             })
-            console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+            print(f"  {t['id']} → done. Good enough. Approved. *burp*")
 
         # Update sprint state with accumulated context (PROM-008)
         parsed_for_sprint = {
@@ -969,9 +962,9 @@ def cmd_sprint(args):
             update_epic_status(root, t["parent_ticket"])
 
     # Sprint summary
-    console.print(f"\n[cyan]{'═' * 60}[/cyan]")
-    console.print(f"  [bold cyan]Adventure Complete — {iteration} adventures[/bold cyan]")
-    console.print(f"[cyan]{'═' * 60}[/cyan]")
+    print(f"\n{'═' * 60}")
+    print(f"  Adventure Complete — {iteration} adventures")
+    print(f"{'═' * 60}")
     tickets = all_tickets(root)
     status_counts = {}
     for t in tickets:
@@ -980,16 +973,16 @@ def cmd_sprint(args):
     total = len(tickets)
     done = status_counts.get("done", 0)
     pct = (done/total*100) if total else 0
-    console.print(f"  [cyan]Final:[/cyan] {done}/{total} done ({pct:.0f}%)")
-    console.print(f"  [dim]Statuses:[/dim] {json.dumps(status_counts)}")
+    print(f"  Final: {done}/{total} done ({pct:.0f}%)")
+    print(f"  Statuses: {json.dumps(status_counts)}")
     if pct == 100:
-        console.print("  [bold green]*Rick takes a swig from his flask* That's how it's done. I'm a genius.[/bold green]")
+        print("  *Rick takes a swig from his flask* That's how it's done. I'm a genius.")
     elif pct >= 75:
-        console.print("  [green]Not bad for a bunch of Morty's. I'll allow it.[/green]")
+        print("  Not bad for a bunch of Morty's. I'll allow it.")
     elif pct >= 50:
-        console.print("  [yellow]Half done? This is why I drink, Morty.[/yellow]")
+        print("  Half done? This is why I drink, Morty.")
     else:
-        console.print("  [red]Pathetic. Absolutely pathetic. I should've done this myself.[/red]")
+        print("  Pathetic. Absolutely pathetic. I should've done this myself.")
 
     append_log(root, {
         "timestamp": now_iso(),
@@ -1059,18 +1052,18 @@ def cmd_review(args):
     review_tickets = [t for t in tickets if t["status"] == "in_review"]
 
     if not review_tickets:
-        console.print("[yellow]Nothing to review. The Morty's are slacking off.[/yellow]")
+        print("Nothing to review. The Morty's are slacking off.")
         return
 
-    console.print(f"[cyan]*Squints* Reviewing {len(review_tickets)} tickets from the Morty's...[/cyan]")
+    print(f"*Squints* Reviewing {len(review_tickets)} tickets from the Morty's...")
 
     for t in review_tickets:
-        console.print(f"\n  [dim]*Squints* Let me look at what Morty #[/dim][yellow]{t['id']}[/yellow] cooked up...")
+        print(f"\n  *Squints* Let me look at what Morty #{t['id']} cooked up...")
         try:
             output = run_delegate(root, t["id"], agent="reviewer-morty")
-            console.print(f"  [dim]Review result:[/dim] {output[:300]}")
+            print(f"  Review result: {output[:300]}")
         except Exception as e:
-            console.print(f"  [red]Review failed: {e}[/red]")
+            print(f"  Review failed: {e}")
 
         # Reload ticket
         t = load_ticket(root, t["id"])
@@ -1080,11 +1073,11 @@ def cmd_review(args):
             t["completed_at"] = now_iso()
             t["updated_at"] = now_iso()
             save_ticket(root, t)
-            console.print(f"  [green]{t['id']} → Not terrible. Approved.[/green]")
+            print(f"  {t['id']} → Not terrible. Approved.")
         elif t["status"] == "todo":
-            console.print(f"  [red]{t['id']} → This is garbage, Morty. Do it again.[/red]")
+            print(f"  {t['id']} → This is garbage, Morty. Do it again.")
         else:
-            console.print(f"  [cyan]{t['id']} → {t['status']}[/cyan]")
+            print(f"  {t['id']} → {t['status']}")
 
         append_log(root, {
             "timestamp": now_iso(),
@@ -1113,7 +1106,13 @@ def cmd_status(args):
     done = status_counts.get("done", 0)
     pct = (done / total * 100) if total else 0
 
+    # Progress bar
+    bar_len = 20
+    filled = int(bar_len * pct / 100) if total else 0
+    bar = "\u2588" * filled + "\u2591" * (bar_len - filled)
+
     # Get last log entry
+    from pathlib import Path as P
     ld = root / ".cto" / "logs"
     last_activity = "No activity yet"
     if ld.exists():
@@ -1132,61 +1131,43 @@ def cmd_status(args):
     testing = status_counts.get("testing", 0)
     blocked = status_counts.get("blocked", 0)
 
-    # Status table
-    status_table = Table(show_header=True, header_style="bold cyan", border_style="green")
-    status_table.add_column("Backlog", justify="center")
-    status_table.add_column("Todo", justify="center")
-    status_table.add_column("In Progress", justify="center")
-    status_table.add_column("In Review", justify="center")
-    status_table.add_column("Testing", justify="center")
-    status_table.add_column("Done", justify="center", style="green")
-    status_table.add_column("Blocked", justify="center", style="red")
-    status_table.add_row(
-        str(backlog), str(todo), str(in_progress),
-        str(in_review), str(testing), str(done), str(blocked),
-    )
-
-    console.print(Panel(
-        f"[bold green]🧪 RICK'S PROJECT: {project_name}[/bold green]\n"
-        f"[dim]Last activity:[/dim] {last_activity}\n"
-        f"[dim]-- Rick Sanchez, the smartest CTO alive. *burp*[/dim]",
-        border_style="green",
-    ))
-    console.print(status_table)
-
-    from rich.progress import BarColumn, Progress, TextColumn as _TC
-    with Progress(
-        _TC("[progress.description]{task.description}"),
-        BarColumn(bar_width=40, style="green", complete_style="bright_green"),
-        _TC("[cyan]{task.percentage:>3.0f}%[/cyan]"),
-        console=console,
-        transient=False,
-    ) as prog:
-        prog.add_task(f"[cyan]Morty Progress ({done}/{total})[/cyan]", total=100, completed=pct)
+    print(f"""
+╔══════════════════════════════════════════════════╗
+║  RICK'S PROJECT: {project_name:<32}║
+╠══════════════════════════════════════════════════╣
+║  Backlog: {backlog:<4}│ Todo: {todo:<5}│ In Progress: {in_progress:<5}  ║
+║  Review:  {in_review:<4}│ Testing: {testing:<2} │ Done: {done:<9}  ║
+║  Blocked: {blocked:<39}║
+╠══════════════════════════════════════════════════╣
+║  Morty Progress:  {bar} {pct:>3.0f}%      ║
+║  Last: {last_activity:<42}║
+╠══════════════════════════════════════════════════╣
+║  -- Rick Sanchez, the smartest CTO alive. *burp* ║
+╚══════════════════════════════════════════════════╝""")
 
     # Show blocked items if any
     if blocked:
-        console.print("\n  [red]Morty's that are stuck:[/red]")
+        print("\n  Morty's that are stuck:")
         for t in tickets:
             if t["status"] == "blocked":
                 note = t.get("review_notes") or "unknown"
-                console.print(f"    [red]{t['id']}:[/red] {t['title'][:40]} — {note[:40]}")
+                print(f"    {t['id']}: {t['title'][:40]} — {note[:40]}")
 
     # Show team status if any active teams
     teams_dir = root / ".cto" / "teams" / "active"
     if teams_dir.exists():
         active_teams = list(teams_dir.glob("*.json"))
         if active_teams:
-            console.print("\n  [cyan]Active Teams:[/cyan]")
+            print("\n  Active Teams:")
             for team_fp in active_teams[:3]:  # Show first 3
                 team = load_json(team_fp)
                 if team.get("status") in ("pending", "active"):
                     members_done = sum(1 for m in team.get("members", []) if m.get("status") == "completed")
                     total_members = len(team.get("members", []))
-                    console.print(f"    [yellow]{team['id']}:[/yellow] {team.get('parent_ticket', '?')} — {members_done}/{total_members} members done")
+                    print(f"    {team['id']}: {team.get('parent_ticket', '?')} — {members_done}/{total_members} members done")
 
     # Hint about visual dashboard
-    console.print("\n  [dim]💡 Tip: Run `python scripts/visual.py sprint` for full visual dashboard[/dim]")
+    print("\n  💡 Tip: Run `python scripts/visual.py sprint` for full visual dashboard")
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────

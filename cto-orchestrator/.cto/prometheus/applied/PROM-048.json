@@ -4,7 +4,7 @@
   "category": "tooling",
   "source": "MCP (Model Context Protocol) server patterns for multi-agent state sharing (modelcontextprotocol.io, 2025-2026)",
   "description": "Currently, Morty agents have no way to query ticket state, read team messages, or update their status during execution \u2014 they receive a static prompt and return text. By exposing CTO state as an MCP server, agents can dynamically read/write tickets, send team messages, check file reservations, and query ADRs during execution. This transforms the one-shot delegation model into a truly interactive multi-agent system.",
-  "impact_score": 9,
+  "impact_score": 10,
   "risk_score": 4,
   "effort_score": 6,
   "target_files": [
@@ -14,9 +14,15 @@
     "agents/architect-morty.json"
   ],
   "proposed_changes": "Create `scripts/mcp_server.py` implementing an MCP server (using the `mcp` Python SDK) with these tools: (1) `get_ticket(ticket_id)` \u2014 read ticket state and dependencies; (2) `update_ticket_status(ticket_id, status, output)` \u2014 partial progress updates; (3) `send_team_message(team_id, to, message)` \u2014 real-time inter-agent messaging; (4) `get_team_context(team_id)` \u2014 read shared decisions/interfaces; (5) `list_files_reserved(team_id)` \u2014 check file ownership; (6) `read_adr(name)` \u2014 access architecture decisions. In delegate.py, modify `delegate_to_agent()` to pass `--mcp-server scripts/mcp_server.py` when invoking `claude -p`, giving each Morty access to these tools. Update agent JSON configs to document available MCP tools in their identity/constraints.",
-  "status": "rejected",
+  "status": "applied",
   "created_at": "2026-04-06T09:43:38.773915+00:00",
-  "applied_at": null,
-  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-048-20260407T060538",
-  "reject_reason": "Apply failed: Evolve timed out after 300s"
+  "applied_at": "2026-04-07T06:33:11.415056+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-048-20260407T063119",
+  "retry_note": "Retry of failed evolve. Original timeout 300s. Bumped impact 9->10 to ensure top priority.",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "agents/architect-morty.json",
+    "agents/backend-morty.json",
+    "scripts/mcp_server.py"
+  ]
 }
