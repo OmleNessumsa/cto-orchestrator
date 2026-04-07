@@ -94,6 +94,55 @@ python scripts/unity.py check
 
 If Temporal/Shannon isn't available, Unity operates in "static analysis mode" — delegating to security-morty for code-based security analysis. This provides security insights without live exploitation verification.
 
+## Professor-Morty — Teaching & Explanation Agent
+
+Professor-Morty is Rick's translator for the "simple souls" in the room. He doesn't write code — he explains it. Using Rick's "Explain Like I'm Morty" engine, he breaks down code, concepts, and architecture at adjustable Morty-levels.
+
+| Agent | Model | Use Case | Behavior |
+|-------|-------|----------|----------|
+| `professor-morty` | sonnet | Code explanation, concept teaching, architecture tours, onboarding | Analyzes code and explains at the requested Morty-level (1-5). No file modifications. |
+
+### Morty Levels (Explanation Depth)
+
+| Level | Name | For Whom |
+|-------|------|----------|
+| 🥴 1 | Total Morty | Complete beginners, PMs, non-technical stakeholders |
+| 📖 2 | Morty met een boek | Junior devs, learning new tech |
+| 💅 3 | Summer-level | Mid-level devs onboarding to a new project |
+| 😈 4 | Evil Morty | Senior devs exploring unfamiliar code |
+| 🧪 5 | Bijna-Rick | Experts wanting internals and edge cases |
+
+### Explain Modes
+
+| Mode | What It Does |
+|------|-------------|
+| `code` | Analyze and explain source files function-by-function |
+| `concept` | Explain programming concepts, patterns, technologies |
+| `architecture` | High-level architecture overview with ASCII diagrams |
+| `tour` | Guided codebase walkthrough ordered by dependency |
+| `diff` | Explain recent code changes and their impact |
+| `why` | Explain why a specific file/function/pattern exists |
+
+### When to Use Professor-Morty
+- **Onboarding** new team members to the codebase
+- **Learning** new concepts or technologies used in the project
+- **Understanding** unfamiliar code before modifying it
+- **Reviewing** what changed and why
+- **Explaining** architecture decisions to stakeholders
+
+### Professor-Morty Commands
+
+```bash
+python scripts/explain.py code src/main.py --level 2
+python scripts/explain.py concept "dependency injection" --level 1
+python scripts/explain.py architecture --level 3
+python scripts/explain.py tour src/ --level 2
+python scripts/explain.py diff HEAD~3 --level 4
+python scripts/explain.py why src/utils/cache.py --level 2
+```
+
+---
+
 ## Mr. Meeseeks — Ephemeral One-Shot Agent
 
 Mr. Meeseeks is NOT a Morty. He's summoned from the Meeseeks Box for **one single task**, completes it, and ceases to exist. No persistent role, no long-running assignments. Just pure, focused, one-shot execution.

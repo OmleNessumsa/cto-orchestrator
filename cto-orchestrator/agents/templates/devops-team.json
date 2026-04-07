@@ -1,0 +1,18 @@
+{
+  "id": "devops-team",
+  "description": "Infrastructure and deployment team",
+  "roles": [
+    {
+      "role": "devops-morty",
+      "focus": "infrastructure and CI/CD"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "service configuration"
+    }
+  ],
+  "coordination": {
+    "mode": "parallel",
+    "lead": "devops-morty"
+  }
+}
