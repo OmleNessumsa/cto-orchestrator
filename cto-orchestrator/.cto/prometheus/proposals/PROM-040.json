@@ -1,0 +1,18 @@
+{
+  "id": "PROM-040",
+  "title": "Fix emoji-width alignment bugs in visual.py box rendering",
+  "category": "ui-ux",
+  "source": "Unicode terminal rendering \u2014 WCWIDTH standard for character display widths",
+  "description": "visual.py uses ljust() for column alignment (lines 233, 243, 274, etc.), but Python's ljust() counts characters, not display width. Emoji like \ud83e\uddea and \ud83d\udee1\ufe0f occupy 2 terminal columns but count as 1-2 characters, causing all boxes to misalign. This is visible in every rendered board \u2014 right borders don't line up. The fix is straightforward with wcwidth or a simple helper function.",
+  "impact_score": 6,
+  "risk_score": 1,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/visual.py"
+  ],
+  "proposed_changes": "Add a `display_width(s: str) -> int` helper using unicodedata.east_asian_width() to calculate true terminal display width of strings containing emoji. Then add `pad_to_width(s: str, width: int) -> str` that pads with spaces based on display width instead of character count. Replace all ljust() calls in render_team_board(), render_sprint_dashboard(), and render_morty_box() with pad_to_width(). Alternatively, add `wcwidth` as an optional dependency for more accurate width calculation. This immediately fixes the broken box borders visible in every visual.py output.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:39:45.813185+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

@@ -291,5 +291,299 @@
       "scripts/security_utils.py",
       "scripts/delegate.py"
     ]
+  },
+  {
+    "timestamp": "2026-03-21T09:37:58.615226+00:00",
+    "proposal_id": "PROM-026",
+    "action": "self-reported",
+    "title": "Test: startup sequence template placeholders not aligned",
+    "severity": "low",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-03-21T10:03:24.798315+00:00",
+    "proposal_id": "PROM-022",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-03-21T10:08:24.821248+00:00",
+    "proposal_id": "PROM-024",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-03-21T10:24:38.132515+00:00",
+    "proposal_id": "PROM-024",
+    "action": "applied",
+    "title": "Implement Builder-Validator pattern with tool restrictions",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/delegate.py",
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-03-21T10:32:38.163293+00:00",
+    "proposal_id": "PROM-015",
+    "action": "failed",
+    "reason": "Evolve timed out after 480s"
+  },
+  {
+    "timestamp": "2026-03-21T10:40:38.205596+00:00",
+    "proposal_id": "PROM-007",
+    "action": "failed",
+    "reason": "Evolve timed out after 480s"
+  },
+  {
+    "timestamp": "2026-03-21T13:38:45.651857+00:00",
+    "proposal_id": "PROM-020",
+    "action": "applied",
+    "title": "Secure inter-agent communication and memory integrity",
+    "target_files": [
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-03-21T14:02:47.214622+00:00",
+    "proposal_id": "PROM-026",
+    "action": "rejected",
+    "reason": "self-protection"
+  },
+  {
+    "timestamp": "2026-04-06T09:33:54.455618+00:00",
+    "proposal_id": "PROM-027",
+    "action": "created",
+    "title": "Adaptive Agent Routing with Capability-Based Selection",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-06T09:33:54.457647+00:00",
+    "proposal_id": "PROM-028",
+    "action": "created",
+    "title": "Structured Agent Handoff Protocol (A2A-Inspired)",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-06T09:33:54.458534+00:00",
+    "proposal_id": "PROM-029",
+    "action": "created",
+    "title": "Agent Reflection Loop with Self-Critique",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-06T09:33:54.459376+00:00",
+    "proposal_id": "PROM-030",
+    "action": "created",
+    "title": "Dynamic Team Composition Based on Ticket DAG Analysis",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-06T09:33:54.460255+00:00",
+    "proposal_id": "PROM-031",
+    "action": "created",
+    "title": "Agent Memory and Context Window Management",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-06T09:37:05.162121+00:00",
+    "proposal_id": "PROM-032",
+    "action": "created",
+    "title": "Add few-shot examples to agent output format prompts",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-04-06T09:37:05.164617+00:00",
+    "proposal_id": "PROM-033",
+    "action": "created",
+    "title": "Implement thinking-budget-aware delegation with extended thinking",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-04-06T09:37:05.165579+00:00",
+    "proposal_id": "PROM-034",
+    "action": "created",
+    "title": "Add role-specific evaluation rubrics to agent prompts",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-04-06T09:37:05.166699+00:00",
+    "proposal_id": "PROM-035",
+    "action": "created",
+    "title": "Structured prefill anchoring for JSON output extraction",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-04-06T09:37:05.167748+00:00",
+    "proposal_id": "PROM-036",
+    "action": "created",
+    "title": "Add contextual negative examples for common failure modes",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-04-06T09:39:45.807729+00:00",
+    "proposal_id": "PROM-037",
+    "action": "created",
+    "title": "Replace print-based ASCII rendering with Rich library for terminal UI",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-04-06T09:39:45.810770+00:00",
+    "proposal_id": "PROM-038",
+    "action": "created",
+    "title": "Add structured event payloads with progress percentage to Rick Terminal",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-04-06T09:39:45.812301+00:00",
+    "proposal_id": "PROM-039",
+    "action": "created",
+    "title": "Add Server-Sent Events (SSE) stream as alternative to fire-and-forget HTTP POST",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-04-06T09:39:45.813440+00:00",
+    "proposal_id": "PROM-040",
+    "action": "created",
+    "title": "Fix emoji-width alignment bugs in visual.py box rendering",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-04-06T09:39:45.814315+00:00",
+    "proposal_id": "PROM-041",
+    "action": "created",
+    "title": "Add dark/light theme support and ANSI color coding to terminal output",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-04-06T09:42:06.104930+00:00",
+    "proposal_id": "PROM-042",
+    "action": "created",
+    "title": "Block prompt injection instead of warn-only",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-04-06T09:42:06.107167+00:00",
+    "proposal_id": "PROM-043",
+    "action": "created",
+    "title": "Sanitize target_files input in meeseeks.py",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-04-06T09:42:06.108173+00:00",
+    "proposal_id": "PROM-044",
+    "action": "created",
+    "title": "Enforce consistent dual-condition permission bypass",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-04-06T09:42:06.109091+00:00",
+    "proposal_id": "PROM-045",
+    "action": "created",
+    "title": "Add structured output schema validation for agent responses",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-04-06T09:42:06.110084+00:00",
+    "proposal_id": "PROM-046",
+    "action": "created",
+    "title": "Add secret detection to prevent credential leakage in prompts and logs",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-04-06T09:43:38.773046+00:00",
+    "proposal_id": "PROM-047",
+    "action": "rejected",
+    "reason": "self-protection"
+  },
+  {
+    "timestamp": "2026-04-06T09:43:38.774717+00:00",
+    "proposal_id": "PROM-048",
+    "action": "created",
+    "title": "Add MCP server for ticket/team state management",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-04-06T09:43:38.776478+00:00",
+    "proposal_id": "PROM-049",
+    "action": "created",
+    "title": "Add structured output schemas for agent responses",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-04-06T09:43:38.777563+00:00",
+    "proposal_id": "PROM-050",
+    "action": "created",
+    "title": "Add agent execution hooks for pre/post delegation",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-04-06T09:43:38.778653+00:00",
+    "proposal_id": "PROM-051",
+    "action": "created",
+    "title": "Add --resume flag for interrupted agent sessions",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-04-06T09:44:54.700169+00:00",
+    "proposal_id": "PROM-052",
+    "action": "rejected",
+    "reason": "self-protection"
+  },
+  {
+    "timestamp": "2026-04-06T09:44:54.702693+00:00",
+    "proposal_id": "PROM-053",
+    "action": "created",
+    "title": "Use structured output (JSON mode) for agent responses",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-04-06T09:44:54.704746+00:00",
+    "proposal_id": "PROM-054",
+    "action": "created",
+    "title": "Add streaming output for real-time Morty progress",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-04-06T09:44:54.705770+00:00",
+    "proposal_id": "PROM-055",
+    "action": "created",
+    "title": "Leverage extended thinking for architect-morty and security-morty",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-04-06T09:44:54.706943+00:00",
+    "proposal_id": "PROM-056",
+    "action": "created",
+    "title": "Use claude -p with --append-system-prompt for agent personas",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-04-07T06:10:38.426120+00:00",
+    "proposal_id": "PROM-048",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-04-07T06:12:25.602804+00:00",
+    "proposal_id": "PROM-033",
+    "action": "applied",
+    "title": "Implement thinking-budget-aware delegation with extended thinking",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T06:16:51.594061+00:00",
+    "proposal_id": "PROM-042",
+    "action": "applied",
+    "title": "Block prompt injection instead of warn-only",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/orchestrate.py"
+    ]
   }
 ]

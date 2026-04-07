@@ -1,0 +1,21 @@
+{
+  "id": "PROM-046",
+  "title": "Add secret detection to prevent credential leakage in prompts and logs",
+  "category": "security",
+  "source": "Supply chain security best practices 2025 \u2014 secret scanning in AI pipelines",
+  "description": "The system currently strips CLAUDECODE from the environment but has no mechanism to detect secrets (API keys, tokens, passwords) that may appear in ticket descriptions, agent prompts, or log output. A ticket description containing a leaked credential would be passed directly to Claude and potentially logged in .cto/logs/ JSONL files in plaintext.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/security_utils.py",
+    "scripts/delegate.py",
+    "scripts/orchestrate.py",
+    "scripts/meeseeks.py"
+  ],
+  "proposed_changes": "1. Add a detect_secrets(text: str) -> list[dict] function in security_utils.py with regex patterns for common secret formats: AWS keys (AKIA...), GitHub tokens (ghp_/gho_/ghs_), generic API keys (Bearer/sk-/pk_), base64-encoded credentials, and high-entropy strings resembling secrets. 2. Add a redact_secrets(text: str) -> str function that replaces detected secrets with [REDACTED-TYPE]. 3. In delegate.py, orchestrate.py, and meeseeks.py, run redact_secrets() on all content written to .cto/logs/ JSONL files. 4. In the prompt construction path, run detect_secrets() on ticket descriptions and user input; if secrets are found, warn and optionally redact before sending to Claude. 5. Add CTO_SECRET_SCAN_MODE env var: 'warn' (default) or 'redact' to control behavior.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:42:06.109883+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

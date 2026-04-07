@@ -1,0 +1,20 @@
+{
+  "id": "PROM-050",
+  "title": "Add agent execution hooks for pre/post delegation",
+  "category": "tooling",
+  "source": "Claude Code hooks system and CI/CD pipeline patterns for agent orchestration (2025-2026)",
+  "description": "The system lacks extension points around agent delegation. Adding a hooks system (inspired by Claude Code's own hooks architecture) would allow: pre-delegation validation (lint checks, dependency verification), post-delegation processing (auto-review, metric collection), and failure handling (retry logic, escalation). This makes the delegation pipeline composable and extensible without modifying core scripts.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/hooks.py",
+    ".cto/config.json"
+  ],
+  "proposed_changes": "Create `scripts/hooks.py` with a hook runner that loads hook definitions from `.cto/config.json` under a `hooks` key. Support these hook points: (1) `pre_delegate` \u2014 runs before agent execution (e.g., validate ticket has acceptance criteria, check no conflicting in-progress tickets); (2) `post_delegate` \u2014 runs after successful completion (e.g., auto-run tests, update metrics dashboard); (3) `on_failure` \u2014 runs on agent failure (e.g., retry with different model, notify via roro event); (4) `on_review` \u2014 runs during review phase. Each hook is a shell command or Python callable. In delegate.py, add hook invocations around the `delegate_to_agent()` call in `main()` (around line 925): call `run_hooks('pre_delegate', ticket, agent)` before execution and `run_hooks('post_delegate', ticket, agent, output)` after. Add hook config examples to `.cto/config.json`.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:43:38.777326+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

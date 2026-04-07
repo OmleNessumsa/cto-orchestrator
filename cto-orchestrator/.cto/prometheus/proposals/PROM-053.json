@@ -1,0 +1,20 @@
+{
+  "id": "PROM-053",
+  "title": "Use structured output (JSON mode) for agent responses",
+  "category": "claude-features",
+  "source": "Anthropic API structured output / tool_use response format",
+  "description": "Agent outputs are currently parsed from raw stdout using regex (e.g., delegate.py parses JSON from text, meeseeks.py uses regex to extract fields like **Beschrijving** and **Complexiteit**). Claude supports structured output via tool_use and JSON mode, guaranteeing valid JSON responses that match a schema \u2014 eliminating fragile regex parsing and reducing agent output failures.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/meeseeks.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "Define response schemas in schemas.py for each agent type (e.g., MortyTaskResult with status, files_changed, summary, description fields). When using the API or Agent SDK, pass these as tool definitions or response_format constraints. Update delegate.py's output parsing (around line 778+) and meeseeks.py's parse_meeseeks_output() to consume structured JSON directly instead of regex-parsing raw text. This eliminates the fragile regex patterns like `re.search(r'\\*\\*Beschrijving\\*\\*:')` in meeseeks.py.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:44:54.701773+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

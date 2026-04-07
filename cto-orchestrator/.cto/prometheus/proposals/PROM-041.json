@@ -1,0 +1,18 @@
+{
+  "id": "PROM-041",
+  "title": "Add dark/light theme support and ANSI color coding to terminal output",
+  "category": "ui-ux",
+  "source": "Modern CLI UX patterns \u2014 color-coded output improves scanability by 2-3x for status-heavy dashboards",
+  "description": "visual.py outputs monochrome text with emoji as the only visual differentiation. In a busy sprint dashboard with 10+ tickets, scanning for blocked or failed items requires reading each status. ANSI color coding (green=done, yellow=working, red=blocked, cyan=in_review) makes status instantly scannable. This follows the pattern used by tools like kubectl, docker, and git status.",
+  "impact_score": 6,
+  "risk_score": 1,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/visual.py"
+  ],
+  "proposed_changes": "Add a minimal ANSI color module at the top of visual.py: STATUS_COLORS mapping status names to ANSI escape codes (green for completed/done, yellow for working/in_progress, red for blocked/failed, cyan for in_review, magenta for testing, dim for pending). Add `colorize(text: str, status: str) -> str` helper. Apply colors to: (1) status text in team boards and sprint dashboards, (2) progress bar fills (green when >80%, yellow 40-80%, red <40%), (3) box borders (dim for pending agents, bright for active). Add `--no-color` flag and respect NO_COLOR env variable per no-color.org convention. Detect non-TTY output and auto-disable colors when piped.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:39:45.814111+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

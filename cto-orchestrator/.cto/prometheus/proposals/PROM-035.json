@@ -1,0 +1,19 @@
+{
+  "id": "PROM-035",
+  "title": "Structured prefill anchoring for JSON output extraction",
+  "category": "prompt-engineering",
+  "source": "Anthropic docs on prefilling Claude's response \u2014 anchoring the response start with a partial JSON structure dramatically improves structured output compliance",
+  "description": "The current system asks agents to end with a JSON report block but relies on regex extraction from freeform output (parse_agent_output, line 703). When using the Claude API directly (or claude -p), prefilling the assistant response with the start of the expected structure forces the model to continue in that format. Since the system uses claude -p (subprocess), this can be achieved by appending a response-anchoring suffix to the prompt that strongly cues the model to produce the JSON block in a predictable location.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/meeseeks.py"
+  ],
+  "proposed_changes": "In the prompt assembly function (around line 699, after the output_format section), append a response-anchoring cue: '\\n---\\nNow execute the ticket. After completing all work, your FINAL output must be the JSON report block \u2014 no text after it.\\n\\nBegin:\\n'. This 'Begin:' cue anchors the model into execution mode. Additionally, in parse_agent_output() (line 703), improve JSON extraction robustness by searching for the LAST ```json block in the output rather than the first, since the final block is most likely to be the actual report (agents may show JSON in their reasoning). Change the regex to use rfind or re.findall and take [-1].",
+  "status": "pending",
+  "created_at": "2026-04-06T09:37:05.166353+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

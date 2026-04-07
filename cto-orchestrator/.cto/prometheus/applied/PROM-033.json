@@ -1,0 +1,23 @@
+{
+  "id": "PROM-033",
+  "title": "Implement thinking-budget-aware delegation with extended thinking",
+  "category": "prompt-engineering",
+  "source": "Anthropic extended thinking documentation \u2014 enables Claude to reason internally before responding, dramatically improving complex multi-step tasks",
+  "description": "The system currently uses a manual reasoning_protocol XML tag asking agents to show their reasoning. Claude's extended thinking (--thinking budget) provides a native, more powerful alternative where the model reasons internally before generating output. For complex tickets (L/XL complexity or architect/security roles), enabling extended thinking would produce significantly better architectural decisions and more thorough security reviews. The current ANALYZE\u2192PLAN\u2192VERIFY\u2192EXECUTE protocol can remain as a lightweight fallback for simple tasks while extended thinking handles complex ones.",
+  "impact_score": 9,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "In delegate.py's delegate_to_agent() function (line 778), add support for passing --thinking-budget to the claude subprocess. Add a thinking_budget parameter (default None). When set, append ['--thinking-budget', str(thinking_budget)] to the cmd list. In cmd_delegate() (line 839), determine thinking budget based on ticket complexity and agent role: XL/L tickets or architect-morty/security-morty get thinking_budget=10000, M tickets get 5000, S/XS get None (disabled). In orchestrate.py's plan_prompt (line 426), always pass thinking_budget=15000 for planning since it benefits most from deep reasoning. Update the reasoning_protocol section to say 'Use your internal thinking to reason deeply, then show a brief summary of your approach before executing.'",
+  "status": "applied",
+  "created_at": "2026-04-06T09:37:05.163742+00:00",
+  "applied_at": "2026-04-07T06:12:25.601555+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-033-20260407T061038",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ]
+}

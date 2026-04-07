@@ -1,0 +1,22 @@
+{
+  "id": "PROM-047",
+  "title": "Use Claude Agent SDK instead of subprocess spawning",
+  "category": "tooling",
+  "source": "Claude Agent SDK documentation and multi-agent orchestration best practices (Anthropic docs, 2025-2026)",
+  "description": "The system currently spawns Morty agents via `subprocess.run(['claude', '-p', ...])` which is brittle, loses structured output, and has no native support for streaming, tool use, or conversation continuity. The Claude Agent SDK (claude_agent_sdk) provides a Python-native way to orchestrate sub-agents with proper typed outputs, tool definitions, streaming callbacks, and conversation management \u2014 eliminating shell escaping issues and enabling richer agent-to-agent communication.",
+  "impact_score": 9,
+  "risk_score": 5,
+  "effort_score": 8,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py",
+    "scripts/meeseeks.py",
+    "scripts/prometheus.py"
+  ],
+  "proposed_changes": "Replace `delegate_to_agent()` in delegate.py (line 778) to use the Claude Agent SDK's `Agent` class instead of subprocess. Create a new `scripts/agent_client.py` module that wraps the SDK: (1) Initialize an Agent with model, system prompt from agent JSON configs, and MCP tools; (2) Use `agent.run()` with structured output schemas for ticket results; (3) Add streaming callbacks that emit roro events in real-time instead of waiting for full completion; (4) Update orchestrate.py's sprint loop to use agent handles for concurrent execution via asyncio instead of `concurrent.futures` with subprocess. Keep `claude -p` as a fallback via env var `CTO_USE_SDK=true` to enable gradual migration.",
+  "status": "rejected",
+  "created_at": "2026-04-06T09:43:38.772655+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Self-protection: cannot modify Prometheus engine"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "PROM-037",
+  "title": "Replace print-based ASCII rendering with Rich library for terminal UI",
+  "category": "ui-ux",
+  "source": "Python Rich library best practices (github.com/Textualize/rich) \u2014 widely adopted standard for modern terminal UIs",
+  "description": "visual.py builds all UI with raw print() and manual string padding/ljust(). This leads to broken alignment when emoji widths vary across terminals, no color support, and fragile box-drawing. The Rich library provides Tables, Panels, Progress bars, Live displays, and Tree views with automatic width handling and true-color support \u2014 all zero-config.",
+  "impact_score": 9,
+  "risk_score": 2,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/visual.py",
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Add `rich` to dependencies. Refactor visual.py to use: (1) `rich.table.Table` for team boards and sprint dashboards instead of manual box-drawing with ljust padding, (2) `rich.progress.Progress` for progress bars instead of manual \u2588/\u2591 construction, (3) `rich.panel.Panel` for agent status boxes with auto-width, (4) `rich.live.Live` context manager for animated portal frames instead of print+sleep+clear-screen, (5) `rich.tree.Tree` for mixed-mode team hierarchy visualization. This fixes the emoji-width alignment bugs (lines 233, 274 where ljust doesn't account for double-width emoji) and adds ANSI color theming (green portal, yellow status, red errors).",
+  "status": "pending",
+  "created_at": "2026-04-06T09:39:45.806654+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

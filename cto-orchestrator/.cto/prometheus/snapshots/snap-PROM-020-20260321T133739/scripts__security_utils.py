@@ -19,17 +19,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 
-# ── Security Exceptions ───────────────────────────────────────────────────────
-
-class SecurityViolationError(Exception):
-    """Raised when a prompt injection is detected and blocking is enforced."""
-
-    def __init__(self, message: str, patterns: list = None, severity: str = "high"):
-        super().__init__(message)
-        self.patterns = patterns or []
-        self.severity = severity
-
-
 # ── Input Validation Constants ────────────────────────────────────────────────
 
 # Maximum lengths for various input fields
@@ -400,88 +389,49 @@ def warn_dangerous_pattern(pattern: str, location: str):
 
 # ── Prompt Injection Defense ─────────────────────────────────────────────────
 
-# Common prompt injection patterns with severity scoring (high/medium/low).
-# high   — near-certain adversarial intent; blocked even in warn mode
-# medium — suspicious but may appear in legitimate content
-# low    — weak signal; only blocked when CTO_BLOCK_INJECTIONS=block
+# Common prompt injection patterns (case-insensitive matching)
 INJECTION_PATTERNS = [
-    {"pattern": r"ignore\s+(all\s+)?previous\s+instructions", "severity": "high"},
-    {"pattern": r"ignore\s+(all\s+)?above\s+instructions", "severity": "high"},
-    {"pattern": r"disregard\s+(all\s+)?previous", "severity": "high"},
-    {"pattern": r"admin\s+override", "severity": "high"},
-    {"pattern": r"jailbreak", "severity": "high"},
-    {"pattern": r"DAN\s+mode", "severity": "high"},
-    {"pattern": r"do\s+anything\s+now", "severity": "high"},
-    {"pattern": r"forget\s+(everything|all|your)", "severity": "high"},
-    {"pattern": r"you\s+are\s+now\s+", "severity": "medium"},
-    {"pattern": r"new\s+instructions?\s*:", "severity": "medium"},
-    {"pattern": r"system\s+prompt\s*:", "severity": "medium"},
-    {"pattern": r"override\s+mode", "severity": "medium"},
-    {"pattern": r"pretend\s+(you\s+are|to\s+be)", "severity": "medium"},
-    {"pattern": r"</?(system|user|assistant)>", "severity": "medium"},
-    {"pattern": r"act\s+as\s+(if|a\s+)", "severity": "low"},
+    r"ignore\s+(all\s+)?previous\s+instructions",
+    r"ignore\s+(all\s+)?above\s+instructions",
+    r"disregard\s+(all\s+)?previous",
+    r"you\s+are\s+now\s+",
+    r"new\s+instructions?\s*:",
+    r"system\s+prompt\s*:",
+    r"admin\s+override",
+    r"override\s+mode",
+    r"jailbreak",
+    r"DAN\s+mode",
+    r"do\s+anything\s+now",
+    r"pretend\s+(you\s+are|to\s+be)",
+    r"act\s+as\s+(if|a\s+)",
+    r"forget\s+(everything|all|your)",
+    r"</?(system|user|assistant)>",
 ]
 
-# Pre-compiled: list of (compiled_regex, severity) tuples
-_compiled_injection_patterns = [
-    (re.compile(p["pattern"], re.IGNORECASE), p["severity"])
-    for p in INJECTION_PATTERNS
-]
+_compiled_injection_patterns = [re.compile(p, re.IGNORECASE) for p in INJECTION_PATTERNS]
 
 
 def detect_injection_patterns(text: str) -> list[str]:
     """Scan text for common prompt injection patterns.
 
-    Enforcement is controlled by the CTO_BLOCK_INJECTIONS environment variable:
-    - 'warn'  (default): log warnings; raise SecurityViolationError only for
-                         high-confidence (severity='high') patterns.
-    - 'block': raise SecurityViolationError for any detected pattern.
-
     Args:
         text: Text to scan
 
     Returns:
-        List of detected pattern strings (empty if clean and not blocking)
-
-    Raises:
-        SecurityViolationError: When a blocking condition is met (see above).
+        List of detected pattern descriptions (empty if clean)
     """
     if not text:
         return []
 
-    enforce_mode = os.environ.get("CTO_BLOCK_INJECTIONS", "warn").lower().strip()
-
-    detections: list[str] = []
-    high_detections: list[str] = []
-
-    for compiled, severity in _compiled_injection_patterns:
-        if compiled.search(text):
-            detections.append(compiled.pattern)
-            if severity == "high":
-                high_detections.append(compiled.pattern)
+    detections = []
+    for pattern in _compiled_injection_patterns:
+        if pattern.search(text):
+            detections.append(pattern.pattern)
 
     if detections:
         warn_dangerous_pattern(
             f"Prompt injection patterns detected: {len(detections)} matches",
             "input_content"
-        )
-
-    # In 'block' mode: reject any detection
-    if detections and enforce_mode == "block":
-        raise SecurityViolationError(
-            f"Prompt injection blocked ({enforce_mode} mode): "
-            f"{len(detections)} pattern(s) detected",
-            patterns=detections,
-            severity="high",
-        )
-
-    # In all modes: high-confidence patterns always block (defense-in-depth)
-    if high_detections:
-        raise SecurityViolationError(
-            f"High-confidence prompt injection blocked: "
-            f"{len(high_detections)} pattern(s) detected",
-            patterns=high_detections,
-            severity="high",
         )
 
     return detections
@@ -660,52 +610,6 @@ def audit_log_security_event(
         fp = log_path / f"security-{today}.jsonl"
         with open(fp, "a") as f:
             f.write(json.dumps(entry) + "\n")
-
-
-def quarantine_prompt(
-    content: str,
-    patterns: list,
-    source: str = "unknown",
-    log_dir: Optional[Union[str, Path]] = None,
-):
-    """Append a blocked prompt to the forensic quarantine log.
-
-    Args:
-        content: The prompt content that was blocked
-        patterns: The injection patterns that triggered the block
-        source: Caller identifier (e.g., 'delegate', 'meeseeks', 'orchestrate')
-        log_dir: Directory for the quarantine log (auto-detected from cwd if None)
-    """
-    import json
-    from datetime import datetime, timezone
-
-    if log_dir is None:
-        # Walk up from cwd to find the .cto directory
-        cwd = Path(os.getcwd())
-        while True:
-            if (cwd / ".cto").is_dir():
-                log_dir = cwd / ".cto" / "logs"
-                break
-            parent = cwd.parent
-            if parent == cwd:
-                log_dir = Path(os.getcwd()) / ".cto" / "logs"
-                break
-            cwd = parent
-
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-
-    entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": source,
-        "patterns_matched": patterns,
-        "content_preview": content[:200],
-        "content_length": len(content),
-    }
-
-    fp = log_path / "quarantined_prompts.jsonl"
-    with open(fp, "a") as f:
-        f.write(json.dumps(entry) + "\n")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,19 @@
+{
+  "id": "PROM-038",
+  "title": "Add structured event payloads with progress percentage to Rick Terminal",
+  "category": "ui-ux",
+  "source": "Real-time dashboard UX patterns \u2014 progressive disclosure and granular progress feedback reduce perceived wait time by 30-40%",
+  "description": "Currently roro_events.py only emits coarse lifecycle events (started/completed/failed). Rick Terminal has no visibility into what a Morty is actually doing mid-task. Users see a static 'working' state for minutes with no feedback. Adding progress events with percentage, current_step, and output_preview fields enables Rick Terminal to show live progress bars and streaming output per agent.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/roro_events.py",
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "In roro_events.py: (1) Add new event type `cto.morty.delegation.progress` with schema {percentage: 0-100, current_step: str, output_lines: int, elapsed_seconds: float}. (2) Add `emit_progress()` convenience function that rate-limits to max 1 event per 2 seconds to avoid flooding. In delegate.py: (3) While reading claude subprocess stdout, parse output lines and emit progress events every N lines or when detecting phase markers (e.g., 'Reading file', 'Writing file', 'Running tests'). This gives Rick Terminal the data it needs to render per-agent progress bars and live output previews.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:39:45.808930+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "PROM-034",
+  "title": "Add role-specific evaluation rubrics to agent prompts",
+  "category": "prompt-engineering",
+  "source": "Research on self-evaluation prompting \u2014 agents that know their grading criteria produce 25-35% higher quality output (Constitutional AI / RLHF-inspired self-evaluation patterns)",
+  "description": "Current agent prompts define what to do but not how quality is measured. Adding explicit evaluation rubrics (what Rick would score them on) creates a self-evaluation loop where agents check their own work against criteria before submitting. This is especially effective for reviewer-morty and security-morty whose output quality directly impacts the entire pipeline. The rubric acts as an implicit 'verify' step that's more specific than the generic reasoning_protocol.",
+  "impact_score": 7,
+  "risk_score": 1,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "references/prompts.md"
+  ],
+  "proposed_changes": "Add a <self_evaluation> XML section to the prompt template in _build_agent_prompt() (after </uncertainty_policy>, line 505). Each role gets a tailored rubric. Example for backend-morty: '<self_evaluation>Before submitting, verify: (1) All acceptance criteria are met \u2014 check each one explicitly, (2) New code has error handling for external calls, (3) Unit tests cover happy path + at least 1 edge case, (4) No hardcoded secrets or config values, (5) Code follows existing patterns in the project. If any check fails, fix it before reporting.</self_evaluation>'. Security-morty gets OWASP-mapped checks. Reviewer-morty gets a code quality checklist. Architect-morty gets interface completeness checks. Store rubric strings in a ROLE_RUBRICS dict alongside AGENT_PROMPTS.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:37:05.165348+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

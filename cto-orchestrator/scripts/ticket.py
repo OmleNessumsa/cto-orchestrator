@@ -202,7 +202,7 @@ def cmd_create(args):
         "type": args.type,
         "status": "backlog",
         "priority": args.priority,
-        "assigned_agent": None,
+        "assigned_agent": getattr(args, 'agent', None),
         "parent_ticket": args.parent or None,
         "dependencies": [d.strip() for d in args.depends.split(",")] if args.depends else [],
         "acceptance_criteria": [c.strip() for c in args.criteria.split("|")] if args.criteria else [],
@@ -440,6 +440,8 @@ def build_parser():
     c.add_argument("--depends", default=None, help="Comma-separated dependency ticket IDs")
     c.add_argument("--criteria", default=None, help="Pipe-separated acceptance criteria")
     c.add_argument("--complexity", default="M", choices=["XS", "S", "M", "L", "XL"])
+    c.add_argument("--agent", default=None,
+                   help="Assign agent (e.g. backend-morty, frontend-morty, devops-morty)")
     # Team collaboration options
     c.add_argument("--team-mode", default="solo", choices=["solo", "collaborative"],
                    help="Work mode: solo (single agent) or collaborative (team)")

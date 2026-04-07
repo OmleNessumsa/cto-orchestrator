@@ -37,19 +37,10 @@ try:
         wrap_untrusted_content,
         sanitize_agent_output,
         audit_log_security_event,
-        detect_injection_patterns,
-        quarantine_prompt,
-        SecurityViolationError,
         SANDWICH_REINFORCEMENT,
     )
 except ImportError:
     # Fallback implementations
-    class SecurityViolationError(Exception):
-        def __init__(self, message, patterns=None, severity="high"):
-            super().__init__(message)
-            self.patterns = patterns or []
-            self.severity = severity
-
     def sanitize_ticket_id(tid):
         if not tid or not re.match(r'^[A-Za-z0-9_-]+$', tid) or len(tid) > 20:
             raise ValueError(f"Invalid ticket ID: {tid}")
@@ -95,12 +86,6 @@ except ImportError:
         if severity in ("warning", "critical"):
             import sys
             print(f"[SECURITY-{severity.upper()}] {event_type}: {details[:200]}", file=sys.stderr)
-
-    def detect_injection_patterns(text):
-        return []
-
-    def quarantine_prompt(content, patterns, source="unknown", log_dir=None):
-        pass
 
 
 def find_cto_root(start=None) -> Path:
@@ -675,15 +660,14 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
 
     prompt += """
 <reasoning_protocol>
-Use your internal thinking to reason deeply, then show a brief summary of your approach before executing.
+Before writing any code, follow this thinking sequence:
 
-If extended thinking is not available, follow this fallback sequence:
 1. **ANALYZE** — Read the ticket, acceptance criteria, and any sprint context. Identify what exists, what's missing, and what constraints apply.
 2. **PLAN** — Outline your approach in 3-5 bullet points. List the files you'll create or modify and the interfaces you'll use.
 3. **VERIFY** — Check your plan against the acceptance criteria. Does it cover every requirement? Are there edge cases?
 4. **EXECUTE** — Implement the plan. Test as you go. If something doesn't work, loop back to ANALYZE with new information.
 
-Show a brief summary of your approach before diving into implementation — Rick respects agents who think before they code.
+Show your reasoning briefly before diving into implementation — Rick respects agents who think before they code.
 </reasoning_protocol>
 
 <execution_rules>
@@ -791,7 +775,7 @@ def parse_agent_output(output: str) -> dict:
     return result
 
 
-def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None) -> str:
+def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False) -> str:
     """Call a claude sub-agent with a specific prompt.
 
     SECURITY NOTE: The --dangerously-skip-permissions flag is only enabled when
@@ -803,7 +787,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         model: Model to use (opus, sonnet, haiku)
         timeout: Timeout in seconds
         skip_permissions: If True, MAY skip permissions (requires env var)
-        thinking_budget: Token budget for extended thinking (None = disabled)
 
     Returns:
         Agent output
@@ -813,22 +796,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     """
     # Sanitize the prompt to prevent prompt injection
     safe_prompt = sanitize_prompt_content(prompt)
-
-    # Block high-confidence injections before touching a subprocess (OWASP LLM01)
-    try:
-        detect_injection_patterns(safe_prompt)
-    except SecurityViolationError as exc:
-        audit_log_security_event(
-            "injection_blocked",
-            f"Prompt injection blocked in delegate_to_agent: {exc}",
-            severity="critical",
-        )
-        quarantine_prompt(safe_prompt, exc.patterns, source="delegate")
-        return (
-            f"[SECURITY VIOLATION] Prompt execution aborted — "
-            f"{len(exc.patterns)} injection pattern(s) detected. "
-            "Event logged and prompt quarantined."
-        )
 
     cmd = ["claude", "-p"]
 
@@ -843,8 +810,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
 
     if model:
         cmd.extend(["--model", model])
-    if thinking_budget is not None:
-        cmd.extend(["--thinking-budget", str(thinking_budget)])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -957,17 +922,9 @@ def cmd_delegate(args):
                 team["started_at"] = now_iso()
             save_json(team_fp, team)
 
-    # Determine thinking budget based on ticket complexity and agent role
-    complexity = ticket.get("estimated_complexity", "").upper()
-    thinking_budget = None
-    if agent in ("architect-morty", "security-morty") or complexity in ("XL", "L"):
-        thinking_budget = 10000
-    elif complexity == "M":
-        thinking_budget = 5000
-
     # Execute
     try:
-        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, thinking_budget=thinking_budget)
+        output = delegate_to_agent(prompt, model=model, timeout=args.timeout)
     except RuntimeError as e:
         error_msg = str(e)
         print(f"Ugh, {agent} screwed up: {error_msg}")

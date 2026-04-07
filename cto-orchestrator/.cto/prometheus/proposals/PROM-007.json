@@ -16,5 +16,5 @@
   "status": "pending",
   "created_at": "2026-03-01T08:55:17.732302+00:00",
   "applied_at": null,
-  "rollback_snapshot": null
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-007-20260321T103238"
 }

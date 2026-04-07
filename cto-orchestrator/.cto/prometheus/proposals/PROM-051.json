@@ -1,0 +1,18 @@
+{
+  "id": "PROM-051",
+  "title": "Add --resume flag for interrupted agent sessions",
+  "category": "tooling",
+  "source": "Claude Code session continuity and conversation resume patterns (Anthropic CLI docs, 2025-2026)",
+  "description": "When a Morty agent times out or fails mid-execution, all progress is lost and the ticket must be re-delegated from scratch. Claude Code supports `--resume` and `--continue` flags to resume conversations. By persisting the Claude session ID for each delegation and supporting resumption, interrupted work can be continued rather than restarted \u2014 saving tokens, time, and avoiding duplicate file changes.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "In delegate.py, modify `delegate_to_agent()` (line 778) to: (1) Capture the Claude session ID from the subprocess output/metadata and store it in the ticket JSON under `session_id`; (2) Add a `--resume` flag to the delegate CLI argument parser; (3) When `--resume` is passed for a ticket that has a stored `session_id`, use `claude --resume <session_id>` instead of `claude -p` with the full prompt, appending only a continuation instruction like 'Continue working on this ticket. Pick up where you left off.'; (4) In the error handler (line 928), when a timeout occurs, save the session_id to the ticket and set status to 'interrupted' instead of 'failed', allowing the user to resume with `python delegate.py --resume TICKET-ID`.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:43:38.778410+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

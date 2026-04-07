@@ -16,6 +16,7 @@ Commands:
 """
 
 import argparse
+import hashlib
 import json
 import os
 import py_compile
@@ -174,6 +175,33 @@ def is_self_protected(target_files: list[str]) -> bool:
         if basename in SELF_PROTECTED_FILES:
             return True
     return False
+
+
+def file_checksums(root: Path, target_files: list[str]) -> dict[str, str | None]:
+    """Compute SHA-256 checksums for target files.
+
+    Returns a dict mapping relative path → hex digest (or None if file
+    doesn't exist yet, which is valid for newly created files).
+    """
+    checksums = {}
+    for tf in target_files:
+        fp = root / tf
+        if fp.exists():
+            checksums[tf] = hashlib.sha256(fp.read_bytes()).hexdigest()
+        else:
+            checksums[tf] = None
+    return checksums
+
+
+def files_actually_changed(before: dict[str, str | None],
+                           after: dict[str, str | None]) -> list[str]:
+    """Compare before/after checksums. Return list of files that changed."""
+    changed = []
+    all_files = set(before) | set(after)
+    for f in all_files:
+        if before.get(f) != after.get(f):
+            changed.append(f)
+    return changed
 
 
 # ── Snapshot management ──────────────────────────────────────────────────────
@@ -582,6 +610,9 @@ def cmd_evolve(args):
             print(f"  Snapshot created: {snap_dir.name}")
             proposal["rollback_snapshot"] = str(snap_dir)
 
+        # Capture pre-evolve checksums for change verification
+        pre_checksums = file_checksums(root, target_files)
+
         # Build evolve prompt for Morty delegation
         evolve_prompt = f"""You are a code improvement agent. Apply the following upgrade to the codebase.
 
@@ -682,9 +713,38 @@ End with:
             })
             continue
 
+        # Verify files actually changed (prevent false-success)
+        post_checksums = file_checksums(root, target_files)
+        actually_changed = files_actually_changed(pre_checksums, post_checksums)
+
+        if not actually_changed:
+            print(f"  NO FILES CHANGED — Morty claimed success but modified nothing!")
+            proposal["status"] = "rejected"
+            proposal["reject_reason"] = "No files were actually modified (false success)"
+            save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+            prop_fp = dirs["proposals"] / f"{prom_id}.json"
+            if prop_fp.exists():
+                prop_fp.unlink()
+
+            emit("cto.prometheus.evolve.failed", {
+                "proposal_id": prom_id,
+                "error": "No files changed (false success)",
+            }, role="rick")
+
+            append_ledger(root, {
+                "timestamp": now_iso(),
+                "proposal_id": prom_id,
+                "action": "failed",
+                "reason": "no files changed (false success)",
+            })
+            continue
+
+        print(f"  Verified: {len(actually_changed)} file(s) modified: {', '.join(actually_changed)}")
+
         # Mark as applied
         proposal["status"] = "applied"
         proposal["applied_at"] = now_iso()
+        proposal["files_actually_changed"] = actually_changed
         save_json(dirs["applied"] / f"{prom_id}.json", proposal)
         prop_fp = dirs["proposals"] / f"{prom_id}.json"
         if prop_fp.exists():
@@ -877,6 +937,7 @@ def cmd_history(args):
         "rejected": "x",
         "failed": "!",
         "rolled_back": "<",
+        "self-reported": "🔥",
     }
 
     for entry in entries:
@@ -891,6 +952,9 @@ def cmd_history(args):
             extra = f" ({entry.get('title', '')[:30]})"
         elif action == "created":
             extra = f" [{entry.get('category', '?')}] {entry.get('title', '')[:30]}"
+        elif action == "self-reported":
+            sev = entry.get("severity", "?")
+            extra = f" [{sev}] {entry.get('title', '')[:30]}"
         elif action == "rolled_back":
             files = entry.get("files_restored", [])
             extra = f" ({len(files)} files restored)"
@@ -898,6 +962,132 @@ def cmd_history(args):
         print(f"  [{icon}] {ts}  {prom_id:<10} {action:<12}{extra}")
 
     print(f"{'─' * 60}")
+
+
+# ── Command: self-report ─────────────────────────────────────────────────────
+
+def orchestrator_root() -> Path:
+    """Return the cto-orchestrator project root (where this script lives).
+
+    Unlike find_cto_root() which walks up from cwd, this always resolves
+    to the orchestrator's own directory — so self-reports land in Rick's
+    own backlog regardless of which project you're working in.
+    """
+    return Path(__file__).parent.parent.resolve()
+
+
+def cmd_self_report(args):
+    """Report a bug/issue in the orchestrator's own tooling.
+
+    Creates a Prometheus proposal with source 'self-diagnosed' that targets
+    the orchestrator's own scripts. These get picked up by the next
+    `prometheus.py evolve` run.
+    """
+    root = orchestrator_root()
+    dirs = ensure_prometheus_dirs(root)
+
+    # Resolve target files — default to the file mentioned, or let Rick specify
+    target_files = []
+    if args.files:
+        target_files = [f.strip() for f in args.files.split(",")]
+    elif args.script:
+        target_files = [f"scripts/{args.script}"]
+
+    # Determine category
+    category = args.category or "self-diagnosed"
+
+    # Severity → impact/risk mapping
+    severity_map = {
+        "critical": (10, 9, 3),   # high impact, high risk, fix fast
+        "high":     (8, 6, 4),
+        "medium":   (6, 4, 5),
+        "low":      (4, 2, 6),
+    }
+    impact, risk, effort = severity_map.get(args.severity, (6, 4, 5))
+
+    # Build the proposal
+    prom_id = next_proposal_id(dirs)
+
+    proposal = {
+        "id": prom_id,
+        "title": sanitize_text_input(args.title, max_length=200),
+        "category": category,
+        "source": "self-diagnosed",
+        "source_context": sanitize_text_input(args.context or "", max_length=1000),
+        "description": sanitize_text_input(args.description or args.title, max_length=2000),
+        "impact_score": impact,
+        "risk_score": risk,
+        "effort_score": effort,
+        "target_files": target_files[:10],
+        "proposed_changes": sanitize_text_input(
+            args.fix_hint or "Investigate and fix the reported issue.", max_length=3000
+        ),
+        "status": "pending",
+        "severity": args.severity,
+        "reported_from_project": str(Path.cwd()),
+        "created_at": now_iso(),
+        "applied_at": None,
+        "rollback_snapshot": None,
+    }
+
+    # Self-protection still applies
+    if is_self_protected(target_files):
+        proposal["status"] = "rejected"
+        proposal["reject_reason"] = "Self-protection: cannot modify Prometheus engine"
+        save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+        print(f"  {prom_id}: REJECTED (self-protection) — {proposal['title']}")
+        append_ledger(root, {
+            "timestamp": now_iso(),
+            "proposal_id": prom_id,
+            "action": "rejected",
+            "reason": "self-protection",
+        })
+        return
+
+    save_json(dirs["proposals"] / f"{prom_id}.json", proposal)
+
+    emit("cto.prometheus.self_report.created", {
+        "proposal_id": prom_id,
+        "title": proposal["title"],
+        "severity": args.severity,
+        "target_files": target_files,
+        "source_project": str(Path.cwd()),
+    }, role="rick")
+
+    append_ledger(root, {
+        "timestamp": now_iso(),
+        "proposal_id": prom_id,
+        "action": "self-reported",
+        "title": proposal["title"],
+        "severity": args.severity,
+        "category": category,
+    })
+
+    append_log(root, {
+        "timestamp": now_iso(),
+        "ticket_id": None,
+        "agent": "prometheus",
+        "action": "self_report",
+        "message": f"Self-diagnosed issue: {proposal['title']}",
+        "files_changed": [],
+    })
+
+    title_display = proposal['title'][:44] + ".." if len(proposal['title']) > 46 else proposal['title']
+    targets_display = ', '.join(target_files)[:44] + ".." if len(', '.join(target_files)) > 46 else ', '.join(target_files)
+
+    print(f"""
+┌───────────────────────────────────────────────────────────┐
+│  🔥 PROMETHEUS — Self-Diagnosed Issue Reported            │
+├───────────────────────────────────────────────────────────┤
+│  ID:       {prom_id:<48}│
+│  Title:    {title_display:<48}│
+│  Severity: {args.severity:<48}│
+│  Targets:  {targets_display:<48}│
+│  Source:   self-diagnosed                                 │
+├───────────────────────────────────────────────────────────┤
+│  Queued for next `prometheus.py evolve` run.              │
+│  *Burrrp* Rick fixes his own bugs. Unlike you people.    │
+└───────────────────────────────────────────────────────────┘""")
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
@@ -938,6 +1128,24 @@ def build_parser():
     rb = sub.add_parser("rollback", help="Rollback a proposal")
     rb.add_argument("proposal_id", help="Proposal ID to rollback (e.g., PROM-001)")
 
+    # self-report
+    sr = sub.add_parser("self-report", help="Report a bug/issue in Rick's own tooling")
+    sr.add_argument("title", help="Short description of the bug/issue")
+    sr.add_argument("--description", default=None, help="Detailed description")
+    sr.add_argument("--severity", default="medium",
+                    choices=["critical", "high", "medium", "low"],
+                    help="Issue severity (default: medium)")
+    sr.add_argument("--files", default=None,
+                    help="Comma-separated target files (relative to orchestrator root)")
+    sr.add_argument("--script", default=None,
+                    help="Shorthand: script name in scripts/ (e.g., 'delegate.py')")
+    sr.add_argument("--category", default=None,
+                    help="Category override (default: self-diagnosed)")
+    sr.add_argument("--context", default=None,
+                    help="Context: what were you doing when the bug occurred?")
+    sr.add_argument("--fix-hint", default=None,
+                    help="Hint for how to fix this issue")
+
     return p
 
 
@@ -951,6 +1159,7 @@ def main():
         "status": cmd_status,
         "history": cmd_history,
         "rollback": cmd_rollback,
+        "self-report": cmd_self_report,
     }
     dispatch[args.command](args)
 

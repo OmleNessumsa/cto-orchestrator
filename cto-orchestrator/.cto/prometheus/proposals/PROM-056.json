@@ -1,0 +1,19 @@
+{
+  "id": "PROM-056",
+  "title": "Use claude -p with --append-system-prompt for agent personas",
+  "category": "claude-features",
+  "source": "Claude Code CLI --append-system-prompt flag for injecting system-level instructions",
+  "description": "Agent personas and system instructions are currently embedded in the user prompt (build_prompt in delegate.py), mixing instructions with task content. Claude Code supports --append-system-prompt to inject system-level instructions separately, which Claude treats with higher authority than user-prompt instructions. This provides better prompt injection resistance and cleaner separation of persona from task.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/meeseeks.py"
+  ],
+  "proposed_changes": "Split build_prompt() in delegate.py into two parts: (1) a system prompt containing the agent persona, role instructions, security boundaries, and SANDWICH_REINFORCEMENT, and (2) a user prompt containing only the task description, ticket context, and project structure. Pass the system prompt via `--append-system-prompt` flag in the claude subprocess call. This cleanly separates trusted instructions from potentially untrusted task content, improving the effectiveness of the existing prompt injection defenses in security_utils.py.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:44:54.706683+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

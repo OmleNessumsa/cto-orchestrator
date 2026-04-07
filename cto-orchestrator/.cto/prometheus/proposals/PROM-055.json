@@ -1,0 +1,20 @@
+{
+  "id": "PROM-055",
+  "title": "Leverage extended thinking for architect-morty and security-morty",
+  "category": "claude-features",
+  "source": "Anthropic Claude extended thinking feature (thinking blocks in API)",
+  "description": "The architect-morty and security-morty roles handle complex reasoning tasks (architecture decisions, security analysis) that benefit from Claude's extended thinking capability. Extended thinking gives the model a dedicated reasoning scratchpad before responding, significantly improving output quality for multi-step planning and analysis tasks \u2014 exactly what these Opus-tier agents need.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "agents/architect-morty.json",
+    "agents/security-morty.json"
+  ],
+  "proposed_changes": "When delegating to architect-morty or security-morty (the Opus-tier agents in AGENT_MODELS), add `--thinking` or the equivalent extended thinking parameter to the claude subprocess call. In delegate.py's delegate_to_agent(), check if the model is 'opus' and the agent is in a reasoning-heavy role, then enable extended thinking. Update the agent JSON configs to include a 'use_extended_thinking: true' flag. Parse and optionally log the thinking blocks separately from the final output for debugging/audit purposes.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:44:54.705558+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

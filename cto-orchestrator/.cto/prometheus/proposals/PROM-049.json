@@ -1,0 +1,20 @@
+{
+  "id": "PROM-049",
+  "title": "Add structured output schemas for agent responses",
+  "category": "tooling",
+  "source": "Claude structured output and JSON mode best practices (Anthropic API docs, 2025-2026)",
+  "description": "Agent output parsing in delegate.py relies on fragile regex extraction of JSON from free-text responses (parsing team updates via regex in `parse_team_agent_output`). Claude now supports enforced JSON schema output via `--output-format json` with schema definitions. Using structured output eliminates parsing failures, ensures all required fields are present, and makes team communication reliable.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "In `scripts/schemas.py`, define JSON schemas for agent responses: (1) `AgentTicketResponse` schema with fields: status (enum), summary, files_changed (array), code_review_notes, team_updates (object with messages/decisions/blocked_on arrays); (2) `ArchitectResponse` extending base with architecture_decisions and interface_definitions. In delegate.py `delegate_to_agent()` (line 800), add `--output-format json` to the claude command and pass the schema. Replace the regex-based `parse_team_agent_output()` (line 342) with direct JSON parsing of the structured response. Update `build_prompt()` to instruct agents to respond in the defined schema format, removing the markdown-based team communication template.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:43:38.776047+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

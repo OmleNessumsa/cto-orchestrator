@@ -1,0 +1,18 @@
+{
+  "id": "PROM-039",
+  "title": "Add Server-Sent Events (SSE) stream as alternative to fire-and-forget HTTP POST",
+  "category": "ui-ux",
+  "source": "SSE (EventSource API) best practices for real-time web dashboards \u2014 persistent connection reduces latency and eliminates lost events",
+  "description": "The current fire-and-forget HTTP POST model in roro_events.py means events can be silently lost if Rick Terminal is temporarily unreachable (circuit breaker opens, events during that window are dropped forever). SSE provides a persistent connection where the server (Python side) pushes events to the client (Rick Terminal), with automatic reconnection and last-event-id replay. This is simpler than WebSocket for unidirectional event streams.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/roro_events.py"
+  ],
+  "proposed_changes": "Add an optional SSE server mode to roro_events.py: (1) Create a lightweight SSE server using Python's built-in http.server on a configurable port (default 3069). (2) Buffer last 50 events in a ring buffer so reconnecting clients can replay missed events via Last-Event-ID header. (3) Keep existing HTTP POST as primary mode \u2014 SSE is opt-in via config flag `roro.sse_enabled: true`. (4) Rick Terminal can then use EventSource/URLSession streaming to receive events with zero polling and guaranteed delivery. Add config key `sse_port` to .cto/config.json.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:39:45.811974+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

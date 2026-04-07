@@ -1,0 +1,21 @@
+{
+  "id": "PROM-045",
+  "title": "Add structured output schema validation for agent responses",
+  "category": "security",
+  "source": "OWASP LLM09: Overreliance + LLM agent output validation best practices 2025",
+  "description": "Agent output parsing in delegate.py and meeseeks.py uses regex fallbacks and loose JSON parsing without schema validation. A compromised or confused agent could return malformed output that bypasses sanitize_agent_output() checks. OWASP LLM09 recommends strict schema validation on all LLM outputs before acting on them.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/security_utils.py",
+    "scripts/delegate.py",
+    "scripts/meeseeks.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "1. In schemas.py, define JSON Schema definitions for expected agent output structures (e.g., DelegateOutputSchema with required fields: status, summary, files_changed). 2. Add a validate_agent_output_schema(output: dict, schema: str) function in security_utils.py that validates parsed JSON against the schema using jsonschema or a lightweight validator. Reject outputs that don't conform. 3. In delegate.py and meeseeks.py, after JSON parsing and before acting on results, call validate_agent_output_schema(). If validation fails, log the event and return a structured error rather than falling back to regex parsing of untrusted output. 4. Remove regex fallback parsing paths that could accept arbitrary unstructured content.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:42:06.108885+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

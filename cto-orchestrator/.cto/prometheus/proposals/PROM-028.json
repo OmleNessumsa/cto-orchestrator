@@ -1,0 +1,20 @@
+{
+  "id": "PROM-028",
+  "title": "Structured Agent Handoff Protocol (A2A-Inspired)",
+  "category": "agent-patterns",
+  "source": "Google Agent-to-Agent (A2A) protocol (April 2025) + OpenAI Swarm handoff pattern for structured inter-agent communication",
+  "description": "The current team communication relies on regex-parsing markdown sections ('### Team Updates') from agent output to extract messages, decisions, and blocked-on items. This is fragile \u2014 agents can format output unpredictably, and the regex misses edge cases. Google's A2A protocol and OpenAI Swarm both standardize agent handoffs using structured JSON 'artifacts' that agents produce alongside their main output. Implementing a structured handoff envelope (JSON block at the end of agent output) would make inter-agent communication reliable and machine-parseable, enabling richer coordination like passing typed artifacts (API schemas, test results) between agents.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/team.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "1. Define a JSON handoff schema: `{\"handoff\": {\"messages\": [{\"to\": \"@role\", \"content\": \"...\", \"type\": \"decision|question|artifact\"}], \"artifacts\": [{\"type\": \"api-schema|test-result|adr\", \"content\": {...}}], \"status\": \"completed|blocked\", \"blocked_on\": [...]}}`. 2. Update _build_agent_prompt() in delegate.py to instruct agents to emit a `<handoff_json>...</handoff_json>` block at the end of their output containing structured JSON. 3. Replace parse_team_agent_output() regex parsing in delegate.py with JSON extraction from the handoff block (with regex fallback for backwards compatibility). 4. Update process_team_output() in delegate.py to handle typed artifacts \u2014 store them in the shared context so downstream agents can consume API schemas, test results, etc.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:33:54.457300+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

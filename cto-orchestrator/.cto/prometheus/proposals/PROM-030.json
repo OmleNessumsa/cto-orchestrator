@@ -1,0 +1,19 @@
+{
+  "id": "PROM-030",
+  "title": "Dynamic Team Composition Based on Ticket DAG Analysis",
+  "category": "agent-patterns",
+  "source": "LangGraph multi-agent DAG execution pattern + CrewAI Process.hierarchical with dynamic crew assembly (2025-2026)",
+  "description": "The current detect_team_need() in orchestrate.py uses simple keyword matching to select from 4 hardcoded team templates. Modern orchestration patterns analyze the full ticket dependency graph (DAG) to dynamically compose teams. For example, if ticket A (backend API) blocks ticket B (frontend UI) and ticket C (tests), the system should auto-compose a team with the right agents AND set their execution order from the DAG rather than relying on template coordination modes. This produces better parallelism for independent subtasks and correct sequencing for dependent ones.",
+  "impact_score": 8,
+  "risk_score": 5,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/orchestrate.py",
+    "scripts/team.py"
+  ],
+  "proposed_changes": "1. Add a `build_ticket_dag()` function in orchestrate.py that reads all sprint tickets and their `dependencies` fields to construct a directed acyclic graph. 2. Add a `compose_team_from_dag()` function that: (a) identifies which agents are needed by running auto_select_agent on each ticket in the DAG, (b) determines execution phases by topological sorting the DAG \u2014 tickets with no unresolved dependencies run in parallel, dependent tickets wait. 3. Modify run_team_sprint() to accept a multi-phase execution plan instead of a single coordination mode \u2014 execute each phase's agents in parallel, then proceed to the next phase. 4. Keep the existing template system as a manual override but make DAG-based composition the default for sprint runs with >2 tickets.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:33:54.459160+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

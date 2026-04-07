@@ -1,0 +1,22 @@
+{
+  "id": "PROM-026",
+  "title": "Evolve falsely reports success when Morty makes no file changes",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Running prometheus.py evolve for PROM-020 scoped to security_utils.py",
+  "description": "PROM-020 evolve reported Applied successfully but git diff shows zero changes to target file. The Morty subprocess completed without error but did not modify any files. Prometheus should verify actual file modifications before marking as applied.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/prometheus.py"
+  ],
+  "proposed_changes": "After delegate_evolve returns, compare file checksums of target_files before and after. If no files changed, mark as failed not applied.",
+  "status": "rejected",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-03-21T14:02:47.214137+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Self-protection: cannot modify Prometheus engine"
+}

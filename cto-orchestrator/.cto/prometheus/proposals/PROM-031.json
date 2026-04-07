@@ -1,0 +1,19 @@
+{
+  "id": "PROM-031",
+  "title": "Agent Memory and Context Window Management",
+  "category": "agent-patterns",
+  "source": "AutoGen 0.4 teachable agents + LangGraph checkpointing + CrewAI long-term memory pattern (2025-2026 context management best practices)",
+  "description": "Each agent invocation via `claude -p` starts with a fresh context \u2014 agents have no memory of previous sprint runs, past decisions, or patterns learned from the codebase. The prompt includes project structure and related tickets, but this is static. Modern frameworks implement agent memory through: (1) persistent summaries of past executions per agent role, (2) a project knowledge base that accumulates architectural decisions and patterns. This would let backend-morty remember that 'this project uses repository pattern' or that 'the last 3 API tickets all needed CORS middleware', reducing repeated mistakes and improving consistency across sprints.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "1. Create a `.cto/memory/` directory structure with per-role memory files (e.g. `backend-morty.jsonl`) that store condensed lessons from each completed ticket (ticket_id, key patterns discovered, mistakes made, conventions followed). 2. After each successful delegation in delegate.py, extract a memory entry by prompting Haiku: 'Summarize the key patterns, conventions, and lessons from this agent's work in 2-3 bullet points as JSON'. Append to the role's memory file. 3. In the prompt assembly section of delegate.py, load the last 10 memory entries for the agent's role and inject them as a `<agent_memory>` section in the prompt. 4. Cap memory files at 50 entries with a rotation policy (oldest entries dropped). This mirrors AutoGen's teachable agent pattern where agents accumulate domain knowledge across sessions.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:33:54.460036+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

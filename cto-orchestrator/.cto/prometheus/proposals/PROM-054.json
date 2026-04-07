@@ -1,0 +1,20 @@
+{
+  "id": "PROM-054",
+  "title": "Add streaming output for real-time Morty progress",
+  "category": "claude-features",
+  "source": "Anthropic API streaming (server-sent events) and Claude Code --output-format stream-json",
+  "description": "Currently, delegate_to_agent() blocks on subprocess.run() with capture_output=True, meaning Rick (and the Rick Terminal) gets zero feedback until the entire agent completes \u2014 which can take 10+ minutes. Claude supports streaming responses, allowing real-time token-by-token or event-by-event progress that can be piped into roro events for live terminal updates.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/meeseeks.py",
+    "scripts/roro_events.py"
+  ],
+  "proposed_changes": "Replace subprocess.run() with subprocess.Popen() in delegate_to_agent() and summon_meeseeks(), using `claude -p --output-format stream-json` to get streaming JSON events. Read stdout line-by-line in a loop, parsing each event. Emit intermediate roro events (cto.morty.progress) when tool_use or text_delta events arrive. This gives the Rick Terminal real-time visibility into what each Morty is doing. Add a `stream=True` parameter to delegate_to_agent() with fallback to blocking mode.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:44:54.704344+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

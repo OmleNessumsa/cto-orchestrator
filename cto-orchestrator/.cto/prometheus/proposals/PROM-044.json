@@ -1,0 +1,20 @@
+{
+  "id": "PROM-044",
+  "title": "Enforce consistent dual-condition permission bypass",
+  "category": "security",
+  "source": "Codebase audit \u2014 inconsistent --dangerously-skip-permissions gating across scripts",
+  "description": "delegate.py uses defense-in-depth requiring BOTH a function parameter AND an env var to enable --dangerously-skip-permissions. However, orchestrate.py and meeseeks.py only check the env var (single condition). This inconsistency means the most dangerous flag has weaker protection in 2 of 3 entry points. OWASP recommends consistent security controls across all code paths.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/orchestrate.py",
+    "scripts/meeseeks.py",
+    "scripts/security_utils.py"
+  ],
+  "proposed_changes": "1. Create a centralized function in security_utils.py: should_skip_permissions(explicit_flag: bool) -> bool that requires BOTH the explicit_flag parameter AND the CTO_ALLOW_SKIP_PERMISSIONS env var to return True. Log via audit_log_security_event() whenever permissions are skipped. 2. Replace the inline env var checks in orchestrate.py and meeseeks.py with calls to this centralized function, passing explicit_flag=False by default (so these scripts never skip permissions unless explicitly opted in). 3. Update delegate.py to also use this centralized function for consistency.",
+  "status": "pending",
+  "created_at": "2026-04-06T09:42:06.107953+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

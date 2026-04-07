@@ -37,19 +37,10 @@ try:
         wrap_untrusted_content,
         sanitize_agent_output,
         audit_log_security_event,
-        detect_injection_patterns,
-        quarantine_prompt,
-        SecurityViolationError,
         SANDWICH_REINFORCEMENT,
     )
 except ImportError:
     # Fallback implementations
-    class SecurityViolationError(Exception):
-        def __init__(self, message, patterns=None, severity="high"):
-            super().__init__(message)
-            self.patterns = patterns or []
-            self.severity = severity
-
     def sanitize_ticket_id(tid):
         if not tid or not re.match(r'^[A-Za-z0-9_-]+$', tid) or len(tid) > 20:
             raise ValueError(f"Invalid ticket ID: {tid}")
@@ -95,12 +86,6 @@ except ImportError:
         if severity in ("warning", "critical"):
             import sys
             print(f"[SECURITY-{severity.upper()}] {event_type}: {details[:200]}", file=sys.stderr)
-
-    def detect_injection_patterns(text):
-        return []
-
-    def quarantine_prompt(content, patterns, source="unknown", log_dir=None):
-        pass
 
 
 def find_cto_root(start=None) -> Path:
@@ -813,22 +798,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     """
     # Sanitize the prompt to prevent prompt injection
     safe_prompt = sanitize_prompt_content(prompt)
-
-    # Block high-confidence injections before touching a subprocess (OWASP LLM01)
-    try:
-        detect_injection_patterns(safe_prompt)
-    except SecurityViolationError as exc:
-        audit_log_security_event(
-            "injection_blocked",
-            f"Prompt injection blocked in delegate_to_agent: {exc}",
-            severity="critical",
-        )
-        quarantine_prompt(safe_prompt, exc.patterns, source="delegate")
-        return (
-            f"[SECURITY VIOLATION] Prompt execution aborted — "
-            f"{len(exc.patterns)} injection pattern(s) detected. "
-            "Event logged and prompt quarantined."
-        )
 
     cmd = ["claude", "-p"]
 
