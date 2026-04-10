@@ -254,130 +254,6 @@ def detect_team_need(ticket: dict) -> Optional[str]:
     return "fullstack-team"
 
 
-# ── DAG-Based Team Composition ───────────────────────────────────────────────
-
-def _dag_select_agent(ticket: dict) -> str:
-    """Select the best agent role for a ticket (used in DAG composition)."""
-    ttype = ticket.get("type", "")
-    title = (ticket.get("title") or "").lower()
-    desc = (ticket.get("description") or "").lower()
-    combined = f"{title} {desc}"
-
-    if ttype in ("epic", "spike"):
-        return "architect-morty"
-
-    keywords_map = {
-        "architect-morty": ["architecture", "design", "adr", "interface", "schema", "data model"],
-        "frontend-morty": ["ui", "frontend", "component", "react", "vue", "css", "html", "layout", "ux"],
-        "backend-morty": ["api", "backend", "endpoint", "database", "server", "migration", "model", "rest", "graphql"],
-        "tester-morty": ["test", "e2e", "integration test", "unit test", "qa", "regression", "coverage"],
-        "security-morty": ["security", "auth", "owasp", "vulnerability", "penetration", "encryption", "xss"],
-        "devops-morty": ["ci/cd", "docker", "deploy", "pipeline", "kubernetes", "monitoring", "infra"],
-    }
-
-    scores: dict[str, int] = {}
-    for role, kws in keywords_map.items():
-        for kw in kws:
-            if kw in combined:
-                scores[role] = scores.get(role, 0) + 1
-
-    if scores:
-        return max(scores, key=lambda k: scores[k])
-    return "fullstack-morty"
-
-
-def build_ticket_dag(tickets: list[dict]) -> dict[str, list[str]]:
-    """Build a dependency DAG from a list of tickets.
-
-    Returns a dict mapping ticket_id → list of dependency ticket_ids.
-    """
-    return {t["id"]: (t.get("dependencies") or []) for t in tickets}
-
-
-def compose_team_from_dag(root: Path, tickets: list[dict]) -> dict:
-    """Dynamically compose a multi-phase execution plan from the ticket DAG.
-
-    Performs a topological sort to group tickets into execution phases:
-    - Tickets with no unresolved dependencies run together in the same phase.
-    - Dependent tickets wait until their dependencies' phase completes.
-
-    Returns:
-        {
-            "phases": [[{"ticket_id": str, "agent": str}, ...], ...],
-            "roles": [str, ...]  # unique agent roles needed
-        }
-    """
-    dag = build_ticket_dag(tickets)
-    ticket_agents = {t["id"]: _dag_select_agent(t) for t in tickets}
-
-    completed: set[str] = set()
-    remaining = set(dag.keys())
-    phases = []
-
-    while remaining:
-        # Tickets whose dependencies are all already completed (or have none)
-        phase = [
-            {"ticket_id": tid, "agent": ticket_agents[tid]}
-            for tid in sorted(remaining)
-            if all(d in completed for d in dag[tid])
-        ]
-
-        if not phase:
-            # Circular dependency — add remaining tickets as a single final phase
-            phase = [{"ticket_id": tid, "agent": ticket_agents[tid]} for tid in sorted(remaining)]
-            phases.append(phase)
-            break
-
-        phases.append(phase)
-        for item in phase:
-            completed.add(item["ticket_id"])
-            remaining.discard(item["ticket_id"])
-
-    unique_roles = list({item["agent"] for phase in phases for item in phase})
-    return {"phases": phases, "roles": unique_roles}
-
-
-def _dag_delegate(root: Path, ticket_id: str, agent: str, timeout: int = 600) -> dict:
-    """Delegate a single ticket to an agent (used in DAG phase execution)."""
-    try:
-        output = run_delegate(root, ticket_id, agent=agent, timeout=timeout)
-        return {"ticket_id": ticket_id, "agent": agent, "status": "completed", "output": output[-500:]}
-    except subprocess.TimeoutExpired:
-        return {"ticket_id": ticket_id, "agent": agent, "status": "timeout", "output": f"Timed out after {timeout}s"}
-    except Exception as e:
-        return {"ticket_id": ticket_id, "agent": agent, "status": "error", "output": str(e)[:500]}
-
-
-def _run_dag_phases(root: Path, execution_plan: dict, timeout: int = 600) -> dict:
-    """Execute a multi-phase DAG plan.
-
-    Each phase runs its tickets in parallel; phases execute sequentially
-    so that dependent tickets only start after their dependencies finish.
-    """
-    results: dict[str, dict] = {}
-    phases = execution_plan["phases"]
-
-    for phase_idx, phase in enumerate(phases):
-        console.print(f"    [cyan]DAG phase {phase_idx + 1}/{len(phases)}: {len(phase)} ticket(s) in parallel...[/cyan]")
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(phase)) as executor:
-            futures = {
-                executor.submit(_dag_delegate, root, item["ticket_id"], item["agent"], timeout): item["ticket_id"]
-                for item in phase
-            }
-            for future in concurrent.futures.as_completed(futures):
-                tid = futures[future]
-                try:
-                    result = future.result()
-                    results[tid] = result
-                    console.print(f"      [{tid}] @{result['agent']}: {result['status']}")
-                except Exception as e:
-                    results[tid] = {"ticket_id": tid, "agent": "unknown", "status": "error", "output": str(e)[:500]}
-                    console.print(f"      [{tid}]: error — {e}")
-
-    return results
-
-
 def load_team(root: Path, team_id: str) -> Optional[dict]:
     """Load a team session."""
     fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
@@ -443,16 +319,12 @@ def delegate_team_member(root: Path, team_id: str, agent_role: str, ticket_id: s
         }
 
 
-def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], timeout: int = 600, execution_plan: Optional[dict] = None) -> dict:
+def run_team_sprint(root: Path, team: dict, ticket: dict, timeout: int = 600) -> dict:
     """Run a team sprint with parallel execution.
 
-    If execution_plan is provided (from compose_team_from_dag), runs multi-phase
-    DAG-based execution across multiple tickets. Otherwise uses the existing
-    coordination-mode logic for a single team/ticket.
+    Coordinates multiple Morty's working on the same ticket using
+    concurrent.futures for parallel execution.
     """
-    if execution_plan is not None:
-        return _run_dag_phases(root, execution_plan, timeout)
-
     team_id = team["id"]
     ticket_id = ticket["id"]
     mode = team["coordination"]["mode"]
@@ -565,20 +437,13 @@ def claude_prompt(prompt: str, model: str = "sonnet", thinking_budget: int = Non
         cmd.insert(2, "--dangerously-skip-permissions")
         print("[SECURITY] Using --dangerously-skip-permissions (authorized)", file=sys.stderr)
 
-    # Attach MCP server so the planning agent can query/update CTO state
-    mcp_server = Path(__file__).parent / "mcp_server.py"
-    if mcp_server.exists():
-        cmd.extend(["--mcp-server", str(mcp_server)])
-
     if thinking_budget is not None:
         cmd.extend(["--thinking-budget", str(thinking_budget)])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
-    # when this script is invoked from within Claude Code.
-    # Set CTO_AGENT_ROLE so the MCP server identifies the caller.
+    # when this script is invoked from within Claude Code
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-    env["CTO_AGENT_ROLE"] = "rick"
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=os.getcwd(), env=env)
     if result.returncode != 0:
@@ -995,56 +860,6 @@ def cmd_sprint(args):
                 break
             # Some tickets are in_progress from previous iteration
             console.print("  [dim]Waiting for in-progress tickets to finish...[/dim]")
-            continue
-
-        # DAG-based composition for sprints with >2 actionable tickets
-        if use_teams and len(candidates) > 2:
-            console.print(f"\n  [bold green]DAG Sprint: composing team from {len(candidates)} tickets...[/bold green]")
-            execution_plan = compose_team_from_dag(root, candidates)
-            n_phases = len(execution_plan["phases"])
-            roles_str = ", ".join(execution_plan["roles"])
-            console.print(f"    [cyan]{n_phases} phase(s) detected, roles: {roles_str}[/cyan]")
-
-            emit("cto.sprint.dag.composed", {
-                "ticket_count": len(candidates),
-                "phase_count": n_phases,
-                "roles": execution_plan["roles"],
-            }, role="rick")
-
-            dag_results = run_team_sprint(root, None, None, timeout=600, execution_plan=execution_plan)
-
-            completed_count = sum(1 for r in dag_results.values() if r["status"] == "completed")
-            console.print(f"    [cyan]DAG sprint results: {completed_count}/{len(dag_results)} completed[/cyan]")
-
-            for tid, result in dag_results.items():
-                try:
-                    t = load_ticket(root, tid)
-                    if t["status"] == "in_review":
-                        t["status"] = "done"
-                        t["completed_at"] = now_iso()
-                        t["updated_at"] = now_iso()
-                        save_ticket(root, t)
-                        console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
-                    parsed_for_sprint = {
-                        "status": t["status"],
-                        "files_changed": t.get("files_touched", []),
-                        "description": t.get("agent_output", ""),
-                        "open_questions": t.get("review_notes", ""),
-                    }
-                    update_sprint_state(root, t, parsed_for_sprint, result.get("agent", "unknown"))
-                    if t.get("parent_ticket"):
-                        update_epic_status(root, t["parent_ticket"])
-                except Exception:
-                    pass
-
-            append_log(root, {
-                "timestamp": now_iso(),
-                "ticket_id": None,
-                "agent": "rick",
-                "action": "dag_sprint",
-                "message": f"DAG sprint: {completed_count}/{len(dag_results)} tickets completed across {n_phases} phase(s)",
-                "files_changed": [],
-            })
             continue
 
         # Delegate the top candidate

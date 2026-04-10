@@ -14,8 +14,11 @@
     "agents/frontend-morty.json"
   ],
   "proposed_changes": "1. Add a `capabilities` field to each agent JSON file (e.g. backend-morty.json gets `{\"capabilities\": [\"python\", \"node\", \"rest-api\", \"graphql\", \"database\", \"migrations\"]}`). 2. Replace the keyword-matching `auto_select_agent()` in delegate.py with a function that loads all agent capability manifests, constructs a short prompt like 'Given this ticket [title+desc], score each agent 1-10 for fit: [agent: capabilities]', calls `claude -p --model haiku` to get a JSON score map, and picks the highest scorer. 3. Add a fallback to the current keyword approach if the Haiku call fails. This mirrors LangGraph's supervisor-with-tools pattern where the supervisor LLM picks which specialist to invoke.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:33:54.454029+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-07T09:39:39.562800+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-027-20260407T093818",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

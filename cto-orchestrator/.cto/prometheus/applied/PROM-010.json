@@ -13,8 +13,12 @@
     "scripts/orchestrate.py"
   ],
   "proposed_changes": "Create cto_mcp_server.py exposing tools: get_ticket, get_team_context, send_team_message, reserve_files, get_adrs. Pass --mcp-config to claude -p. Reduce prompt size dramatically.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-03-01T08:55:17.733437+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-07T07:06:01.498445+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-010-20260407T070118",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ]
 }

@@ -658,5 +658,46 @@
       "scripts/meeseeks.py",
       "references/prompts.md"
     ]
+  },
+  {
+    "timestamp": "2026-04-07T07:06:01.499699+00:00",
+    "proposal_id": "PROM-010",
+    "action": "applied",
+    "title": "Add MCP tool server for cross-agent shared workspace",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/team.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T09:38:18.477896+00:00",
+    "proposal_id": "PROM-030",
+    "action": "applied",
+    "title": "Dynamic Team Composition Based on Ticket DAG Analysis",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T09:39:39.564823+00:00",
+    "proposal_id": "PROM-027",
+    "action": "applied",
+    "title": "Adaptive Agent Routing with Capability-Based Selection",
+    "target_files": [
+      "scripts/delegate.py",
+      "agents/backend-morty.json",
+      "agents/architect-morty.json",
+      "agents/frontend-morty.json"
+    ]
+  },
+  {
+    "timestamp": "2026-04-07T14:59:43.586306+00:00",
+    "proposal_id": "PROM-057",
+    "action": "self-reported",
+    "title": "delegate.py passes invalid --mcp-server flag to claude CLI",
+    "severity": "critical",
+    "category": "self-diagnosed"
   }
 ]

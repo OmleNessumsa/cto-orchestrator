@@ -462,8 +462,8 @@ def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
     return parsed
 
 
-def _keyword_select_agent(ticket: dict) -> str:
-    """Fallback: select agent role based on keyword matching."""
+def auto_select_agent(ticket: dict) -> str:
+    """Select agent role based on ticket type and content."""
     ttype = ticket.get("type", "")
     title = (ticket.get("title") or "").lower()
     desc = (ticket.get("description") or "").lower()
@@ -490,78 +490,6 @@ def _keyword_select_agent(ticket: dict) -> str:
     if scores:
         return max(scores, key=lambda k: scores[k])
     return "fullstack-morty"
-
-
-def auto_select_agent(ticket: dict, root: Optional[Path] = None) -> str:
-    """Select agent role using capability-based LLM routing.
-
-    Loads agent capability manifests, asks Claude Haiku to score each agent's
-    fit for the ticket, and picks the highest scorer. Falls back to keyword
-    matching if the Haiku call fails.
-    """
-    ttype = ticket.get("type", "")
-    if ttype in ("epic", "spike"):
-        return "architect-morty"
-
-    # Load agent capability manifests
-    if root is None:
-        try:
-            root = find_cto_root()
-        except SystemExit:
-            return _keyword_select_agent(ticket)
-
-    agents_dir = root / "agents"
-    agent_caps: dict[str, list] = {}
-    if agents_dir.is_dir():
-        for fp in agents_dir.glob("*.json"):
-            try:
-                data = load_json(fp)
-                agent_id = data.get("id") or fp.stem
-                caps = data.get("capabilities", [])
-                if agent_id and caps:
-                    agent_caps[agent_id] = caps
-            except Exception:
-                pass
-
-    if not agent_caps:
-        return _keyword_select_agent(ticket)
-
-    title = (ticket.get("title") or "").strip()
-    desc = (ticket.get("description") or "").strip()
-    ticket_text = f"{title}\n{desc}".strip()[:500]
-
-    agents_list = "\n".join(
-        f"- {agent_id}: {', '.join(caps)}"
-        for agent_id, caps in agent_caps.items()
-    )
-    scoring_prompt = (
-        f"Given this software ticket:\n{ticket_text}\n\n"
-        f"Score each agent 1-10 for fit based on their capabilities:\n{agents_list}\n\n"
-        f"Reply with ONLY a JSON object mapping agent id to score, e.g. "
-        f'{{"{list(agent_caps.keys())[0]}": 7, ...}}. No other text.'
-    )
-
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", scoring_prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        raw = result.stdout.strip()
-        # Extract JSON object from output
-        match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
-        if match:
-            scores = json.loads(match.group())
-            # Filter to known agents and pick highest
-            valid = {k: float(v) for k, v in scores.items() if k in agent_caps}
-            if valid:
-                best = max(valid, key=lambda k: valid[k])
-                return best
-    except Exception:
-        pass
-
-    return _keyword_select_agent(ticket)
 
 
 # ── Prompt assembly ─────────────────────────────────────────────────────────
@@ -1109,7 +1037,7 @@ def cmd_delegate(args):
         sys.exit(1)
 
     ticket = load_ticket(root, safe_ticket_id)
-    agent = args.agent or auto_select_agent(ticket, root=root)
+    agent = args.agent or auto_select_agent(ticket)
     model = args.model or AGENT_MODELS.get(agent, "sonnet")
 
     # Sanitize team ID if provided

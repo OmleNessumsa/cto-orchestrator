@@ -462,8 +462,8 @@ def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
     return parsed
 
 
-def _keyword_select_agent(ticket: dict) -> str:
-    """Fallback: select agent role based on keyword matching."""
+def auto_select_agent(ticket: dict) -> str:
+    """Select agent role based on ticket type and content."""
     ttype = ticket.get("type", "")
     title = (ticket.get("title") or "").lower()
     desc = (ticket.get("description") or "").lower()
@@ -490,78 +490,6 @@ def _keyword_select_agent(ticket: dict) -> str:
     if scores:
         return max(scores, key=lambda k: scores[k])
     return "fullstack-morty"
-
-
-def auto_select_agent(ticket: dict, root: Optional[Path] = None) -> str:
-    """Select agent role using capability-based LLM routing.
-
-    Loads agent capability manifests, asks Claude Haiku to score each agent's
-    fit for the ticket, and picks the highest scorer. Falls back to keyword
-    matching if the Haiku call fails.
-    """
-    ttype = ticket.get("type", "")
-    if ttype in ("epic", "spike"):
-        return "architect-morty"
-
-    # Load agent capability manifests
-    if root is None:
-        try:
-            root = find_cto_root()
-        except SystemExit:
-            return _keyword_select_agent(ticket)
-
-    agents_dir = root / "agents"
-    agent_caps: dict[str, list] = {}
-    if agents_dir.is_dir():
-        for fp in agents_dir.glob("*.json"):
-            try:
-                data = load_json(fp)
-                agent_id = data.get("id") or fp.stem
-                caps = data.get("capabilities", [])
-                if agent_id and caps:
-                    agent_caps[agent_id] = caps
-            except Exception:
-                pass
-
-    if not agent_caps:
-        return _keyword_select_agent(ticket)
-
-    title = (ticket.get("title") or "").strip()
-    desc = (ticket.get("description") or "").strip()
-    ticket_text = f"{title}\n{desc}".strip()[:500]
-
-    agents_list = "\n".join(
-        f"- {agent_id}: {', '.join(caps)}"
-        for agent_id, caps in agent_caps.items()
-    )
-    scoring_prompt = (
-        f"Given this software ticket:\n{ticket_text}\n\n"
-        f"Score each agent 1-10 for fit based on their capabilities:\n{agents_list}\n\n"
-        f"Reply with ONLY a JSON object mapping agent id to score, e.g. "
-        f'{{"{list(agent_caps.keys())[0]}": 7, ...}}. No other text.'
-    )
-
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", scoring_prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        raw = result.stdout.strip()
-        # Extract JSON object from output
-        match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
-        if match:
-            scores = json.loads(match.group())
-            # Filter to known agents and pick highest
-            valid = {k: float(v) for k, v in scores.items() if k in agent_caps}
-            if valid:
-                best = max(valid, key=lambda k: valid[k])
-                return best
-    except Exception:
-        pass
-
-    return _keyword_select_agent(ticket)
 
 
 # ── Prompt assembly ─────────────────────────────────────────────────────────
@@ -690,10 +618,6 @@ def _load_sprint_context(root: Path) -> str:
 def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None) -> str:
     """Assemble the full prompt for the sub-agent.
 
-    Context is kept minimal here — agents pull ADRs, related ticket details,
-    and team state on-demand via MCP tools (get_ticket, get_team_context,
-    read_adr, reserve_files, send_team_message) instead of bloating the prompt.
-
     Args:
         root: Project root path
         ticket: Ticket dict
@@ -703,24 +627,20 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
     role_prompt = AGENT_PROMPTS.get(agent_role, AGENT_PROMPTS["fullstack-morty"])
     criteria = ticket.get("acceptance_criteria") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "(none specified)"
+    adrs = load_adrs(root)
+    related = get_related_tickets(root, ticket)
     structure = get_project_structure(root)
+
+    # Build team context if in a team session
+    team_context = ""
+    if team_id:
+        team_context = build_team_context(root, team_id, agent_role)
 
     # Wrap untrusted user content with boundary delimiters (PROM-017)
     safe_description = wrap_untrusted_content(
         ticket.get('description') or '(no description)', label="TICKET_DESCRIPTION"
     )
     safe_criteria = wrap_untrusted_content(criteria_text, label="ACCEPTANCE_CRITERIA")
-
-    # Summarise related tickets (IDs + status only) — full data available via get_ticket MCP tool
-    dep_ids = ticket.get("dependencies") or []
-    parent_id = ticket.get("parent_ticket")
-    related_ids = list(set(dep_ids + ([parent_id] if parent_id else [])))
-    related_summary = ", ".join(related_ids) if related_ids else "(none)"
-
-    # List available ADR names — full content available via read_adr MCP tool
-    dd = root / ".cto" / "decisions"
-    adr_names = [fp.stem for fp in sorted(dd.glob("*.md"))] if dd.exists() else []
-    adr_list = ", ".join(adr_names) if adr_names else "(none)"
 
     prompt = f"""{role_prompt}
 
@@ -740,22 +660,25 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
 - Project structure:
 {structure}
 
-### Context available via MCP tools
-You have MCP tools to pull context on-demand — use them instead of guessing:
-- **read_adr(name)** — Read an Architecture Decision Record. Pass `*` to list all.
-  Available ADRs: {adr_list}
-- **get_ticket(ticket_id)** — Read full ticket data including agent output and dependencies.
-  Related ticket IDs: {related_summary}
-- **get_team_context(team_id)** — Read shared team decisions, interfaces, and messages.{f" Your team_id: {team_id}" if team_id else " (solo delegation — no team)"}
-- **reserve_files(team_id, files)** — Reserve files before modifying to prevent teammate conflicts.
-- **send_team_message(team_id, to, message, msg_type)** — Send a message to a teammate.
-- **update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.
+### Architecture Decisions
+{adrs}
+
+### Related Tickets
+{related}
 """
 
     # Inject sprint context for downstream agents (PROM-008)
     sprint_ctx = _load_sprint_context(root)
     if sprint_ctx:
         prompt += f"\n{sprint_ctx}\n"
+
+    # Add team context if available
+    if team_context:
+        prompt += f"""
+## Team Collaboration
+
+{team_context}
+"""
 
     prompt += """
 <reasoning_protocol>
@@ -1024,12 +947,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
-    # when this script is invoked from within Claude Code.
-    # Set CTO_AGENT_ROLE so the MCP server knows which agent is calling.
+    # when this script is invoked from within Claude Code
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-    env["CTO_AGENT_ROLE"] = agent_role
-    if team_id:
-        env["CTO_TEAM_ID"] = team_id
 
     start_time = time.time()
     output_chunks: list[str] = []
@@ -1109,7 +1028,7 @@ def cmd_delegate(args):
         sys.exit(1)
 
     ticket = load_ticket(root, safe_ticket_id)
-    agent = args.agent or auto_select_agent(ticket, root=root)
+    agent = args.agent or auto_select_agent(ticket)
     model = args.model or AGENT_MODELS.get(agent, "sonnet")
 
     # Sanitize team ID if provided
