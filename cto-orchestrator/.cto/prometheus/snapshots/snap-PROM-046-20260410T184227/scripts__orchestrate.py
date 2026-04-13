@@ -49,8 +49,6 @@ try:
         sanitize_text_input,
         wrap_untrusted_content,
         detect_injection_patterns,
-        detect_secrets,
-        redact_secrets,
         quarantine_prompt,
         audit_log_security_event,
         SecurityViolationError,
@@ -84,10 +82,6 @@ except ImportError:
     )
     def detect_injection_patterns(text):
         return []
-    def detect_secrets(text):
-        return []
-    def redact_secrets(text):
-        return text
     def quarantine_prompt(content, patterns, source="unknown", log_dir=None):
         pass
     def audit_log_security_event(event_type, details, severity="info", log_dir=None):
@@ -158,7 +152,7 @@ def append_log(root: Path, entry: dict):
     ld.mkdir(parents=True, exist_ok=True)
     fp = ld / f"{today}.jsonl"
     with open(fp, "a") as f:
-        f.write(redact_secrets(json.dumps(entry)) + "\n")
+        f.write(json.dumps(entry) + "\n")
 
 
 def scripts_dir() -> Path:
@@ -197,6 +191,27 @@ def run_team_cmd(root: Path, *args) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(root))
     return result.stdout + result.stderr
 
+
+# ── Team Templates ───────────────────────────────────────────────────────────
+
+TEAM_TEMPLATES = {
+    "fullstack-team": {
+        "description": "Full-stack feature development team",
+        "roles": ["architect-morty", "backend-morty", "frontend-morty"],
+    },
+    "api-team": {
+        "description": "API development and testing team",
+        "roles": ["architect-morty", "backend-morty", "tester-morty"],
+    },
+    "security-team": {
+        "description": "Security audit and hardening team",
+        "roles": ["architect-morty", "security-morty", "unity", "tester-morty"],
+    },
+    "devops-team": {
+        "description": "Infrastructure and deployment team",
+        "roles": ["devops-morty", "backend-morty"],
+    },
+}
 
 COMPLEXITY_TEAM_THRESHOLD = {"L": True, "XL": True}  # These need teams
 

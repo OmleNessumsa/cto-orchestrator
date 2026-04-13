@@ -13,8 +13,13 @@
     "scripts/orchestrate.py"
   ],
   "proposed_changes": "Create agents/ directory with JSON agent cards. Replace AGENT_PROMPTS/AGENT_MODELS with load_agent_card(). Replace auto_select_agent() with match_agent_cards() scoring against card capabilities. Replace TEAM_TEMPLATES with template files referencing cards.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-03-01T08:55:17.732302+00:00",
-  "applied_at": null,
-  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-007-20260321T103238"
+  "applied_at": "2026-04-10T18:49:25.853074+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-007-20260410T184511",
+  "files_actually_changed": [
+    "scripts/orchestrate.py",
+    "scripts/delegate.py",
+    "scripts/team.py"
+  ]
 }

@@ -1,0 +1,10 @@
+{
+  "proposal_id": "PROM-057",
+  "created_at": "2026-04-10T18:41:42.246820+00:00",
+  "files": {
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 52104
+    }
+  }
+}

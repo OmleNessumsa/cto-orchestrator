@@ -104,37 +104,54 @@ def ensure_team_dirs(root: Path):
 
 # ── Team Templates ───────────────────────────────────────────────────────────
 
-def _templates_dir(root: Path) -> Path:
-    return root / "agents" / "templates"
+TEAM_TEMPLATES = {
+    "fullstack-team": {
+        "description": "Full-stack feature development team",
+        "roles": [
+            {"role": "architect-morty", "focus": "architecture and interfaces"},
+            {"role": "backend-morty", "focus": "backend implementation"},
+            {"role": "frontend-morty", "focus": "frontend implementation"},
+        ],
+        "coordination": {"mode": "mixed", "lead": "architect-morty"},
+    },
+    "api-team": {
+        "description": "API development and testing team",
+        "roles": [
+            {"role": "architect-morty", "focus": "API design and interfaces"},
+            {"role": "backend-morty", "focus": "API implementation"},
+            {"role": "tester-morty", "focus": "API testing and validation"},
+        ],
+        "coordination": {"mode": "sequential", "lead": "architect-morty"},
+    },
+    "security-team": {
+        "description": "Security audit and hardening team",
+        "roles": [
+            {"role": "architect-morty", "focus": "security architecture review"},
+            {"role": "security-morty", "focus": "vulnerability assessment"},
+            {"role": "unity", "focus": "penetration testing (Shannon)"},
+            {"role": "tester-morty", "focus": "security test automation"},
+        ],
+        "coordination": {"mode": "parallel", "lead": "security-morty"},
+    },
+    "devops-team": {
+        "description": "Infrastructure and deployment team",
+        "roles": [
+            {"role": "devops-morty", "focus": "infrastructure and CI/CD"},
+            {"role": "backend-morty", "focus": "service configuration"},
+        ],
+        "coordination": {"mode": "parallel", "lead": "devops-morty"},
+    },
+}
 
 
-def get_template(name: str, root: Optional[Path] = None) -> Optional[dict]:
-    """Get a team template by name, loaded from agents/templates/{name}.json."""
-    if root is None:
-        try:
-            root = find_cto_root()
-        except SystemExit:
-            return None
-    fp = _templates_dir(root) / f"{name}.json"
-    if fp.exists():
-        try:
-            return load_json(fp)
-        except Exception:
-            pass
-    return None
+def get_template(name: str) -> Optional[dict]:
+    """Get a team template by name."""
+    return TEAM_TEMPLATES.get(name)
 
 
-def list_templates(root: Optional[Path] = None) -> list[str]:
-    """List all available team templates from agents/templates/."""
-    if root is None:
-        try:
-            root = find_cto_root()
-        except SystemExit:
-            return []
-    tdir = _templates_dir(root)
-    if not tdir.is_dir():
-        return []
-    return sorted(fp.stem for fp in tdir.glob("*.json"))
+def list_templates() -> list[str]:
+    """List all available team templates."""
+    return list(TEAM_TEMPLATES.keys())
 
 
 # ── Team Session Management ──────────────────────────────────────────────────
@@ -713,16 +730,12 @@ def cmd_templates(args):
     """List available team templates."""
     print("Available team templates:")
     print("─" * 50)
-    for name in list_templates():
-        template = get_template(name)
-        if not template:
-            continue
-        roles = ", ".join(r["role"] for r in template.get("roles", []))
-        coord = template.get("coordination", {})
+    for name, template in TEAM_TEMPLATES.items():
+        roles = ", ".join(r["role"] for r in template["roles"])
         print(f"\n{name}:")
-        print(f"  {template.get('description', '')}")
+        print(f"  {template['description']}")
         print(f"  Roles: {roles}")
-        print(f"  Mode: {coord.get('mode', '?')}, Lead: {coord.get('lead', '?')}")
+        print(f"  Mode: {template['coordination']['mode']}, Lead: {template['coordination']['lead']}")
 
 
 # ── CLI Parser ───────────────────────────────────────────────────────────────
@@ -734,7 +747,7 @@ def build_parser():
     # create
     c = sub.add_parser("create", help="Create a new team session")
     c.add_argument("--ticket", required=True, help="Parent ticket ID")
-    c.add_argument("--template", required=True, choices=list_templates(), help="Team template")
+    c.add_argument("--template", required=True, choices=list(TEAM_TEMPLATES.keys()), help="Team template")
 
     # list
     ls = sub.add_parser("list", help="List all teams")

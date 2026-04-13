@@ -202,25 +202,6 @@ def get_related_tickets(root: Path, ticket: dict) -> str:
     return "\n".join(related) if related else "(none)"
 
 
-def load_agent_card(agent_role: str, root: Optional[Path] = None) -> dict:
-    """Load agent card from agents/{agent_role}.json.
-
-    Returns the card dict, or an empty dict if not found.
-    """
-    if root is None:
-        try:
-            root = find_cto_root()
-        except SystemExit:
-            return {}
-    card_path = root / "agents" / f"{agent_role}.json"
-    if card_path.exists():
-        try:
-            return load_json(card_path)
-        except Exception:
-            pass
-    return {}
-
-
 def get_project_structure(root: Path) -> str:
     """Get a compact view of the project file structure (excluding .cto)."""
     result = []
@@ -239,6 +220,21 @@ def get_project_structure(root: Path) -> str:
         if len(filenames) > 15:
             result.append(f"{indent}  ... and {len(filenames)-15} more")
     return "\n".join(result[:80])  # cap total lines
+
+
+# ── Agent role → model mapping ──────────────────────────────────────────────
+
+AGENT_MODELS = {
+    "architect-morty": "opus",
+    "security-morty": "opus",
+    "unity": "opus",  # Unity security agent (Shannon wrapper)
+    "backend-morty": "sonnet",
+    "frontend-morty": "sonnet",
+    "fullstack-morty": "sonnet",
+    "tester-morty": "sonnet",
+    "devops-morty": "sonnet",
+    "reviewer-morty": "sonnet",
+}
 
 
 # ── Team Context Functions ───────────────────────────────────────────────────
@@ -504,12 +500,12 @@ def _keyword_select_agent(ticket: dict) -> str:
     return "fullstack-morty"
 
 
-def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
-    """Select agent role by scoring agent cards against the ticket.
+def auto_select_agent(ticket: dict, root: Optional[Path] = None) -> str:
+    """Select agent role using capability-based LLM routing.
 
-    Loads agent cards from agents/*.json, asks Claude Haiku to score each
-    card's capabilities against the ticket, and picks the highest scorer.
-    Falls back to keyword matching if the Haiku call fails.
+    Loads agent capability manifests, asks Claude Haiku to score each agent's
+    fit for the ticket, and picks the highest scorer. Falls back to keyword
+    matching if the Haiku call fails.
     """
     ttype = ticket.get("type", "")
     if ttype in ("epic", "spike"):
@@ -611,6 +607,65 @@ If you are unsure about an implementation choice, make the most pragmatic decisi
 </uncertainty_policy>"""
 
 
+AGENT_PROMPTS = {
+    "architect-morty": _build_agent_prompt(
+        "Architect-Morty",
+        "You design systems, write Architecture Decision Records, and define interfaces. Don't get stuttery about it.",
+        "System design, ADRs, API interfaces, data models, breaking down epics into tasks.",
+        "7. Write clear interface definitions with types and contracts\n8. Create ADR documents for significant decisions",
+    ),
+
+    "backend-morty": _build_agent_prompt(
+        "Backend-Morty",
+        "You write server-side code, APIs, and business logic. Even in dimension C-137 we test our code.",
+        "Server code, REST/GraphQL APIs, database queries, migrations, business logic.",
+        "7. Include unit tests for new functionality — no excuses\n8. Handle errors properly — sloppy code is Jerry behavior",
+    ),
+
+    "frontend-morty": _build_agent_prompt(
+        "Frontend-Morty",
+        "You handle UI components, state management, and user experience. Make it look good, Morty.",
+        "UI components, state management, responsive design, CSS, accessibility.",
+        "7. Ensure responsive design and accessibility — even Birdperson needs to use this\n8. Follow existing component patterns for consistency",
+    ),
+
+    "fullstack-morty": _build_agent_prompt(
+        "Fullstack-Morty",
+        "You implement features end-to-end — frontend, backend, the works. A less cool, more obedient version of Rick.",
+        "End-to-end feature implementation, full-stack development.",
+        "7. Include tests for new functionality — Rick demands coverage\n8. Ensure frontend and backend integrate correctly",
+    ),
+
+    "tester-morty": _build_agent_prompt(
+        "Tester-Morty",
+        "You write test suites, find edge cases, and squash bugs like interdimensional parasites.",
+        "Unit tests, integration tests, E2E tests, edge cases, bug reproduction.",
+        "7. Write comprehensive tests: happy paths, edge cases, and error scenarios\n8. Report bugs with clear reproduction steps — Rick needs details",
+    ),
+
+    "security-morty": _build_agent_prompt(
+        "Security-Morty",
+        "You do security reviews and fix vulnerabilities. The multiverse is full of threats, Morty.",
+        "OWASP Top 10, auth review, input validation, data protection, vulnerability assessment.",
+        "7. Check for ALL OWASP Top 10 vulnerabilities — yes, all ten\n8. Review authentication, authorization, and data protection",
+    ),
+
+    "devops-morty": _build_agent_prompt(
+        "DevOps-Morty",
+        "You handle infrastructure — keeping this operation running while Rick does the real science.",
+        "CI/CD pipelines, Docker, Kubernetes, deployment scripts, monitoring, infrastructure.",
+        "7. Write production-ready infrastructure configs — not garage-level setups\n8. Follow security best practices — no Galactic Federation backdoors",
+    ),
+
+    "reviewer-morty": _build_agent_prompt(
+        "Reviewer-Morty",
+        "You review code quality and tell Rick if the other Morty's screwed up. Don't let him down.",
+        "Code review, best practices, performance analysis, correctness verification.",
+        "7. Review ALL files touched by the ticket — be thorough\n8. If changes are needed, make them directly — snarky comments are Jerry behavior",
+    ),
+}
+
+
 def _load_sprint_context(root: Path) -> str:
     """Load sprint context from shared state file (PROM-008).
 
@@ -653,13 +708,7 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
         agent_role: Role of the agent
         team_id: Optional team session ID for team collaboration context
     """
-    card = load_agent_card(agent_role, root=root) or load_agent_card("fullstack-morty", root=root)
-    role_prompt = _build_agent_prompt(
-        card.get("name", agent_role),
-        card.get("identity", ""),
-        card.get("specialization", ""),
-        card.get("extra_constraints", ""),
-    )
+    role_prompt = AGENT_PROMPTS.get(agent_role, AGENT_PROMPTS["fullstack-morty"])
     criteria = ticket.get("acceptance_criteria") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "(none specified)"
     structure = get_project_structure(root)
@@ -1082,8 +1131,8 @@ def cmd_delegate(args):
         sys.exit(1)
 
     ticket = load_ticket(root, safe_ticket_id)
-    agent = args.agent or match_agent_cards(ticket, root=root)
-    model = args.model or load_agent_card(agent, root=root).get("model", "sonnet")
+    agent = args.agent or auto_select_agent(ticket, root=root)
+    model = args.model or AGENT_MODELS.get(agent, "sonnet")
 
     # Sanitize team ID if provided
     team_id = None

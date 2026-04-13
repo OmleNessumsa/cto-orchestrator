@@ -198,6 +198,27 @@ def run_team_cmd(root: Path, *args) -> str:
     return result.stdout + result.stderr
 
 
+# ── Team Templates ───────────────────────────────────────────────────────────
+
+TEAM_TEMPLATES = {
+    "fullstack-team": {
+        "description": "Full-stack feature development team",
+        "roles": ["architect-morty", "backend-morty", "frontend-morty"],
+    },
+    "api-team": {
+        "description": "API development and testing team",
+        "roles": ["architect-morty", "backend-morty", "tester-morty"],
+    },
+    "security-team": {
+        "description": "Security audit and hardening team",
+        "roles": ["architect-morty", "security-morty", "unity", "tester-morty"],
+    },
+    "devops-team": {
+        "description": "Infrastructure and deployment team",
+        "roles": ["devops-morty", "backend-morty"],
+    },
+}
+
 COMPLEXITY_TEAM_THRESHOLD = {"L": True, "XL": True}  # These need teams
 
 

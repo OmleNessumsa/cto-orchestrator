@@ -699,5 +699,37 @@
     "title": "delegate.py passes invalid --mcp-server flag to claude CLI",
     "severity": "critical",
     "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-10T18:42:27.373389+00:00",
+    "proposal_id": "PROM-057",
+    "action": "applied",
+    "title": "delegate.py passes invalid --mcp-server flag to claude CLI",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-10T18:45:11.845874+00:00",
+    "proposal_id": "PROM-046",
+    "action": "applied",
+    "title": "Add secret detection to prevent credential leakage in prompts and logs",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py",
+      "scripts/orchestrate.py",
+      "scripts/meeseeks.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-10T18:49:25.854459+00:00",
+    "proposal_id": "PROM-007",
+    "action": "applied",
+    "title": "Add Agent Card discovery protocol (A2A-inspired)",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/team.py",
+      "scripts/orchestrate.py"
+    ]
   }
 ]

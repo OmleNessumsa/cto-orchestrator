@@ -31,8 +31,6 @@ try:
         sanitize_text_input,
         wrap_untrusted_content,
         detect_injection_patterns,
-        detect_secrets,
-        redact_secrets,
         quarantine_prompt,
         validate_safe_path,
         sanitize_path_component,
@@ -67,10 +65,6 @@ except ImportError:
     )
     def detect_injection_patterns(text):
         return []
-    def detect_secrets(text):
-        return []
-    def redact_secrets(text):
-        return text
     def quarantine_prompt(content, patterns, source="unknown", log_dir=None):
         pass
     def validate_safe_path(base_dir, user_path: str):
@@ -113,7 +107,7 @@ def append_meeseeks_log(root: Path, entry: dict):
     ld.mkdir(parents=True, exist_ok=True)
     fp = ld / "meeseeks.log"
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{timestamp}] {redact_secrets(json.dumps(entry))}\n"
+    line = f"[{timestamp}] {json.dumps(entry)}\n"
     with open(fp, "a") as f:
         f.write(line)
 
@@ -175,12 +169,6 @@ MAX_TARGET_FILES = 20
 
 def build_meeseeks_prompt(task: str, target_files: list[str] | None, root: Path) -> str:
     """Assemble the Mr. Meeseeks prompt with injection defense (PROM-017)."""
-    # Scan task for secrets before sending to Claude
-    secret_scan_mode = os.environ.get("CTO_SECRET_SCAN_MODE", "warn").lower().strip()
-    detected = detect_secrets(task)
-    if detected and secret_scan_mode == "redact":
-        task = redact_secrets(task)
-
     safe_task = wrap_untrusted_content(task, label="MEESEEKS_TASK")
 
     if not target_files:
