@@ -559,7 +559,16 @@ def claude_prompt(prompt: str, model: str = "opus-4-7", thinking_budget: int = N
     # Attach MCP server so the planning agent can query/update CTO state
     mcp_server = Path(__file__).parent / "mcp_server.py"
     if mcp_server.exists():
-        cmd.extend(["--mcp-server", str(mcp_server)])
+        import json as _json
+        mcp_config = _json.dumps({
+            "mcpServers": {
+                "cto-orchestrator": {
+                    "command": "python3",
+                    "args": [str(mcp_server)],
+                }
+            }
+        })
+        cmd.extend(["--mcp-config", mcp_config])
 
     if thinking_budget is not None:
         cmd.extend(["--thinking-budget", str(thinking_budget)])

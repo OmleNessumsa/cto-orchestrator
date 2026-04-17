@@ -931,5 +931,37 @@
     "target_files": [
       "scripts/delegate.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-17T13:04:17.704553+00:00",
+    "proposal_id": "PROM-067",
+    "action": "self-reported",
+    "title": "orchestrate.py plan crasht op '--mcp-server' onbekende optie",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-17T14:40:00+00:00",
+    "proposal_id": "PROM-067",
+    "action": "applied-manual",
+    "title": "orchestrate.py plan crasht op '--mcp-server' onbekende optie",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-17T13:12:21.861160+00:00",
+    "proposal_id": "PROM-068",
+    "action": "self-reported",
+    "title": "delegate.py: --thinking-budget flag onbekend in claude CLI",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-17T13:12:28.968043+00:00",
+    "proposal_id": "PROM-069",
+    "action": "self-reported",
+    "title": "ticket.py create: --agent flag niet gepersisteerd",
+    "severity": "medium",
+    "category": "self-diagnosed"
   }
 ]

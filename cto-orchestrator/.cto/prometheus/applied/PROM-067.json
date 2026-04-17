@@ -1,0 +1,22 @@
+{
+  "id": "PROM-067",
+  "title": "orchestrate.py plan crasht op '--mcp-server' onbekende optie",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Draaide orchestrate.py plan vanuit het Zeasparkan project op 2026-04-17, claude CLI up-to-date.",
+  "description": "De 'plan' subcommand in orchestrate.py roept 'claude' aan met een --mcp-server flag die niet meer bestaat in de huidige claude CLI versie. Gevolg: plan-genereren faalt direct met 'error: unknown option --mcp-server'.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Verwijder --mcp-server uit de argv die orchestrate.py aan claude -p meegeeft, of maak de flag conditioneel op claude versie-detectie. Check scripts/orchestrate.py en delegate.py voor zelfde call-pattern.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T13:04:17.703079+00:00",
+  "applied_at": "2026-04-17T14:40:00+00:00",
+  "rollback_snapshot": null,
+  "notes": "Hand-applied: replaced --mcp-server with --mcp-config JSON pattern in orchestrate.py (mirroring delegate.py:1271). Updated mcp_server.py docstring usage line. Verified current claude CLI accepts --mcp-config with haiku smoke test."
+}

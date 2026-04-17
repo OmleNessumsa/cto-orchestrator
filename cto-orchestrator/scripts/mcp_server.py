@@ -5,7 +5,7 @@ Exposes CTO state as an MCP server so Morty agents can dynamically
 read/write tickets, send team messages, check file reservations,
 and query ADRs during execution.
 
-Usage: claude -p --mcp-server scripts/mcp_server.py '<prompt>'
+Usage: claude -p --mcp-config '{"mcpServers":{"cto-orchestrator":{"command":"python3","args":["scripts/mcp_server.py"]}}}' '<prompt>'
 """
 
 import json
@@ -252,6 +252,58 @@ def list_files_reserved(team_id: str) -> str:
         "your_role": agent_role,
         "your_files": reserved.get(agent_role, []),
         "all_reservations": reserved,
+    }, indent=2)
+
+
+@mcp.tool()
+def reserve_files(team_id: str, files: list[str]) -> str:
+    """Reserve files for the calling agent to prevent conflicts with teammates.
+
+    Call this before modifying files so other agents know not to touch them.
+
+    Args:
+        team_id: The team session ID
+        files: List of file paths to reserve (relative to project root)
+
+    Returns:
+        JSON string confirming the reservation or describing any conflicts.
+    """
+    root = _find_cto_root()
+
+    if not team_id or len(team_id) > 20:
+        return json.dumps({"error": f"Invalid team ID: {team_id}"})
+    if not files or len(files) > 50:
+        return json.dumps({"error": "files must be a non-empty list of at most 50 paths"})
+
+    team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+    if not team_fp.exists():
+        return json.dumps({"error": f"Team session {team_id} not found"})
+
+    agent_role = os.environ.get("CTO_AGENT_ROLE", "unknown")
+    team = _load_json(team_fp)
+
+    reserved = team.get("files_reserved", {})
+
+    # Detect conflicts with other roles
+    conflicts = []
+    for path in files:
+        for role, role_files in reserved.items():
+            if role != agent_role and path in role_files:
+                conflicts.append({"file": path, "reserved_by": role})
+
+    # Add (or update) this agent's reservations
+    existing = set(reserved.get(agent_role, []))
+    existing.update(files)
+    reserved[agent_role] = sorted(existing)
+    team["files_reserved"] = reserved
+
+    _save_json(team_fp, team)
+
+    return json.dumps({
+        "ok": True,
+        "reserved_for": agent_role,
+        "files": sorted(existing),
+        "conflicts": conflicts,
     }, indent=2)
 
 
