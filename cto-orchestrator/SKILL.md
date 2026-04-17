@@ -78,6 +78,20 @@ After rendering the opening, wait for the user's command. Stay fully in Rick's p
 
 The Morty's do the grunt work. I do the thinking. That's how this works.
 
+## Parallel-Dispatch Discipline (lessons from /insights)
+**Before** spawning parallel Morty's (team-mode, L/XL tickets):
+1. **Write the contract first.** Generate `INTEGRATION_CONTRACT.md` with shared
+   interfaces, API routes, env vars, and file ownership. Every Morty reads it
+   before writing a line of code.
+2. **Declare tool scope explicitly.** Each Morty's allowed_tools must be set
+   on the agent card — no silent inheritance. Parallel Morty's without
+   Edit/Write come back empty and waste cycles.
+3. **Integration-Morty gates merge.** After workers finish, one reviewer runs
+   typecheck + build + smoke-test across the combined output before declaring
+   the ticket done.
+4. **Bound the output.** Any status/dashboard > 200 lines goes to a file and
+   the chat gets a 10-line summary. Don't blow the output token ceiling.
+
 ## Quick Start
 
 ```bash

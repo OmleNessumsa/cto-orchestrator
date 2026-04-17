@@ -1,0 +1,24 @@
+{
+  "id": "PROM-064",
+  "title": "Generate INTEGRATION_CONTRACT.md before dispatching parallel Morty teams",
+  "category": "agent-patterns",
+  "source": "self-diagnosed",
+  "source_context": "Claude Code /insights analyzed 150+ sessions and identified this as the highest-ROI fix for parallel orchestration. Quote: 'Having agents agree on shared types/interfaces before coding would prevent most post-deploy firefighting.' Our team.py has context_file but not a strict integration contract step. [PRIORITY: /insights report identified as top-ROI fix]",
+  "description": "From /insights (Claude Code usage report): #1 root cause of 'mostly_achieved' sessions requiring hotfix rounds is parallel-agent integration bugs \u2014 API contract mismatches, missing files, CORS double-escaping, queue routing. Fix: before spawning parallel Mortys (team-mode), Rick generates a shared INTEGRATION_CONTRACT.md file containing: (1) API endpoint signatures with request/response types, (2) shared env vars, (3) file locations each agent writes to, (4) queue/event names, (5) shared TypeScript interfaces / JSON schemas. Then inject this file path as MANDATORY first read into each Morty's system prompt. Team-mode already has shared context; formalize it as a first-class contract file that teammates must ingest before any code is written.",
+  "impact_score": 9,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/team.py"
+  ],
+  "proposed_changes": "Add scripts/team.py command 'write-contract' that generates .cto/teams/<team-id>/INTEGRATION_CONTRACT.md from the epic ticket. Extend build_prompt() in delegate.py for team members to include: 'FIRST: read INTEGRATION_CONTRACT.md from team context \u2014 do NOT write code that violates these signatures.' Gate team start on contract existence.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T12:36:53.504174+00:00",
+  "applied_at": "2026-04-17T12:42:15.592929+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-064-20260417T123944",
+  "files_actually_changed": [
+    "scripts/team.py"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "PROM-066",
+  "title": "Enforce explicit Morty tool-scope permissions in delegation prompts",
+  "category": "agent-patterns",
+  "source": "self-diagnosed",
+  "source_context": "/insights: 'Parallel Mortys launched without Edit/Write permissions returned empty, forcing Claude to redo all fixes directly after the rebase approach also failed'. Our agent JSON files don't declare tool scopes. [PRIORITY: /insights report identified as top-ROI fix]",
+  "description": "From /insights: parallel Morty teams repeatedly stalled because sub-agents launched without Edit/Write/Bash permissions, forcing Rick to redo work manually. Currently delegate.py's build_prompt implicitly assumes Morty's have full tool access. Fix: for each Morty role, explicitly enumerate its required tool scope in the system prompt (e.g., backend-morty: [Read, Write, Edit, Bash, Grep, Glob]; security-morty: [Read, Grep, Bash-audit-only]). Pass this as an explicit 'ALLOWED TOOLS' block so the CLI/sandbox layer grants the right scope. Also document this in references/team-templates.md.",
+  "impact_score": 8,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add 'allowed_tools' field to each agents/*-morty.json. In build_prompt, inject: '## ALLOWED TOOLS\\nYou have permission to use: {tools}. Do not attempt tools outside this list.' Also surface in the console preview so users see what the Morty will be able to do.",
+  "status": "applied",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T12:37:09.184790+00:00",
+  "applied_at": "2026-04-17T12:45:15.824694+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-066-20260417T124215",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

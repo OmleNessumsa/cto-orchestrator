@@ -287,6 +287,16 @@ def get_team_messages(root: Path, team_id: str, for_role: str) -> list[dict]:
     return messages
 
 
+def _team_contract_path(root: Path, team_id: str) -> Path:
+    """Return the INTEGRATION_CONTRACT.md path for a team."""
+    return root / ".cto" / "teams" / team_id / "INTEGRATION_CONTRACT.md"
+
+
+def _team_contract_exists(root: Path, team_id: str) -> bool:
+    """Return True if the integration contract has been written for this team."""
+    return _team_contract_path(root, team_id).exists()
+
+
 def build_team_context(root: Path, team_id: str, agent_role: str) -> str:
     """Build context section for team collaboration.
 
@@ -847,6 +857,12 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
         card.get("specialization", ""),
         card.get("extra_constraints", ""),
     )
+    allowed_tools = card.get("allowed_tools", ["Read", "Write", "Edit", "Bash", "Grep", "Glob"])
+    allowed_tools_block = (
+        f"## ALLOWED TOOLS\n"
+        f"You have permission to use: {', '.join(allowed_tools)}. "
+        f"Do not attempt tools outside this list.\n"
+    )
     criteria = ticket.get("acceptance_criteria") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "(none specified)"
     structure = get_project_structure(root)
@@ -874,6 +890,7 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
     adr_list = ", ".join(adr_names) if adr_names else "(none)"
 
     team_delegation_note = ""
+    contract_note = ""
     if team_id:
         team_delegation_note = (
             "\n\n**TEAM MODE — DELEGATION REQUIRED**: You MUST delegate subtasks to teammates "
@@ -881,6 +898,16 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
             "Spawn teammate work explicitly for every subtask that falls outside your specialty. "
             "Doing everything yourself when teammates are available is Jerry behavior."
         )
+        contract_fp = _team_contract_path(root, team_id)
+        if _team_contract_exists(root, team_id):
+            contract_note = (
+                f"\n\n**INTEGRATION CONTRACT — MANDATORY FIRST READ**: Before writing a single "
+                f"line of code, read `{contract_fp}`. "
+                f"Do NOT create API endpoints, env vars, file paths, queue names, or TypeScript "
+                f"interfaces that contradict the signatures defined in that file. "
+                f"If you need to deviate, broadcast a `decision` message to `@*` FIRST, then "
+                f"update the contract."
+            )
 
     budget_section = ""
     if task_budget is not None:
@@ -893,6 +920,7 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
 
     prompt = f"""{budget_section}{role_prompt}
 
+{allowed_tools_block}
 ## Your Mission, Morty
 
 **Ticket {ticket['id']}**: {ticket['title']}
@@ -919,7 +947,7 @@ You have MCP tools to pull context on-demand — use them instead of guessing:
 - **reserve_files(team_id, files)** — Reserve files before modifying to prevent teammate conflicts.
 - **send_team_message(team_id, to, message, msg_type)** — Send a message to a teammate.
 - **update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.
-{team_delegation_note}"""
+{team_delegation_note}{contract_note}"""
 
     # Inject sprint context for downstream agents (PROM-008)
     sprint_ctx = _load_sprint_context(root)
@@ -1353,6 +1381,19 @@ def cmd_delegate(args):
 
     team_msg = f" (team: {team_id})" if team_id else ""
 
+    # Gate team delegation on integration contract existence
+    if team_id and not _team_contract_exists(root, team_id):
+        contract_fp = _team_contract_path(root, team_id)
+        err_console.print(
+            f"[red]Error: No integration contract found for team {team_id}.[/red]\n"
+            f"Generate one first with:\n"
+            f"  python3 scripts/team.py write-contract {team_id} --ticket {safe_ticket_id}\n"
+            f"Then fill in the contract at:\n"
+            f"  {contract_fp}\n"
+            f"*Burrrp* — skipping the contract is how you get a 3am hotfix, Morty."
+        )
+        sys.exit(1)
+
     # Show portal animation if visual module available
     try:
         from visual import animate_portal
@@ -1381,6 +1422,9 @@ def cmd_delegate(args):
         console.print(f"[dim]Task budget: ~{task_budget:,} tokens[/dim]")
     if effort:
         console.print(f"[dim]Effort level: {effort}[/dim]")
+    agent_card_preview = load_agent_card(agent, root=root)
+    preview_tools = agent_card_preview.get("allowed_tools", ["Read", "Write", "Edit", "Bash", "Grep", "Glob"])
+    console.print(f"[dim]Allowed tools: {', '.join(preview_tools)}[/dim]")
 
     prompt = build_prompt(root, ticket, agent, team_id=team_id, task_budget=task_budget)
 

@@ -880,5 +880,56 @@
       "scripts/delegate.py",
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-17T12:36:53.505509+00:00",
+    "proposal_id": "PROM-064",
+    "action": "self-reported",
+    "title": "Generate INTEGRATION_CONTRACT.md before dispatching parallel Morty teams",
+    "severity": "high",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-17T12:37:01.163505+00:00",
+    "proposal_id": "PROM-065",
+    "action": "self-reported",
+    "title": "Bound orchestrator output to prevent session-killing token limit errors",
+    "severity": "high",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-04-17T12:37:09.185807+00:00",
+    "proposal_id": "PROM-066",
+    "action": "self-reported",
+    "title": "Enforce explicit Morty tool-scope permissions in delegation prompts",
+    "severity": "medium",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-17T12:39:44.079826+00:00",
+    "proposal_id": "PROM-065",
+    "action": "applied",
+    "title": "Bound orchestrator output to prevent session-killing token limit errors",
+    "target_files": [
+      "scripts/visual.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T12:42:15.595214+00:00",
+    "proposal_id": "PROM-064",
+    "action": "applied",
+    "title": "Generate INTEGRATION_CONTRACT.md before dispatching parallel Morty teams",
+    "target_files": [
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T12:45:15.826699+00:00",
+    "proposal_id": "PROM-066",
+    "action": "applied",
+    "title": "Enforce explicit Morty tool-scope permissions in delegation prompts",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
   }
 ]

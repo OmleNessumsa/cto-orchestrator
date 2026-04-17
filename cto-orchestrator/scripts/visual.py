@@ -11,6 +11,7 @@ Features:
 - Individual agent status boxes
 """
 
+import io
 import json
 import os
 import sys
@@ -199,17 +200,52 @@ def render_morty_box(
     return ""
 
 
+# ── Bounded Output Helper ─────────────────────────────────────────────────────
+
+_BOUND_LINES = 200
+_BOUND_CHARS = 50_000
+
+
+def render_bounded(content: str, kind: str, root: Path) -> bool:
+    """Offload *content* to a report file when it exceeds display thresholds.
+
+    Thresholds: > 200 lines OR > 50 000 chars.
+
+    Prints a 10-line preview + file path to the console and returns True when
+    the content was offloaded.  Returns False when content is within bounds
+    (caller is responsible for rendering it normally).
+    """
+    lines = content.splitlines()
+    if len(lines) <= _BOUND_LINES and len(content) <= _BOUND_CHARS:
+        return False
+
+    reports_dir = root / ".cto" / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%d-%H%M")
+    report_file = reports_dir / f"{ts}-{kind}.md"
+    report_file.write_text(content)
+
+    preview = "\n".join(lines[:10])
+    console.print(Panel(
+        f"[dim]Output too large ({len(lines)} lines / {len(content):,} chars) — saved to file.[/dim]\n\n"
+        f"[white]{preview}[/white]\n"
+        f"[dim]…[/dim]\n\n"
+        f"[cyan]Full report → {report_file}[/cyan]",
+        title=f"[yellow]📄 {kind} (truncated)[/yellow]",
+        border_style="yellow",
+    ))
+    return True
+
+
+def _make_console(buf: io.StringIO) -> Console:
+    """Return a plain-text Console writing into *buf* (for size estimation)."""
+    return Console(file=buf, width=120, no_color=True, highlight=False)
+
+
 # ── Team Board ────────────────────────────────────────────────────────────────
 
-def render_team_board(team: dict) -> str:
-    """Render a full team collaboration board using Rich Table/Tree.
-
-    Args:
-        team: Team session dict
-
-    Returns:
-        Empty string (output printed via Rich console).
-    """
+def _render_team_board_impl(team: dict, con: Console) -> None:
+    """Core team board rendering — writes to *con*."""
     team_id = team.get("id", "TEAM-???")
     parent_ticket = team.get("parent_ticket", "???")
     status = team.get("status", "unknown")
@@ -221,8 +257,7 @@ def render_team_board(team: dict) -> str:
     completed = sum(1 for m in members if m.get("status") in ("completed", "done"))
     progress = int((completed / total * 100) if total else 0)
 
-    # Header panel
-    console.print(Panel(
+    con.print(Panel(
         f"Team: [bold]{team_id}[/bold]  "
         f"Ticket: [yellow]{parent_ticket}[/yellow]  "
         f"Status: {STATUS_ICONS.get(status, '❓')} [cyan]{status}[/cyan]  "
@@ -233,7 +268,6 @@ def render_team_board(team: dict) -> str:
     ))
 
     if mode == "mixed":
-        # Tree visualization for mixed-mode hierarchy
         lead_member = next((m for m in members if m.get("role") == lead), None)
         other_members = [m for m in members if m.get("role") != lead]
 
@@ -252,10 +286,9 @@ def render_team_board(team: dict) -> str:
                 f"{icon} [yellow]{role}[/yellow]  "
                 f"{STATUS_ICONS.get(s, '⏳')} [{sc}]{s}[/{sc}]"
             )
-        console.print(tree)
+        con.print(tree)
 
     else:
-        # Table visualization for parallel/sequential modes
         table = Table(
             show_header=True,
             header_style="bold cyan",
@@ -268,7 +301,6 @@ def render_team_board(team: dict) -> str:
         table.add_column("Focus")
 
         if mode == "sequential":
-            # Add ordering arrows between rows via numbering
             for i, m in enumerate(members):
                 role = m.get("role", "?")
                 s = m.get("status", "pending")
@@ -295,14 +327,13 @@ def render_team_board(team: dict) -> str:
                     f"{STATUS_ICONS.get(s, '⏳')} [{sc}]{s}[/{sc}]",
                     focus,
                 )
-        console.print(table)
+        con.print(table)
 
-    # Progress bar
     with Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(bar_width=50, style="green", complete_style="bright_green"),
         TextColumn("[cyan]{task.percentage:>3.0f}%[/cyan]"),
-        console=console,
+        console=con,
         transient=False,
     ) as prog:
         prog.add_task(
@@ -311,21 +342,30 @@ def render_team_board(team: dict) -> str:
             completed=progress,
         )
 
+
+def render_team_board(team: dict) -> str:
+    """Render a full team collaboration board using Rich Table/Tree.
+
+    Output exceeding 200 lines or 50 000 chars is written to
+    .cto/reports/ and only a 10-line summary is printed inline.
+
+    Returns:
+        Empty string (output printed via Rich console).
+    """
+    buf = io.StringIO()
+    _render_team_board_impl(team, _make_console(buf))
+    if render_bounded(buf.getvalue(), "team-board", find_cto_root()):
+        return ""
+    _render_team_board_impl(team, console)
     return ""
 
 
 # ── Sprint Dashboard ──────────────────────────────────────────────────────────
 
-def render_sprint_dashboard(tickets: list[dict], current_sprint: Optional[int] = None) -> str:
-    """Render a sprint dashboard with all tickets using Rich Table.
-
-    Args:
-        tickets: List of ticket dicts
-        current_sprint: Optional current sprint number
-
-    Returns:
-        Empty string (output printed via Rich console).
-    """
+def _render_sprint_dashboard_impl(
+    tickets: list[dict], current_sprint: Optional[int], con: Console
+) -> None:
+    """Core sprint dashboard rendering — writes to *con*."""
     status_counts: dict[str, int] = {}
     for t in tickets:
         s = t.get("status", "unknown")
@@ -366,13 +406,13 @@ def render_sprint_dashboard(tickets: list[dict], current_sprint: Optional[int] =
                 row_data.append("")
         table.add_row(*row_data)
 
-    console.print(table)
+    con.print(table)
 
     with Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(bar_width=50, style="cyan", complete_style="bright_cyan"),
         TextColumn("[cyan]{task.percentage:>3.0f}%[/cyan]"),
-        console=console,
+        console=con,
         transient=False,
     ) as prog:
         prog.add_task(
@@ -381,6 +421,21 @@ def render_sprint_dashboard(tickets: list[dict], current_sprint: Optional[int] =
             completed=progress,
         )
 
+
+def render_sprint_dashboard(tickets: list[dict], current_sprint: Optional[int] = None) -> str:
+    """Render a sprint dashboard with all tickets using Rich Table.
+
+    Output exceeding 200 lines or 50 000 chars is written to
+    .cto/reports/ and only a 10-line summary is printed inline.
+
+    Returns:
+        Empty string (output printed via Rich console).
+    """
+    buf = io.StringIO()
+    _render_sprint_dashboard_impl(tickets, current_sprint, _make_console(buf))
+    if render_bounded(buf.getvalue(), "sprint-dashboard", find_cto_root()):
+        return ""
+    _render_sprint_dashboard_impl(tickets, current_sprint, console)
     return ""
 
 
