@@ -613,6 +613,82 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Sleepy Mode Section */}
+      <section className="py-20 px-4 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="morty-card rounded-2xl p-8 md:p-12 relative overflow-hidden border-2 border-[var(--rick-blue)]/30">
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-full bg-[var(--rick-blue)]/20 flex items-center justify-center text-4xl">
+                  🌙
+                </div>
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold">
+                    <span className="text-[var(--rick-blue)]">{t.sleepy.title}</span>
+                  </h2>
+                  <p className="text-[var(--rick-blue)]/60 font-mono text-sm mt-1">
+                    {t.sleepy.tagline}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-lg mb-4 max-w-2xl">
+                {t.sleepy.description}
+              </p>
+              <p className="text-gray-500 mb-8 max-w-2xl">
+                {t.sleepy.how_it_works}
+              </p>
+
+              {/* Sleepy Features */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🧠</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.sleepy.feature1_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.sleepy.feature1_desc}</p>
+                </div>
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🌿</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.sleepy.feature2_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.sleepy.feature2_desc}</p>
+                </div>
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">📬</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.sleepy.feature3_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.sleepy.feature3_desc}</p>
+                </div>
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">📉</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.sleepy.feature4_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.sleepy.feature4_desc}</p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="mb-8 p-4 rounded-xl bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20">
+                <p className="text-[var(--rick-blue)] font-bold text-sm mb-1">{t.sleepy.stats_headline}</p>
+                <p className="text-gray-400 text-xs">{t.sleepy.stats_subline}</p>
+              </div>
+
+              {/* Example commands */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="code-block rounded-lg p-4">
+                  <p className="text-gray-500 text-xs mb-1">Start overnight run</p>
+                  <code className="text-[var(--rick-blue)] text-sm">
+                    {t.sleepy.example_start}
+                  </code>
+                </div>
+                <div className="code-block rounded-lg p-4">
+                  <p className="text-gray-500 text-xs mb-1">Review in the morning</p>
+                  <code className="text-[var(--rick-blue)] text-sm">
+                    {t.sleepy.example_review}
+                  </code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 px-4 relative">
         <div className="max-w-6xl mx-auto">
