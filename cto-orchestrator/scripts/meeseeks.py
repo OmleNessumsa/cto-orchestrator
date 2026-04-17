@@ -36,6 +36,9 @@ try:
         quarantine_prompt,
         validate_safe_path,
         sanitize_path_component,
+        validate_agent_output_schema,
+        audit_log_security_event,
+        should_skip_permissions,
         SecurityViolationError,
         SANDWICH_REINFORCEMENT,
     )
@@ -89,6 +92,20 @@ except ImportError:
         if sanitized in ('..', '.'):
             raise ValueError(f"Path traversal attempt detected: {component}")
         return sanitized
+
+    def validate_agent_output_schema(output, schema):
+        """Fallback: no schema validation available without security_utils."""
+        return True, []
+
+    def audit_log_security_event(event_type, details, severity="info", log_dir=None):
+        if severity in ("warning", "critical"):
+            print(f"[SECURITY-{severity.upper()}] {event_type}: {details[:200]}", file=sys.stderr)
+    def should_skip_permissions(explicit_flag: bool = False) -> bool:
+        env_allowed = os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true"
+        if explicit_flag and env_allowed:
+            audit_log_security_event("skip_permissions_authorized", "Using --dangerously-skip-permissions", severity="warning")
+            return True
+        return False
 
 
 def find_cto_root(start=None) -> Path:
@@ -223,11 +240,40 @@ def parse_meeseeks_output(output: str) -> dict:
     """Parse the Meeseeks report from output.
 
     Tries structured JSON extraction first (from ```json fences),
-    then falls back to regex-based Markdown parsing for backward compatibility.
+    then falls back to the schemas module. Validates all JSON output against
+    a strict schema before acting on it (OWASP LLM09).
     """
+    # ── Check for EXISTENCE IS PAIN escalation before JSON parsing ──
+    if "EXISTENCE IS PAIN" in output.upper():
+        return {
+            "status": "too_complex",
+            "files_changed": [],
+            "description": "Task too complex for a Meeseeks. Rick needs to assign a Morty.",
+            "complexity": "too_complex",
+            "confidence": "low",
+            "next_steps": [],
+            "existence_is_pain": True,
+        }
+
     # ── Try inline JSON extraction first ──
     json_data = _extract_json_from_output(output)
     if json_data is not None:
+        is_valid, schema_errors = validate_agent_output_schema(json_data, "meeseeks")
+        if not is_valid:
+            audit_log_security_event(
+                "schema_validation_failed",
+                f"Meeseeks output failed schema validation: {'; '.join(schema_errors)}",
+                severity="warning",
+            )
+            return {
+                "status": "needs_review",
+                "files_changed": [],
+                "description": f"Meeseeks output rejected: failed schema validation ({'; '.join(schema_errors[:2])})",
+                "complexity": "simple",
+                "confidence": "low",
+                "next_steps": [],
+                "existence_is_pain": False,
+            }
         existence_is_pain = json_data.get("status", "").lower() == "too_complex"
         return {
             "status": json_data.get("status", "completed"),
@@ -245,66 +291,45 @@ def parse_meeseeks_output(output: str) -> dict:
         json_result = parse_meeseeks_json(output)
         if json_result is not None:
             parsed = json_result.to_dict()
+            is_valid, schema_errors = validate_agent_output_schema(parsed, "meeseeks")
+            if not is_valid:
+                audit_log_security_event(
+                    "schema_validation_failed",
+                    f"Meeseeks output (schemas) failed schema validation: {'; '.join(schema_errors)}",
+                    severity="warning",
+                )
+                return {
+                    "status": "needs_review",
+                    "files_changed": [],
+                    "description": f"Meeseeks output rejected: failed schema validation ({'; '.join(schema_errors[:2])})",
+                    "complexity": "simple",
+                    "confidence": "low",
+                    "next_steps": [],
+                    "existence_is_pain": False,
+                }
             parsed.setdefault("confidence", "high")
             parsed.setdefault("next_steps", [])
             return parsed
     except ImportError:
         pass
 
-    # ── Fallback: regex-based parsing ──
-    result = {
-        "status": "completed",
+    # ── No structured JSON found — return safe default ──
+    # Regex fallback parsing removed (OWASP LLM09): unstructured content must not
+    # be parsed as structured output since it could bypass validation checks.
+    audit_log_security_event(
+        "no_structured_output",
+        "Meeseeks output contained no parseable JSON block; returning safe default",
+        severity="info",
+    )
+    return {
+        "status": "needs_review",
         "files_changed": [],
-        "description": "",
+        "description": output[-300:].strip() if output else "(no output)",
         "complexity": "simple",
-        "confidence": "high",
+        "confidence": "low",
         "next_steps": [],
         "existence_is_pain": False,
     }
-
-    # Check for the EXISTENCE IS PAIN escalation
-    if "EXISTENCE IS PAIN" in output.upper():
-        result["status"] = "too_complex"
-        result["existence_is_pain"] = True
-        result["complexity"] = "too_complex"
-        result["description"] = "Task too complex for a Meeseeks. Rick needs to assign a Morty."
-        return result
-
-    # Try to find the Meeseeks Report section (legacy Markdown)
-    report_match = re.search(r"###\s*Meeseeks Report\s*\n(.*)", output, re.DOTALL | re.IGNORECASE)
-
-    if report_match:
-        report = report_match.group(1)
-
-        # Status
-        status_match = re.search(r"\*\*Status\*\*:\s*(\w+)", report)
-        if status_match:
-            result["status"] = status_match.group(1).lower()
-
-        # Files changed
-        files_match = re.search(r"\*\*Bestanden gewijzigd\*\*:\s*(.*?)(?:\n\*\*|\Z)", report, re.DOTALL)
-        if files_match:
-            raw = files_match.group(1).strip()
-            files = []
-            for line in raw.split("\n"):
-                line = line.strip().lstrip("- ").strip("`").strip()
-                if line and not line.startswith("[") and ("/" in line or "." in line):
-                    files.append(line)
-            result["files_changed"] = files
-
-        # Description
-        desc_match = re.search(r"\*\*Beschrijving\*\*:\s*(.*?)(?:\n\*\*|\Z)", report, re.DOTALL)
-        if desc_match:
-            result["description"] = desc_match.group(1).strip()
-
-        # Complexity
-        cx_match = re.search(r"\*\*Complexiteit\*\*:\s*(\w+)", report)
-        if cx_match:
-            result["complexity"] = cx_match.group(1).lower()
-    else:
-        result["description"] = output[-300:].strip()
-
-    return result
 
 
 def summon_meeseeks(prompt: str, model: str = "sonnet", timeout: int = 180) -> str:
@@ -334,10 +359,9 @@ def summon_meeseeks(prompt: str, model: str = "sonnet", timeout: int = 180) -> s
 
     cmd = ["claude", "-p"]
 
-    # SECURITY: Only skip permissions if explicitly authorized via environment variable
-    if os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true":
+    # SECURITY: Only skip permissions if BOTH explicit_flag=True AND env var set
+    if should_skip_permissions(explicit_flag=False):
         cmd.append("--dangerously-skip-permissions")
-        print("[SECURITY] Using --dangerously-skip-permissions (authorized)", file=sys.stderr)
 
     if model:
         cmd.extend(["--model", model])

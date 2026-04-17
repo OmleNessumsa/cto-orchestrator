@@ -12,8 +12,11 @@
     "scripts/orchestrate.py"
   ],
   "proposed_changes": "1. Add a `reflect_on_output()` function in delegate.py that takes the agent's output and the ticket's acceptance_criteria, calls `claude -p --model haiku` with a prompt like 'Review this agent output against these acceptance criteria. Return JSON {\"criteria_met\": [list], \"criteria_missed\": [list], \"pass\": bool}'. 2. In the main delegation flow (after agent completes), call reflect_on_output(). If pass=false and missed criteria exist, re-invoke the agent with the reflection feedback appended to the prompt (max 1 retry to avoid loops). 3. Add a --no-reflect flag to delegate.py for cases where reflection should be skipped (e.g. dry-run, simple tasks). 4. Log reflection results to the ticket's agent_output for reviewer-morty visibility.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:33:54.458319+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-17T10:54:14.731733+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-029-20260417T105244",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

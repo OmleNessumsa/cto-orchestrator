@@ -1,0 +1,23 @@
+{
+  "id": "PROM-063",
+  "title": "Integrate Sleepy Mode (Stein's autonomous Claude Code loop) for long-horizon unattended sprints",
+  "category": "tooling",
+  "source": "self-diagnosed",
+  "source_context": "User has Claude Pro Max account with unused token headroom. Wants autonomous overnight/weekend loops that burn allocated tokens on real work while Elmo sleeps. Stein's sleepy repo is MIT-licensed \u2014 can vendor/fork and adapt to Rick's Morty/ticket model. Key insight: our .cto/tickets/ is already a backlog; add a sleepy_supervisor script that loops orchestrate sprint with token budget tracking + worktree isolation + review queue. [PRIORITY: user-requested Pro Max token utilization]",
+  "description": "User's colleague Stein (github.com/STEIN64-BIT/sleepy, MIT) built an autonomous Claude Code loop that runs unattended for hours/days producing git branches for review. Core mechanics: (1) supervisor process enforces duration + token cap (--cap 5000000) + intensity presets (30k-300k tokens/iter), (2) orchestrator session decides next task writing next-action.json, (3) worker session executes in isolated git worktree on sleepy/<slug> branch, commits + writes SLEEPY_ARTIFACT.md, (4) diff validated against deny-list, (5) completed work queued in SLEEPY_QUEUE.md for review. Adaptive pacing downshifts intensity (high->medium->low) if burn rate exceeds remaining budget. PERFECT FIT with Rick's architecture \u2014 our Rick=orchestrator, Morty=worker, tickets=backlog, .cto/=.sleepy/. Unlocks: (a) Elmo's Pro Max token allowance fully utilized in sleepy mode overnight runs, (b) git worktree isolation (new safety layer we lack), (c) Opus 4.7 task_budget integration perfectly complements Sleepy's adaptive pacing.",
+  "impact_score": 9,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Create scripts/sleepy.py with subcommands: (1) 'sleepy go <english>' \u2014 NL planner using claude -p --model opus-4-7 to set duration/focus; (2) 'sleepy start --duration 8h --cap 5M --intensity medium' \u2014 runs orchestrate sprint loop in a subprocess, each ticket gets worktree, commits to sleepy/TICKET-id branch; (3) 'sleepy queue' \u2014 show pending review items; (4) 'sleepy apply N' / 'sleepy discard N' \u2014 merge or drop. Store state in .cto/sleepy/ (RULES.md, BACKLOG.md symlinked to tickets, QUEUE.md, budget.json). Integrate with Opus 4.7 task_budget: adaptive pacing writes task_budget=remaining_tokens/expected_iters to each Morty delegation. Add denylist validation reusing security_utils.py. Log iterations to .cto/logs/sleepy-{date}.jsonl.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T10:35:42.340122+00:00",
+  "applied_at": "2026-04-17T11:50:00+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-063-20260417T103557",
+  "reject_reason": null,
+  "notes": "Auto-evolve timed out twice on greenfield scaffolding; built MVP manually. 585-line scripts/sleepy.py + .cto/sleepy/ scaffolding."
+}

@@ -385,6 +385,35 @@ class SecurityContext:
         return teams_dir / f"{safe_id}.json"
 
 
+# ── Permission Skip Guard ─────────────────────────────────────────────────────
+
+def should_skip_permissions(explicit_flag: bool = False) -> bool:
+    """Determine whether --dangerously-skip-permissions should be used.
+
+    Requires BOTH conditions to return True (defense-in-depth):
+    1. explicit_flag=True was passed by the caller
+    2. CTO_ALLOW_SKIP_PERMISSIONS env var is set to "true"
+
+    Logs a security audit event whenever permissions are skipped.
+
+    Args:
+        explicit_flag: The caller's explicit opt-in to skip permissions.
+                       Pass False (default) to always deny.
+
+    Returns:
+        True only when both conditions are met.
+    """
+    env_allowed = os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true"
+    if explicit_flag and env_allowed:
+        audit_log_security_event(
+            "skip_permissions_authorized",
+            "Using --dangerously-skip-permissions (explicit_flag=True + env var set)",
+            severity="warning",
+        )
+        return True
+    return False
+
+
 # ── Deprecated Pattern Warning ────────────────────────────────────────────────
 
 def warn_dangerous_pattern(pattern: str, location: str):
@@ -692,6 +721,101 @@ def sanitize_agent_output(parsed: dict) -> dict:
     sanitized["open_questions"] = sanitize_text_input(str(questions), max_length=1000)
 
     return sanitized
+
+
+def validate_agent_output_schema(output: dict, schema: str) -> tuple[list, list]:
+    """Validate a parsed agent output dict against a named JSON schema.
+
+    Uses jsonschema if available, otherwise falls back to a lightweight
+    built-in validator. Rejects outputs that don't conform so callers can
+    log and return a structured error instead of acting on untrusted data
+    (OWASP LLM09).
+
+    Args:
+        output: Parsed agent output dict to validate
+        schema: Schema name — "delegate" or "meeseeks"
+
+    Returns:
+        Tuple of (is_valid: bool, errors: list[str])
+    """
+    # Lazy import to avoid circular dependencies
+    try:
+        from schemas import DELEGATE_OUTPUT_SCHEMA, MEESEEKS_OUTPUT_SCHEMA
+        schema_map: dict = {
+            "delegate": DELEGATE_OUTPUT_SCHEMA,
+            "meeseeks": MEESEEKS_OUTPUT_SCHEMA,
+        }
+    except ImportError:
+        # Minimal inline schemas when schemas module is not available
+        schema_map = {
+            "delegate": {
+                "required": ["status", "files_changed"],
+                "properties": {
+                    "status": {"enum": ["completed", "needs_review", "blocked"]},
+                    "files_changed": {"type": "array"},
+                },
+            },
+            "meeseeks": {
+                "required": ["status", "files_changed"],
+                "properties": {
+                    "status": {"enum": ["completed", "too_complex"]},
+                    "files_changed": {"type": "array"},
+                },
+            },
+        }
+
+    schema_def = schema_map.get(schema)
+    if schema_def is None:
+        return False, [f"Unknown schema name: '{schema}'"]
+
+    if not isinstance(output, dict):
+        return False, ["Output must be a JSON object (dict)"]
+
+    # Try jsonschema library first
+    try:
+        import jsonschema
+        try:
+            jsonschema.validate(output, schema_def)
+            return True, []
+        except jsonschema.ValidationError as exc:
+            return False, [exc.message]
+        except jsonschema.SchemaError as exc:
+            return False, [f"Schema error: {exc.message}"]
+    except ImportError:
+        pass
+
+    # Lightweight fallback validator (stdlib only)
+    errors: list[str] = []
+
+    for field in schema_def.get("required", []):
+        if field not in output:
+            errors.append(f"Missing required field: '{field}'")
+
+    for prop, prop_schema in schema_def.get("properties", {}).items():
+        if prop not in output:
+            continue
+        value = output[prop]
+
+        if "enum" in prop_schema and value not in prop_schema["enum"]:
+            errors.append(
+                f"Field '{prop}' must be one of {prop_schema['enum']}, got {value!r}"
+            )
+
+        if "type" in prop_schema:
+            expected = prop_schema["type"]
+            type_ok = (
+                (expected == "string" and isinstance(value, str))
+                or (expected == "array" and isinstance(value, list))
+                or (expected == "object" and isinstance(value, dict))
+                or (expected == "boolean" and isinstance(value, bool))
+                or (expected == "number" and isinstance(value, (int, float)))
+            )
+            if not type_ok:
+                errors.append(
+                    f"Field '{prop}' must be type '{expected}', got {type(value).__name__}"
+                )
+
+    return len(errors) == 0, errors
 
 
 def audit_log_security_event(

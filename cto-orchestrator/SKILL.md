@@ -177,6 +177,21 @@ python scripts/orchestrate.py status
 | `python scripts/team.py templates` | List team templates |
 | `python scripts/ticket.py create --team-mode collaborative --team-template fullstack-team` | Create team ticket |
 
+### Sleepy Mode — Autonomous Overnight Sprints (NEW!)
+Inspired by [Stein's sleepy](https://github.com/STEIN64-BIT/sleepy) (MIT), adapted to Rick's Morty/ticket architecture. Runs unattended for hours/days, burning your Claude Pro Max token allowance while you sleep. Each completed ticket lands on a `sleepy/<TICKET-id>` branch for review.
+
+| Command | Description |
+|---------|-------------|
+| `python scripts/sleepy.py init` | Scaffold `.cto/sleepy/` (RULES.md + MEMORY.md + QUEUE.md) |
+| `python scripts/sleepy.py start --duration 8h --cap 5M --intensity medium` | Run supervisor loop (blocking) |
+| `python scripts/sleepy.py status` | Live dashboard (budget, iterations, queue) |
+| `python scripts/sleepy.py queue` | List pending review branches |
+| `python scripts/sleepy.py apply N` | Merge sleepy/TICKET-id branch into current |
+| `python scripts/sleepy.py discard N` | Delete sleepy branch |
+| `python scripts/sleepy.py stop` | Signal graceful shutdown |
+
+**Intensity presets** (Opus 4.7 `task_budget` per iteration): low=30k · medium=60k · high=150k · max=300k. Adaptive pacing downshifts when burn-rate exceeds cap/time ratio.
+
 ### Unity Security Agent
 | Command | Description |
 |---------|-------------|

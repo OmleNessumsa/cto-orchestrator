@@ -1,0 +1,24 @@
+{
+  "id": "PROM-059",
+  "title": "Add task_budget advisory for Morty delegation to prevent runaway agentic loops",
+  "category": "claude-features",
+  "source": "self-diagnosed",
+  "source_context": "delegate.py:929 delegate_to_agent has timeout but no token-loop budget. For long agentic Morty runs this causes unpredictable cost/token usage. The claude CLI doesn't yet accept --task-budget natively, but we can inject it via prompt scaffolding until CLI support lands.",
+  "description": "Opus 4.7 introduced task_budgets (beta header task-budgets-2026-03-13) \u2014 an advisory token budget the model sees as a running countdown across a full agentic loop. Unlike max_tokens (hard cap, model unaware), task_budget lets the model self-moderate and gracefully finish work. PERFECT for Morty subprocess delegation where Morty's can currently run unbounded. Implementation: add --task-budget flag to delegate.py; when set, inject a TASK BUDGET section into the Morty system prompt: 'You have approximately N tokens across this entire agentic loop (thinking + tool calls + output). Prioritize and wrap up gracefully as you approach this limit.' Map ticket complexity to budget: XL=200k, L=120k, M=60k, S=30k. Minimum 20k per Anthropic docs.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add task_budget param to delegate_to_agent(). In the Morty prompt assembly, prepend: '## BUDGET (Opus 4.7 task_budget advisory)\\nYou have ~{N} tokens total for this entire agentic loop (thinking, tool calls, final output). Track your usage mentally and finish gracefully as the budget approaches exhaustion.\\n'. Add --task-budget CLI arg, auto-derive from ticket complexity if unset.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T09:56:58.665014+00:00",
+  "applied_at": "2026-04-17T09:58:56.921036+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-059-20260417T095741",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

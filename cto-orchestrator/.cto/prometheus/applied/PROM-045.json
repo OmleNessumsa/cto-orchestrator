@@ -14,8 +14,14 @@
     "scripts/schemas.py"
   ],
   "proposed_changes": "1. In schemas.py, define JSON Schema definitions for expected agent output structures (e.g., DelegateOutputSchema with required fields: status, summary, files_changed). 2. Add a validate_agent_output_schema(output: dict, schema: str) function in security_utils.py that validates parsed JSON against the schema using jsonschema or a lightweight validator. Reject outputs that don't conform. 3. In delegate.py and meeseeks.py, after JSON parsing and before acting on results, call validate_agent_output_schema(). If validation fails, log the event and return a structured error rather than falling back to regex parsing of untrusted output. 4. Remove regex fallback parsing paths that could accept arbitrary unstructured content.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:42:06.108885+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-17T10:14:03.868040+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-045-20260417T100941",
+  "files_actually_changed": [
+    "scripts/meeseeks.py",
+    "scripts/security_utils.py",
+    "scripts/delegate.py",
+    "scripts/schemas.py"
+  ]
 }

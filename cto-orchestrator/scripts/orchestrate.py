@@ -53,6 +53,7 @@ try:
         redact_secrets,
         quarantine_prompt,
         audit_log_security_event,
+        should_skip_permissions,
         SecurityViolationError,
         SANDWICH_REINFORCEMENT,
     )
@@ -93,6 +94,12 @@ except ImportError:
     def audit_log_security_event(event_type, details, severity="info", log_dir=None):
         if severity in ("warning", "critical"):
             err_console.print(f"[red][SECURITY-{severity.upper()}] {event_type}: {details[:200]}[/red]")
+    def should_skip_permissions(explicit_flag: bool = False) -> bool:
+        env_allowed = os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true"
+        if explicit_flag and env_allowed:
+            audit_log_security_event("skip_permissions_authorized", "Using --dangerously-skip-permissions", severity="warning")
+            return True
+        return False
 
 
 # ── Shared helpers (same as other scripts) ──────────────────────────────────
@@ -518,7 +525,7 @@ def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], ti
     return results
 
 
-def claude_prompt(prompt: str, model: str = "sonnet", thinking_budget: int = None) -> str:
+def claude_prompt(prompt: str, model: str = "opus-4-7", thinking_budget: int = None) -> str:
     """Call claude CLI directly for Rick-level genius thinking.
 
     SECURITY NOTE: The --dangerously-skip-permissions flag is only enabled
@@ -545,10 +552,9 @@ def claude_prompt(prompt: str, model: str = "sonnet", thinking_budget: int = Non
 
     cmd = ["claude", "-p", "--model", model]
 
-    # SECURITY: Only skip permissions if explicitly authorized
-    if os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true":
+    # SECURITY: Only skip permissions if BOTH explicit_flag=True AND env var set
+    if should_skip_permissions(explicit_flag=False):
         cmd.insert(2, "--dangerously-skip-permissions")
-        print("[SECURITY] Using --dangerously-skip-permissions (authorized)", file=sys.stderr)
 
     # Attach MCP server so the planning agent can query/update CTO state
     mcp_server = Path(__file__).parent / "mcp_server.py"

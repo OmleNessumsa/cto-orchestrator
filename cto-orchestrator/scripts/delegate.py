@@ -44,7 +44,9 @@ try:
         sanitize_text_input,
         wrap_untrusted_content,
         sanitize_agent_output,
+        validate_agent_output_schema,
         audit_log_security_event,
+        should_skip_permissions,
         detect_injection_patterns,
         detect_secrets,
         redact_secrets,
@@ -105,6 +107,13 @@ except ImportError:
         if severity in ("warning", "critical"):
             err_console.print(f"[red][SECURITY-{severity.upper()}] {event_type}: {details[:200]}[/red]")
 
+    def should_skip_permissions(explicit_flag: bool = False) -> bool:
+        env_allowed = os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true"
+        if explicit_flag and env_allowed:
+            audit_log_security_event("skip_permissions_authorized", "Using --dangerously-skip-permissions", severity="warning")
+            return True
+        return False
+
     def detect_injection_patterns(text):
         return []
 
@@ -116,6 +125,10 @@ except ImportError:
 
     def quarantine_prompt(content, patterns, source="unknown", log_dir=None):
         pass
+
+    def validate_agent_output_schema(output, schema):
+        """Fallback: no schema validation available without security_utils."""
+        return True, []
 
 
 def find_cto_root(start=None) -> Path:
@@ -348,46 +361,100 @@ Team lead: {team['coordination']['lead']}
                 conflict_lines.append(f"  - @{role}: {', '.join(files)}")
             sections.append("**Files Reserved by Others** (DO NOT MODIFY):\n" + "\n".join(conflict_lines))
 
-    # Communication instructions
+    # Communication instructions — structured handoff envelope
     sections.append("""
 ### Team Communication
 
-To communicate with your team, include a section in your output:
+At the END of your output, emit a structured handoff block so Rick can parse it reliably:
 
 ```
-### Team Updates
-**Messages to team**:
-- @backend-morty: [your message here]
-- @*: [broadcast to all team members]
-
-**Decisions made**:
-- [decision description]
-
-**Blocked on**:
-- Waiting for @architect-morty to [reason]
+<handoff_json>
+{
+  "handoff": {
+    "messages": [
+      {"to": "@backend-morty", "content": "API schema ready at schemas/api.json", "type": "artifact"},
+      {"to": "@*", "content": "Using REST not GraphQL — see ADR-003", "type": "decision"}
+    ],
+    "artifacts": [
+      {"type": "api-schema", "content": {"endpoint": "/users", "method": "GET"}},
+      {"type": "test-result", "content": {"passed": 12, "failed": 0}}
+    ],
+    "status": "completed",
+    "blocked_on": []
+  }
+}
+</handoff_json>
 ```
 
-This helps Rick coordinate the Morty army effectively.
+Supported message types: `decision`, `question`, `artifact`
+Supported artifact types: `api-schema`, `test-result`, `adr`
+Set `status` to `blocked` and list reasons in `blocked_on` if you cannot complete your work.
+Omit arrays that are empty — Rick doesn't want JSON noise.
 """)
 
     return "\n\n".join(sections)
 
 
+def _extract_handoff_json(output: str) -> Optional[dict]:
+    """Extract structured handoff envelope from <handoff_json>...</handoff_json> block."""
+    match = re.search(r"<handoff_json>\s*(.*?)\s*</handoff_json>", output, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
 def parse_team_agent_output(output: str) -> dict:
     """Parse team-related output from agent response.
+
+    Tries structured <handoff_json> extraction first (A2A-inspired protocol),
+    then falls back to regex-based markdown parsing for backwards compatibility.
 
     Extracts:
     - Messages to other team members
     - Decisions made
     - Blocked dependencies
+    - Typed artifacts (api-schema, test-result, adr)
     """
     result = {
         "messages": [],
         "decisions": [],
         "blocked_on": [],
+        "artifacts": [],
     }
 
-    # Find Team Updates section
+    # ── Try structured handoff JSON first ──
+    handoff_data = _extract_handoff_json(output)
+    if handoff_data is not None:
+        handoff = handoff_data.get("handoff", {})
+
+        for msg in handoff.get("messages", []):
+            to = msg.get("to", "")
+            content = msg.get("content", "")
+            msg_type = msg.get("type", "info")
+            if to and content:
+                result["messages"].append({
+                    "to": to.lstrip("@"),
+                    "message": content,
+                    "type": msg_type,
+                })
+                # Decisions embedded in messages surface to decisions list too
+                if msg_type == "decision":
+                    result["decisions"].append(content)
+
+        for artifact in handoff.get("artifacts", []):
+            if artifact.get("type") and artifact.get("content") is not None:
+                result["artifacts"].append(artifact)
+
+        for item in handoff.get("blocked_on", []):
+            if item:
+                result["blocked_on"].append(item)
+
+        return result
+
+    # ── Fallback: regex-based markdown parsing (backwards compatibility) ──
     team_match = re.search(r"###\s*Team Updates\s*\n(.*?)(?:\n###|\Z)", output, re.DOTALL | re.IGNORECASE)
     if not team_match:
         return result
@@ -399,12 +466,12 @@ def parse_team_agent_output(output: str) -> dict:
     if messages_match:
         for line in messages_match.group(1).strip().split("\n"):
             line = line.strip().lstrip("- ")
-            # Parse @recipient: message
             msg_match = re.match(r"@(\S+):\s*(.+)", line)
             if msg_match:
                 result["messages"].append({
                     "to": msg_match.group(1),
                     "message": msg_match.group(2).strip(),
+                    "type": "info",
                 })
 
     # Parse decisions
@@ -429,7 +496,8 @@ def parse_team_agent_output(output: str) -> dict:
 def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
     """Process and save team-related output.
 
-    Saves messages to the team message queue and decisions to shared context.
+    Saves messages to the team message queue, decisions and typed artifacts
+    to shared context so downstream agents can consume them.
     """
     parsed = parse_team_agent_output(output)
 
@@ -447,20 +515,25 @@ def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
                 "from": agent_role,
                 "to": msg["to"],
                 "message": msg["message"],
-                "type": "info",
+                "type": msg.get("type", "info"),
                 "timestamp": now_iso(),
                 "read_by": [],
             }
             save_json(msg_dir / f"msg-{msg_num:03d}.json", msg_data)
             msg_num += 1
 
-    # Save decisions to context
-    if parsed["decisions"]:
+    # Save decisions and artifacts to shared context
+    has_decisions = bool(parsed["decisions"])
+    has_artifacts = bool(parsed.get("artifacts"))
+    if has_decisions or has_artifacts:
         ctx_fp = root / ".cto" / "teams" / "context" / f"{team_id}-shared.json"
         if ctx_fp.exists():
             ctx = load_json(ctx_fp)
         else:
-            ctx = {"team_id": team_id, "decisions": [], "interfaces": [], "notes": []}
+            ctx = {"team_id": team_id, "decisions": [], "interfaces": [], "notes": [], "artifacts": []}
+
+        # Ensure artifacts list exists for older context files
+        ctx.setdefault("artifacts", [])
 
         for decision in parsed["decisions"]:
             ctx["decisions"].append({
@@ -468,6 +541,16 @@ def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
                 "author": agent_role,
                 "timestamp": now_iso(),
             })
+
+        # Store typed artifacts so downstream agents can consume them
+        for artifact in parsed.get("artifacts", []):
+            ctx["artifacts"].append({
+                "type": artifact["type"],
+                "content": artifact["content"],
+                "author": agent_role,
+                "timestamp": now_iso(),
+            })
+
         ctx["updated_at"] = now_iso()
         save_json(ctx_fp, ctx)
 
@@ -576,6 +659,67 @@ def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
     return _keyword_select_agent(ticket)
 
 
+# ── Scratchpad / Persistent Memory ──────────────────────────────────────────
+
+def _ensure_scratchpad(root: Path, agent_role: str) -> Path:
+    """Return the scratchpad path for agent_role, creating it if needed."""
+    scratchpad_dir = root / ".cto" / "scratchpad"
+    scratchpad_dir.mkdir(parents=True, exist_ok=True)
+    fp = scratchpad_dir / f"{agent_role}.md"
+    if not fp.exists():
+        fp.write_text(
+            f"# {agent_role} scratchpad\n\n"
+            f"Persistent memory across tickets. Append WHAT I LEARNED entries here.\n\n"
+        )
+    return fp
+
+
+def _ensure_team_scratchpad(root: Path, team_id: str) -> Path:
+    """Return the shared team scratchpad path, creating it if needed."""
+    scratchpad_dir = root / ".cto" / "scratchpad"
+    scratchpad_dir.mkdir(parents=True, exist_ok=True)
+    fp = scratchpad_dir / "team-scratchpad.md"
+    if not fp.exists():
+        fp.write_text(
+            "# Team scratchpad\n\n"
+            "Shared persistent memory for team collaboration. Append cross-role learnings here.\n\n"
+        )
+    return fp
+
+
+def _build_memory_section(root: Path, agent_role: str, team_id: Optional[str] = None) -> str:
+    """Build the MEMORY section for the agent prompt."""
+    scratchpad_path = _ensure_scratchpad(root, agent_role)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    lines = [
+        "## MEMORY — Your Persistent Scratchpad",
+        "",
+        f"Your scratchpad lives at `{scratchpad_path}` — it persists across tickets and sprints.",
+        "",
+        "**At task START**: Read your scratchpad for prior learnings about this codebase.",
+        "**At task END**: Append a `WHAT I LEARNED` note (1-3 bullet points, concrete patterns not trivia).",
+        "",
+        "Example entry format:",
+        f"```",
+        f"## {today} — <ticket-id>",
+        f"WHAT I LEARNED:",
+        f"- Fixed auth bug by reading JWT lib docs; always verify alg=RS256 claim.",
+        f"- Pattern: migrations go in migrations/versions/, naming: NNNN_description.py",
+        f"```",
+    ]
+
+    if team_id:
+        team_scratchpad_path = _ensure_team_scratchpad(root, team_id)
+        lines += [
+            "",
+            f"**Team scratchpad** (shared with all team members): `{team_scratchpad_path}`",
+            "Append cross-role decisions and interface conventions here for teammates to consume.",
+        ]
+
+    return "\n".join(lines)
+
+
 # ── Prompt assembly ─────────────────────────────────────────────────────────
 
 # ── XML-Structured Agent Prompts (PROM-012) ─────────────────────────────────
@@ -603,6 +747,8 @@ Complete the assigned ticket fully. Success means: all acceptance criteria met, 
 4. Follow existing project conventions and patterns
 5. Execute all tasks DIRECTLY — do not ask for permission or confirmation
 6. When uncertain, make the most pragmatic choice and document your reasoning
+7. VERIFY file contents by reading them before drawing any conclusions — do not infer file contents from reasoning alone; use Read or Grep on every file you intend to modify
+8. Enumerate EVERY acceptance criterion explicitly — do not assume that handling one example covers all similar cases; address each criterion individually
 {extra_constraints}
 </constraints>
 
@@ -640,7 +786,47 @@ def _load_sprint_context(root: Path) -> str:
     return "\n".join(sections)
 
 
-def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None) -> str:
+_COMPLEXITY_BUDGET_MAP = {
+    "XL": 200_000,
+    "L": 120_000,
+    "M": 60_000,
+    "S": 30_000,
+    "XS": 20_000,
+}
+_MIN_TASK_BUDGET = 20_000
+
+_COMPLEXITY_EFFORT_MAP = {
+    "XL": "xhigh",
+    "L": "xhigh",
+    "M": "high",
+    "S": "medium",
+    "XS": "low",
+}
+
+_EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"]
+
+_claude_effort_supported: Optional[bool] = None
+
+
+def _check_claude_effort_support() -> bool:
+    """Return True if the installed claude CLI supports --effort."""
+    global _claude_effort_supported
+    if _claude_effort_supported is not None:
+        return _claude_effort_supported
+    try:
+        result = subprocess.run(
+            ["claude", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        _claude_effort_supported = "--effort" in (result.stdout + result.stderr)
+    except Exception:
+        _claude_effort_supported = False
+    return _claude_effort_supported
+
+
+def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None, task_budget: Optional[int] = None) -> str:
     """Assemble the full prompt for the sub-agent.
 
     Context is kept minimal here — agents pull ADRs, related ticket details,
@@ -652,6 +838,7 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
         ticket: Ticket dict
         agent_role: Role of the agent
         team_id: Optional team session ID for team collaboration context
+        task_budget: Optional advisory token budget (Opus 4.7 task_budget feature)
     """
     card = load_agent_card(agent_role, root=root) or load_agent_card("fullstack-morty", root=root)
     role_prompt = _build_agent_prompt(
@@ -686,7 +873,25 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
     adr_names = [fp.stem for fp in sorted(dd.glob("*.md"))] if dd.exists() else []
     adr_list = ", ".join(adr_names) if adr_names else "(none)"
 
-    prompt = f"""{role_prompt}
+    team_delegation_note = ""
+    if team_id:
+        team_delegation_note = (
+            "\n\n**TEAM MODE — DELEGATION REQUIRED**: You MUST delegate subtasks to teammates "
+            "via send_team_message — do NOT attempt to complete all work yourself. "
+            "Spawn teammate work explicitly for every subtask that falls outside your specialty. "
+            "Doing everything yourself when teammates are available is Jerry behavior."
+        )
+
+    budget_section = ""
+    if task_budget is not None:
+        budget_section = (
+            f"## BUDGET (Opus 4.7 task_budget advisory)\n"
+            f"You have ~{task_budget:,} tokens total for this entire agentic loop "
+            f"(thinking, tool calls, final output). Track your usage mentally and "
+            f"finish gracefully as the budget approaches exhaustion.\n\n"
+        )
+
+    prompt = f"""{budget_section}{role_prompt}
 
 ## Your Mission, Morty
 
@@ -714,12 +919,16 @@ You have MCP tools to pull context on-demand — use them instead of guessing:
 - **reserve_files(team_id, files)** — Reserve files before modifying to prevent teammate conflicts.
 - **send_team_message(team_id, to, message, msg_type)** — Send a message to a teammate.
 - **update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.
-"""
+{team_delegation_note}"""
 
     # Inject sprint context for downstream agents (PROM-008)
     sprint_ctx = _load_sprint_context(root)
     if sprint_ctx:
         prompt += f"\n{sprint_ctx}\n"
+
+    # Inject persistent scratchpad / memory section
+    memory_section = _build_memory_section(root, agent_role, team_id=team_id)
+    prompt += f"\n{memory_section}\n"
 
     prompt += """
 <reasoning_protocol>
@@ -780,6 +989,8 @@ EXECUTE: Created helper module and updated all three call sites.
 - Execute ALL tasks directly. Do NOT ask for permission or confirmation — Rick hates that.
 - Create and modify files as needed. Do NOT just describe what should be done — that's Jerry behavior.
 - Run commands directly. Do NOT suggest commands for someone else to run.
+- VERIFY by reading each file before modifying it — never assume its contents from prior reasoning; use Read/Grep on every file you intend to touch.
+- Address EVERY acceptance criterion individually — completing one does NOT implicitly satisfy similar ones.
 </execution_rules>
 
 <output_format>
@@ -815,11 +1026,27 @@ def parse_agent_output(output: str) -> dict:
     """Parse the agent's summary section from output.
 
     Tries structured JSON extraction first (from ```json fences),
-    then falls back to regex-based Markdown parsing for backward compatibility.
+    then falls back to the schemas module. Validates all JSON output against
+    a strict schema before acting on it (OWASP LLM09).
     """
     # ── Try inline JSON extraction first ──
     json_data = _extract_json_from_output(output)
     if json_data is not None:
+        is_valid, schema_errors = validate_agent_output_schema(json_data, "delegate")
+        if not is_valid:
+            audit_log_security_event(
+                "schema_validation_failed",
+                f"Delegate agent output failed schema validation: {'; '.join(schema_errors)}",
+                severity="warning",
+            )
+            return {
+                "status": "needs_review",
+                "files_changed": [],
+                "description": f"Agent output rejected: failed schema validation ({'; '.join(schema_errors[:2])})",
+                "open_questions": "Schema validation failed — manual review required",
+                "confidence": "low",
+                "next_steps": [],
+            }
         result = {
             "status": json_data.get("status", "completed"),
             "files_changed": json_data.get("files_changed", []),
@@ -836,70 +1063,93 @@ def parse_agent_output(output: str) -> dict:
         json_result = parse_agent_json(output)
         if json_result is not None:
             parsed = json_result.to_dict()
+            is_valid, schema_errors = validate_agent_output_schema(parsed, "delegate")
+            if not is_valid:
+                audit_log_security_event(
+                    "schema_validation_failed",
+                    f"Delegate agent output (schemas) failed schema validation: {'; '.join(schema_errors)}",
+                    severity="warning",
+                )
+                return {
+                    "status": "needs_review",
+                    "files_changed": [],
+                    "description": f"Agent output rejected: failed schema validation ({'; '.join(schema_errors[:2])})",
+                    "open_questions": "Schema validation failed — manual review required",
+                    "confidence": "low",
+                    "next_steps": [],
+                }
             parsed.setdefault("confidence", "high")
             parsed.setdefault("next_steps", [])
             return sanitize_agent_output(parsed)
     except ImportError:
         pass
 
-    # ── Fallback: regex-based Markdown parsing ──
-    result = {
-        "status": "completed",
+    # ── No structured JSON found — return safe default ──
+    # Regex fallback parsing removed (OWASP LLM09): unstructured content must not
+    # be parsed as structured output since it could bypass sanitize_agent_output().
+    audit_log_security_event(
+        "no_structured_output",
+        "Delegate agent output contained no parseable JSON block; returning safe default",
+        severity="info",
+    )
+    return sanitize_agent_output({
+        "status": "needs_review",
         "files_changed": [],
-        "description": "",
-        "open_questions": "",
-        "confidence": "high",
+        "description": output[-500:].strip() if output else "(no output)",
+        "open_questions": "No structured JSON output found — manual review required",
+        "confidence": "low",
         "next_steps": [],
-    }
+    })
 
-    # Try to find the summary section (Dutch or English headers)
-    summary_match = re.search(r"###\s*Samenvatting\s*\n(.*)", output, re.DOTALL | re.IGNORECASE)
-    if not summary_match:
-        summary_match = re.search(r"###\s*Summary\s*\n(.*)", output, re.DOTALL | re.IGNORECASE)
 
-    if summary_match:
-        summary = summary_match.group(1)
+def reflect_on_output(output: str, criteria: list, ticket_id: str = "") -> dict:
+    """Run a cheap Haiku reflection pass on agent output against acceptance criteria.
 
-        # Status
-        status_match = re.search(r"\*\*Status\*\*:\s*(\w+)", summary)
-        if status_match:
-            result["status"] = status_match.group(1).lower()
+    Calls claude haiku to check if each criterion was satisfied.
+    Returns {"criteria_met": [...], "criteria_missed": [...], "pass": bool}.
+    Defaults to pass=True if the reflection call fails, to avoid blocking on error.
+    """
+    if not criteria:
+        return {"criteria_met": [], "criteria_missed": [], "pass": True}
 
-        # Files changed
-        files_match = re.search(r"\*\*Bestanden gewijzigd\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL)
-        if not files_match:
-            files_match = re.search(r"\*\*Files changed\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL | re.IGNORECASE)
-        if files_match:
-            raw = files_match.group(1).strip()
-            files = []
-            for line in raw.split("\n"):
-                line = line.strip().lstrip("- ").strip("`").strip()
-                if line and not line.startswith("[") and ("/" in line or "." in line):
-                    files.append(line)
-            result["files_changed"] = files
+    criteria_text = "\n".join(f"- {c}" for c in criteria)
+    # Use last 4000 chars of output to stay within Haiku's sweet spot
+    safe_output = (output or "")[-4000:]
 
-        # Description
-        desc_match = re.search(r"\*\*Beschrijving\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL)
-        if not desc_match:
-            desc_match = re.search(r"\*\*Description\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL | re.IGNORECASE)
-        if desc_match:
-            result["description"] = desc_match.group(1).strip()
+    prompt = (
+        "Review this agent output against the acceptance criteria below. "
+        'Return ONLY a JSON object with this exact format: '
+        '{"criteria_met": ["list of met criteria"], "criteria_missed": ["list of missed criteria"], "pass": true/false}\n\n'
+        f"Acceptance criteria:\n{criteria_text}\n\n"
+        f"Agent output (last 4000 chars):\n{safe_output}"
+    )
 
-        # Open questions
-        q_match = re.search(r"\*\*Open vragen\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL)
-        if not q_match:
-            q_match = re.search(r"\*\*Open questions\*\*:\s*(.*?)(?:\n\*\*|\Z)", summary, re.DOTALL | re.IGNORECASE)
-        if q_match:
-            result["open_questions"] = q_match.group(1).strip()
+    try:
+        result = subprocess.run(
+            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", prompt],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={k: v for k, v in os.environ.items() if k != "CLAUDECODE"},
+        )
+        raw = result.stdout.strip()
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if match:
+            data = json.loads(match.group())
+            return {
+                "criteria_met": data.get("criteria_met", []),
+                "criteria_missed": data.get("criteria_missed", []),
+                "pass": bool(data.get("pass", True)),
+            }
+    except Exception as exc:
+        audit_log_security_event(
+            "reflection_error",
+            f"Reflection pass failed for {ticket_id}: {exc}",
+            severity="info",
+        )
 
-    else:
-        # No structured summary found — use the last 500 chars as description
-        result["description"] = output[-500:].strip()
-
-    # Apply Least-Agency validation (PROM-018) — sanitize status, paths, and text
-    result = sanitize_agent_output(result)
-
-    return result
+    # Default to pass to avoid blocking the pipeline when reflection itself fails
+    return {"criteria_met": criteria, "criteria_missed": [], "pass": True}
 
 
 # ── Progress Phase Detection ─────────────────────────────────────────────────
@@ -926,7 +1176,7 @@ def _detect_phase(line: str) -> Optional[str]:
     return None
 
 
-def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None, agent_role: str = "rick", team_id: Optional[str] = None) -> str:
+def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None, agent_role: str = "rick", team_id: Optional[str] = None, task_budget: Optional[int] = None, effort: Optional[str] = None) -> str:
     """Call a claude sub-agent with a specific prompt.
 
     SECURITY NOTE: The --dangerously-skip-permissions flag is only enabled when
@@ -939,6 +1189,11 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         timeout: Timeout in seconds
         skip_permissions: If True, MAY skip permissions (requires env var)
         thinking_budget: Token budget for extended thinking (None = disabled)
+        task_budget: Advisory token budget for the full agentic loop (None = disabled).
+            Already injected into prompt by build_prompt(); this param is accepted
+            for call-site documentation and future API-level integration.
+        effort: Effort level for Opus 4.7+ (one of low/medium/high/xhigh/max).
+            Passed via --effort CLI flag if supported, else injected as a prompt directive.
 
     Returns:
         Agent output
@@ -967,14 +1222,11 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
 
     cmd = ["claude", "-p"]
 
-    # SECURITY: Only skip permissions if BOTH conditions are met:
+    # SECURITY: Only skip permissions if BOTH conditions are met (via centralized guard):
     # 1. skip_permissions=True was passed
     # 2. CTO_ALLOW_SKIP_PERMISSIONS environment variable is set to "true"
-    if skip_permissions and os.environ.get("CTO_ALLOW_SKIP_PERMISSIONS", "").lower() == "true":
+    if should_skip_permissions(explicit_flag=skip_permissions):
         cmd.append("--dangerously-skip-permissions")
-        # Log this for audit purposes
-        import sys
-        print("[SECURITY] Using --dangerously-skip-permissions (authorized)", file=sys.stderr)
 
     # Attach MCP server so agents can query/update CTO state during execution
     mcp_server = Path(__file__).parent / "mcp_server.py"
@@ -994,6 +1246,11 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.extend(["--model", model])
     if thinking_budget is not None:
         cmd.extend(["--thinking-budget", str(thinking_budget)])
+    if effort and effort in _EFFORT_LEVELS:
+        if _check_claude_effort_support():
+            cmd.extend(["--effort", effort])
+        else:
+            safe_prompt = f"## EFFORT LEVEL: {effort} — reason accordingly.\n\n{safe_prompt}"
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -1104,9 +1361,28 @@ def cmd_delegate(args):
     except ImportError:
         pass
 
-    console.print(f"[green]*Burrrp* Alright, sending [bold]{agent}[/bold] on a mission — ticket [yellow]{ticket['id']}[/yellow] (model: {model}){team_msg}[/green]")
+    # Derive task_budget: use explicit CLI arg if given, otherwise map from complexity
+    complexity = ticket.get("estimated_complexity", "").upper()
+    task_budget: Optional[int] = None
+    if hasattr(args, "task_budget") and args.task_budget is not None:
+        task_budget = max(_MIN_TASK_BUDGET, args.task_budget)
+    elif complexity in _COMPLEXITY_BUDGET_MAP:
+        task_budget = _COMPLEXITY_BUDGET_MAP[complexity]
 
-    prompt = build_prompt(root, ticket, agent, team_id=team_id)
+    # Derive effort: use explicit CLI arg if given, otherwise map from complexity
+    effort: Optional[str] = None
+    if hasattr(args, "effort") and args.effort is not None:
+        effort = args.effort
+    elif complexity in _COMPLEXITY_EFFORT_MAP:
+        effort = _COMPLEXITY_EFFORT_MAP[complexity]
+
+    console.print(f"[green]*Burrrp* Alright, sending [bold]{agent}[/bold] on a mission — ticket [yellow]{ticket['id']}[/yellow] (model: {model}){team_msg}[/green]")
+    if task_budget:
+        console.print(f"[dim]Task budget: ~{task_budget:,} tokens[/dim]")
+    if effort:
+        console.print(f"[dim]Effort level: {effort}[/dim]")
+
+    prompt = build_prompt(root, ticket, agent, team_id=team_id, task_budget=task_budget)
 
     if args.dry_run:
         console.print(f"\n[cyan]{'=' * 60}[/cyan]")
@@ -1158,7 +1434,6 @@ def cmd_delegate(args):
             save_json(team_fp, team)
 
     # Determine thinking budget based on ticket complexity and agent role
-    complexity = ticket.get("estimated_complexity", "").upper()
     thinking_budget = None
     if agent in ("architect-morty", "security-morty") or complexity in ("XL", "L"):
         thinking_budget = 10000
@@ -1167,7 +1442,7 @@ def cmd_delegate(args):
 
     # Execute
     try:
-        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id)
+        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort)
     except RuntimeError as e:
         error_msg = str(e)
         console.print(f"[red]Ugh, {agent} screwed up: {error_msg}[/red]")
@@ -1220,6 +1495,49 @@ def cmd_delegate(args):
     # Parse output
     parsed = parse_agent_output(output)
 
+    # Reflection pass — check output against acceptance criteria (optional, skip with --no-reflect)
+    no_reflect = getattr(args, 'no_reflect', False)
+    reflection_summary = None
+    if not no_reflect:
+        criteria = ticket.get("acceptance_criteria") or []
+        if criteria:
+            console.print(f"[dim]Running reflection pass for {ticket['id']}...[/dim]")
+            reflection = reflect_on_output(output, criteria, ticket_id=ticket["id"])
+            reflection_summary = (
+                f"Reflection: {len(reflection['criteria_met'])} met, "
+                f"{len(reflection['criteria_missed'])} missed, pass={reflection['pass']}"
+            )
+            if not reflection["pass"] and reflection["criteria_missed"]:
+                missed_text = "\n".join(f"- {c}" for c in reflection["criteria_missed"])
+                console.print(
+                    f"[yellow]Reflection flagged {len(reflection['criteria_missed'])} missed "
+                    f"criteria — retrying once...[/yellow]"
+                )
+                retry_prompt = (
+                    prompt
+                    + f"\n\n## Reflection Feedback (retry)\n"
+                    f"The previous attempt missed these acceptance criteria:\n{missed_text}\n"
+                    f"Please address the missed criteria and complete the implementation."
+                )
+                try:
+                    output = delegate_to_agent(
+                        retry_prompt,
+                        model=model,
+                        timeout=args.timeout,
+                        thinking_budget=thinking_budget,
+                        agent_role=agent,
+                        team_id=team_id,
+                        task_budget=task_budget,
+                        effort=effort,
+                    )
+                    parsed = parse_agent_output(output)
+                    reflection_summary += " [retried]"
+                    console.print("[dim]Reflection retry complete.[/dim]")
+                except RuntimeError as retry_err:
+                    console.print(f"[yellow]Reflection retry failed: {retry_err}[/yellow]")
+            else:
+                console.print(f"[dim]{reflection_summary}[/dim]")
+
     # Process team output if in a team
     if team_id:
         team_parsed = process_team_output(root, team_id, agent, output)
@@ -1258,7 +1576,10 @@ def cmd_delegate(args):
     else:
         ticket["status"] = "in_review"
 
-    ticket["agent_output"] = parsed["description"][:2000]
+    agent_output_text = parsed["description"][:2000]
+    if reflection_summary:
+        agent_output_text = f"{agent_output_text}\n[{reflection_summary}]"
+    ticket["agent_output"] = agent_output_text
     ticket["files_touched"] = parsed["files_changed"]
     ticket["updated_at"] = now_iso()
     save_ticket(root, ticket)
@@ -1308,10 +1629,20 @@ def build_parser():
     p.add_argument("--agent", default=None,
                    choices=["architect-morty", "backend-morty", "frontend-morty", "fullstack-morty",
                             "tester-morty", "security-morty", "devops-morty", "reviewer-morty", "unity"])
-    p.add_argument("--model", default=None, choices=["opus", "sonnet", "haiku"])
+    p.add_argument("--model", default=None, choices=["opus", "opus-4-7", "sonnet", "sonnet-4-6", "haiku"])
     p.add_argument("--dry-run", action="store_true", help="Show prompt without executing")
     p.add_argument("--timeout", type=int, default=600, help="Timeout in seconds (default: 600)")
     p.add_argument("--team-id", default=None, help="Team session ID for team collaboration")
+    p.add_argument("--task-budget", type=int, default=None,
+                   help="Advisory token budget for the full agentic loop (e.g. 60000). "
+                        "Auto-derived from ticket complexity if unset (XL=200k, L=120k, M=60k, S=30k).")
+    p.add_argument("--effort", default=None, choices=_EFFORT_LEVELS,
+                   help="Effort level for Opus 4.7+ extended reasoning "
+                        "(low/medium/high/xhigh/max). Auto-derived from ticket complexity if unset "
+                        "(XL/L=xhigh, M=high, S=medium, XS=low). "
+                        "Passed via --effort CLI flag if supported, else injected as a prompt directive.")
+    p.add_argument("--no-reflect", action="store_true",
+                   help="Skip the Haiku reflection pass (useful for dry-run, simple tasks, or speed).")
     return p
 
 

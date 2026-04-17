@@ -1,0 +1,24 @@
+{
+  "id": "PROM-058",
+  "title": "Upgrade to Claude Opus 4.7 as default planner/scanner model",
+  "category": "tooling",
+  "source": "self-diagnosed",
+  "source_context": "User reported Opus 4.7 release and asked Rick to integrate features. Model aliases used across orchestrate.py:633, prometheus.py:336,360, delegate.py:1311, meeseeks.py:514, explain.py:418. argparse --model choices are restricted to [opus,sonnet,haiku] in several places.",
+  "description": "Anthropic released Opus 4.7 on 2026-04-16. It outperforms 4.6 on agentic coding (+13%), 3x production task completion, has 1M context at standard pricing, new tokenizer, and better file-system memory usage. Rick's core commands (plan, scan, delegate) should default to opus-4-7 model alias. Update: (1) orchestrate.py claude_prompt default, (2) prometheus.py claude_scan default, (3) delegate.py --model choices to include 'opus-4-7', (4) config.json default_model to 'opus-4-7' for planning tickets, (5) agent cards using 'opus' alias (no change needed if claude CLI resolves 'opus' to latest). Also update SKILL.md docs and .cto/config.json.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Add 'opus-4-7' and 'sonnet-4-6' to the --model argparse choices across delegate.py, prometheus.py, meeseeks.py, explain.py. The claude CLI already accepts full model IDs. Keep 'opus' as backwards-compat alias. Update claude_prompt/claude_scan defaults to 'opus-4-7' for Rick-level tasks.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T09:56:47.220349+00:00",
+  "applied_at": "2026-04-17T09:59:19.247356+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-058-20260417T095856",
+  "files_actually_changed": [
+    "scripts/orchestrate.py"
+  ]
+}

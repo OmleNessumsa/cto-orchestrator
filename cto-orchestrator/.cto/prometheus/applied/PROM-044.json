@@ -13,8 +13,13 @@
     "scripts/security_utils.py"
   ],
   "proposed_changes": "1. Create a centralized function in security_utils.py: should_skip_permissions(explicit_flag: bool) -> bool that requires BOTH the explicit_flag parameter AND the CTO_ALLOW_SKIP_PERMISSIONS env var to return True. Log via audit_log_security_event() whenever permissions are skipped. 2. Replace the inline env var checks in orchestrate.py and meeseeks.py with calls to this centralized function, passing explicit_flag=False by default (so these scripts never skip permissions unless explicitly opted in). 3. Update delegate.py to also use this centralized function for consistency.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:42:06.107953+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-17T10:20:39.855972+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-044-20260417T101903",
+  "files_actually_changed": [
+    "scripts/meeseeks.py",
+    "scripts/security_utils.py",
+    "scripts/orchestrate.py"
+  ]
 }

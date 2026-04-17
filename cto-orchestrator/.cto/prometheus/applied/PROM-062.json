@@ -1,0 +1,24 @@
+{
+  "id": "PROM-062",
+  "title": "Update Morty prompts for Opus 4.7 behavior changes (literal instructions, fewer emojis, fewer subagents)",
+  "category": "prompt-engineering",
+  "source": "self-diagnosed",
+  "source_context": "Official Opus 4.7 migration guide at platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-7 lists these as behavior changes requiring prompt updates. Our existing scaffolding ('double-check X', 'respond in N bullets') may now be either redundant or insufficient. [PRIORITY: Opus 4.7 migration wave \u2014 user-requested]",
+  "description": "Opus 4.7 behavior changes that silently affect Morty output: (1) MORE LITERAL instruction following \u2014 will not generalize from one bullet to another; prompts must enumerate every case explicitly. (2) LESS verbose / response length calibrates to task complexity \u2014 Morty output will be terser unless asked for detail. (3) FEWER tool calls by default \u2014 Morty's may now skip Read/Grep when reasoning suffices; counter with explicit 'verify by reading the file' directive. (4) MORE DIRECT tone \u2014 less validation-forward; Rick persona is safer, but user-facing Morty output may feel blunter. (5) FEWER subagents spawned by default \u2014 our team-mode relies on subagent spawning; we must explicitly instruct team-lead to delegate. Update: delegate.py Morty system prompt templates (references/prompts.md, delegate.py:build_prompt).",
+  "impact_score": 9,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Audit all Morty identity/constraints in agents/*.json and references/prompts.md. Add explicit enumeration where bullets imply generalization. Add explicit 'read files before concluding' to counter fewer-tool-calls default. For team-lead agent prompts, add 'DELEGATE subtasks to teammates via send_team_message \u2014 do not attempt to do everything yourself' to counter fewer-subagents default.",
+  "status": "applied",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T09:57:31.420794+00:00",
+  "applied_at": "2026-04-17T10:45:40.674392+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-062-20260417T104257",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

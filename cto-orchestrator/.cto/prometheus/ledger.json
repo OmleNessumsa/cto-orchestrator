@@ -731,5 +731,154 @@
       "scripts/team.py",
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-17T09:56:47.221400+00:00",
+    "proposal_id": "PROM-058",
+    "action": "self-reported",
+    "title": "Upgrade to Claude Opus 4.7 as default planner/scanner model",
+    "severity": "high",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-04-17T09:56:58.666737+00:00",
+    "proposal_id": "PROM-059",
+    "action": "self-reported",
+    "title": "Add task_budget advisory for Morty delegation to prevent runaway agentic loops",
+    "severity": "high",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-04-17T09:57:06.297852+00:00",
+    "proposal_id": "PROM-060",
+    "action": "self-reported",
+    "title": "Add --effort CLI param with xhigh level for Rick's heavy-thinking commands",
+    "severity": "medium",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-04-17T09:57:18.066817+00:00",
+    "proposal_id": "PROM-061",
+    "action": "self-reported",
+    "title": "Enable persistent file-system memory scratchpads for Morty's across sprints",
+    "severity": "medium",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-04-17T09:57:31.421897+00:00",
+    "proposal_id": "PROM-062",
+    "action": "self-reported",
+    "title": "Update Morty prompts for Opus 4.7 behavior changes (literal instructions, fewer emojis, fewer subagents)",
+    "severity": "medium",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-04-17T09:58:56.922022+00:00",
+    "proposal_id": "PROM-059",
+    "action": "applied",
+    "title": "Add task_budget advisory for Morty delegation to prevent runaway agentic loops",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T09:59:19.247917+00:00",
+    "proposal_id": "PROM-058",
+    "action": "applied",
+    "title": "Upgrade to Claude Opus 4.7 as default planner/scanner model",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:00:37.065518+00:00",
+    "proposal_id": "PROM-028",
+    "action": "applied",
+    "title": "Structured Agent Handoff Protocol (A2A-Inspired)",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/team.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:14:03.869544+00:00",
+    "proposal_id": "PROM-045",
+    "action": "applied",
+    "title": "Add structured output schema validation for agent responses",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/schemas.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:19:03.895935+00:00",
+    "proposal_id": "PROM-049",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-04-17T10:20:39.857539+00:00",
+    "proposal_id": "PROM-044",
+    "action": "applied",
+    "title": "Enforce consistent dual-condition permission bypass",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/meeseeks.py",
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:35:42.341291+00:00",
+    "proposal_id": "PROM-063",
+    "action": "self-reported",
+    "title": "Integrate Sleepy Mode (Stein's autonomous Claude Code loop) for long-horizon unattended sprints",
+    "severity": "high",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-04-17T10:42:57.225765+00:00",
+    "proposal_id": "PROM-063",
+    "action": "failed",
+    "reason": "Evolve timed out after 420s"
+  },
+  {
+    "timestamp": "2026-04-17T10:45:40.675596+00:00",
+    "proposal_id": "PROM-062",
+    "action": "applied",
+    "title": "Update Morty prompts for Opus 4.7 behavior changes (literal instructions, fewer emojis, fewer subagents)",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:46:35.195860+00:00",
+    "proposal_id": "PROM-061",
+    "action": "applied",
+    "title": "Enable persistent file-system memory scratchpads for Morty's across sprints",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:48:00.525455+00:00",
+    "proposal_id": "PROM-060",
+    "action": "applied",
+    "title": "Add --effort CLI param with xhigh level for Rick's heavy-thinking commands",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-17T10:54:14.733487+00:00",
+    "proposal_id": "PROM-029",
+    "action": "applied",
+    "title": "Agent Reflection Loop with Self-Critique",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
   }
 ]

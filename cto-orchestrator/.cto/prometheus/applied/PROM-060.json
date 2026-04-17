@@ -1,0 +1,24 @@
+{
+  "id": "PROM-060",
+  "title": "Add --effort CLI param with xhigh level for Rick's heavy-thinking commands",
+  "category": "claude-features",
+  "source": "self-diagnosed",
+  "source_context": "Opus 4.7 adaptive thinking is off by default and effort controls depth. Our existing thinking_budget logic at delegate.py:1160-1166 maps complexity to thinking_budget integer; replace with effort string. XL/L=xhigh, M=high, S=medium. [PRIORITY: Opus 4.7 migration wave \u2014 user-requested]",
+  "description": "Opus 4.7 exposes an effort parameter with levels {low, medium, high, xhigh, max} \u2014 Anthropic recommends xhigh as the default for coding/agentic use cases. Rick's plan, scan, and delegate heavy-complexity tickets should use xhigh. Currently we have thinking_budget (being deprecated) and no effort control. Expose --effort argparse flag on: orchestrate.py plan, prometheus.py scan, delegate.py (auto-scale from ticket complexity). When set, pass through to claude CLI via --effort if supported, else inject as prompt directive.",
+  "impact_score": 9,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add --effort arg with choices [low, medium, high, xhigh, max]. Replace thinking_budget-to-int mapping with complexity-to-effort mapping. Pass to claude CLI via --effort flag (if --help shows support) or otherwise inject into system prompt as: '## EFFORT LEVEL: {level} \u2014 reason accordingly.'",
+  "status": "applied",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T09:57:06.296825+00:00",
+  "applied_at": "2026-04-17T10:48:00.524134+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-060-20260417T104649",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

@@ -178,3 +178,35 @@ def parse_meeseeks_json(output: str) -> Optional[MeeseeksOutput]:
         )
     except (TypeError, ValueError):
         return None
+
+
+# ── JSON Schema definitions for structured output validation ─────────────────
+
+DELEGATE_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "required": ["status", "files_changed"],
+    "properties": {
+        "status": {"type": "string", "enum": list(VALID_AGENT_STATUSES)},
+        "summary": {"type": "string"},
+        "files_changed": {"type": "array", "items": {"type": "string"}},
+        "description": {"type": "string"},
+        "open_questions": {},
+        "confidence": {"type": "string"},
+        "next_steps": {"type": "array"},
+    },
+    "additionalProperties": True,
+}
+
+MEESEEKS_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "required": ["status", "files_changed"],
+    "properties": {
+        "status": {"type": "string", "enum": list(VALID_MEESEEKS_STATUSES)},
+        "files_changed": {"type": "array", "items": {"type": "string"}},
+        "description": {"type": "string"},
+        "complexity": {"type": "string", "enum": list(VALID_COMPLEXITIES)},
+        "confidence": {"type": "string"},
+        "next_steps": {"type": "array"},
+    },
+    "additionalProperties": True,
+}

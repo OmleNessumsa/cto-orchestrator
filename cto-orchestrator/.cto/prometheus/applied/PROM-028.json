@@ -13,8 +13,11 @@
     "scripts/orchestrate.py"
   ],
   "proposed_changes": "1. Define a JSON handoff schema: `{\"handoff\": {\"messages\": [{\"to\": \"@role\", \"content\": \"...\", \"type\": \"decision|question|artifact\"}], \"artifacts\": [{\"type\": \"api-schema|test-result|adr\", \"content\": {...}}], \"status\": \"completed|blocked\", \"blocked_on\": [...]}}`. 2. Update _build_agent_prompt() in delegate.py to instruct agents to emit a `<handoff_json>...</handoff_json>` block at the end of their output containing structured JSON. 3. Replace parse_team_agent_output() regex parsing in delegate.py with JSON extraction from the handoff block (with regex fallback for backwards compatibility). 4. Update process_team_output() in delegate.py to handle typed artifacts \u2014 store them in the shared context so downstream agents can consume API schemas, test results, etc.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:33:54.457300+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-17T10:00:37.064274+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-028-20260417T095919",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

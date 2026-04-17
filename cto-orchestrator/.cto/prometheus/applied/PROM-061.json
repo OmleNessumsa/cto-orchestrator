@@ -1,0 +1,24 @@
+{
+  "id": "PROM-061",
+  "title": "Enable persistent file-system memory scratchpads for Morty's across sprints",
+  "category": "agent-patterns",
+  "source": "self-diagnosed",
+  "source_context": "This is the Opus 4.7 feature most aligned with our Morty-based architecture. The docs explicitly say 'that agent should improve at jotting down notes to itself and leveraging its notes in future tasks.' We lose context between Morty invocations today because subprocesses are ephemeral. [PRIORITY: Opus 4.7 migration wave \u2014 user-requested]",
+  "description": "Opus 4.7 is measurably better at file-system-based memory \u2014 agents that keep a scratchpad, notes file, or structured memory store across turns get cheaper and smarter over time. We already have .cto/sessions/ and SESSION_LOG.md for Rick, but individual Morty's have NO persistent memory between tickets. Implementation: (1) create .cto/scratchpad/{agent-role}.md auto-seeded on first Morty invocation; (2) inject 'MEMORY' section into every Morty system prompt pointing to their scratchpad with read+append permissions; (3) at Morty exit, prompt requests a short 'WHAT I LEARNED' note appended to scratchpad; (4) next run of same Morty reads scratchpad as context. Benefits: backend-morty remembers API conventions, tester-morty remembers flaky tests, security-morty builds a vulnerability pattern library.",
+  "impact_score": 9,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "In delegate.py build_prompt(), add a MEMORY section: 'Your scratchpad lives at .cto/scratchpad/{agent}.md \u2014 READ it at task start for prior learnings, APPEND a WHAT I LEARNED note before exit (1-3 bullet points, concrete patterns not trivia). Example entry: - 2026-04-17 Fixed auth bug by reading JWT lib docs; always verify alg=RS256 claim.' Create .cto/scratchpad/ directory if missing. Add a team-scratchpad.md for team-mode tickets.",
+  "status": "applied",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T09:57:18.065625+00:00",
+  "applied_at": "2026-04-17T10:46:35.194145+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-061-20260417T104540",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}
