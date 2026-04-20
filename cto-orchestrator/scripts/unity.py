@@ -29,6 +29,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Flag set to True when security_utils is unavailable (set in except ImportError block below)
+SECURITY_DEGRADED = False
+
 # Import security utilities
 try:
     from security_utils import (
@@ -37,6 +40,15 @@ try:
         validate_url,
     )
 except ImportError:
+    # Security module unavailable — warn loudly and degrade gracefully
+    import sys as _sys
+    print(
+        "[SECURITY-CRITICAL] security_utils module not found — "
+        "running with DEGRADED security. Supply chain integrity cannot be verified.",
+        file=_sys.stderr,
+    )
+    SECURITY_DEGRADED = True
+
     def sanitize_prompt_content(content):
         return (content or "")[:10000].replace('\x00', '')
 

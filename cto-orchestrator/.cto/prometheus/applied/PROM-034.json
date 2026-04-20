@@ -12,8 +12,13 @@
     "references/prompts.md"
   ],
   "proposed_changes": "Add a <self_evaluation> XML section to the prompt template in _build_agent_prompt() (after </uncertainty_policy>, line 505). Each role gets a tailored rubric. Example for backend-morty: '<self_evaluation>Before submitting, verify: (1) All acceptance criteria are met \u2014 check each one explicitly, (2) New code has error handling for external calls, (3) Unit tests cover happy path + at least 1 edge case, (4) No hardcoded secrets or config values, (5) Code follows existing patterns in the project. If any check fails, fix it before reporting.</self_evaluation>'. Security-morty gets OWASP-mapped checks. Reviewer-morty gets a code quality checklist. Architect-morty gets interface completeness checks. Store rubric strings in a ROLE_RUBRICS dict alongside AGENT_PROMPTS.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:37:05.165348+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:35:53.640778+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-034-20260418T143421",
+  "reject_reason": null,
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "references/prompts.md"
+  ]
 }

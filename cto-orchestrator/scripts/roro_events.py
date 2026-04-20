@@ -6,25 +6,34 @@ Emits events to roro's webhook endpoint for monitoring the Morty army.
 
 Features:
 - Fire-and-forget HTTP POST to roro webhook
+- Optional SSE server for persistent streaming (opt-in via roro.sse_enabled)
 - Circuit breaker pattern for graceful degradation
 - Config loading from .cto/config.json or environment variables
 - Decorator and context manager for easy event emission
 """
 
+import collections
 import json
 import os
+import queue
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Callable, Optional
-from contextlib import contextmanager
 
 # Try to import urllib.request for HTTP without external dependencies
-import urllib.request
 import urllib.error
+import urllib.request
 import atexit
+
+try:
+    from security_utils import validate_webhook_endpoint as _validate_webhook_endpoint
+except ImportError:
+    _validate_webhook_endpoint = None  # graceful degradation if module unavailable
 
 
 # ── Thread Tracking (prevents SIGSEGV on exit) ────────────────────────────────
@@ -83,6 +92,8 @@ DEFAULT_CONFIG = {
     "timeout": 2.0,
     "verbose": False,
     "require_https": False,  # Set to True in production
+    "sse_enabled": False,
+    "sse_port": 3069,
 }
 
 # Environment variable overrides
@@ -203,6 +214,146 @@ class CircuitBreaker:
 
 # Global circuit breaker instance
 _circuit_breaker = CircuitBreaker()
+
+
+# ── SSE Server ────────────────────────────────────────────────────────────────
+
+_SSE_BUFFER_SIZE = 50
+_sse_event_buffer: collections.deque = collections.deque(maxlen=_SSE_BUFFER_SIZE)
+_sse_event_counter = 0
+_sse_buffer_lock = threading.Lock()
+_sse_clients: list[queue.Queue] = []
+_sse_clients_lock = threading.Lock()
+_sse_server_instance: Optional["_SSEServerWrapper"] = None
+_sse_server_start_lock = threading.Lock()
+
+
+def _format_sse_event(event_id: int, payload: dict) -> bytes:
+    """Format a payload dict as an SSE message frame."""
+    data = json.dumps(payload)
+    return f"id: {event_id}\ndata: {data}\n\n".encode("utf-8")
+
+
+def _push_to_sse(payload: dict):
+    """Add event to ring buffer and deliver to all connected SSE clients."""
+    global _sse_event_counter
+
+    with _sse_buffer_lock:
+        _sse_event_counter += 1
+        event_id = _sse_event_counter
+        formatted = _format_sse_event(event_id, payload)
+        _sse_event_buffer.append((event_id, formatted))
+
+    with _sse_clients_lock:
+        dead = []
+        for q in _sse_clients:
+            try:
+                q.put_nowait(formatted)
+            except queue.Full:
+                dead.append(q)
+        for q in dead:
+            _sse_clients.remove(q)
+
+
+class _SSEHandler(BaseHTTPRequestHandler):
+    """HTTP handler for SSE connections on /events."""
+
+    def log_message(self, format, *args):  # noqa: A002
+        """Suppress default per-request logging."""
+        pass
+
+    def do_GET(self):
+        if self.path != "/events":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        # Replay events missed since Last-Event-ID
+        last_id_str = self.headers.get("Last-Event-ID", "")
+        last_id = int(last_id_str) if last_id_str.isdigit() else 0
+
+        with _sse_buffer_lock:
+            missed = [(eid, fmt) for eid, fmt in _sse_event_buffer if eid > last_id]
+
+        try:
+            for _, fmt in missed:
+                self.wfile.write(fmt)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return
+
+        client_q: queue.Queue = queue.Queue(maxsize=100)
+        with _sse_clients_lock:
+            _sse_clients.append(client_q)
+
+        try:
+            while True:
+                try:
+                    data = client_q.get(timeout=15.0)
+                    self.wfile.write(data)
+                    self.wfile.flush()
+                except queue.Empty:
+                    # Keepalive comment to detect dead connections
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            with _sse_clients_lock:
+                try:
+                    _sse_clients.remove(client_q)
+                except ValueError:
+                    pass
+
+
+class _SSEServerWrapper:
+    """Wraps HTTPServer to run in a background daemon thread."""
+
+    def __init__(self, port: int):
+        self.port = port
+        self._server: Optional[HTTPServer] = None
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self):
+        try:
+            self._server = HTTPServer(("localhost", self.port), _SSEHandler)
+            self._thread = threading.Thread(
+                target=self._server.serve_forever,
+                daemon=True,
+                name="roro-sse-server",
+            )
+            self._thread.start()
+        except OSError:
+            # Port already in use or other bind error — degrade silently
+            self._server = None
+
+    def stop(self):
+        if self._server:
+            self._server.shutdown()
+            self._server = None
+
+    @property
+    def running(self) -> bool:
+        return self._server is not None
+
+
+def _ensure_sse_server(port: int):
+    """Start the global SSE server if not already running (lazy singleton)."""
+    global _sse_server_instance
+    with _sse_server_start_lock:
+        if _sse_server_instance is None or not _sse_server_instance.running:
+            wrapper = _SSEServerWrapper(port)
+            wrapper.start()
+            if wrapper.running:
+                _sse_server_instance = wrapper
+                atexit.register(wrapper.stop)
 
 
 # ── Agent ID Generation ───────────────────────────────────────────────────────
@@ -326,7 +477,23 @@ def emit(
         "data": data,
     }
 
+    # Push to SSE stream if enabled (opt-in)
+    if config.get("sse_enabled"):
+        sse_port = int(config.get("sse_port", 3069))
+        _ensure_sse_server(sse_port)
+        _push_to_sse(payload)
+
     # Send to roro endpoint in background thread (fire-and-forget)
+    if endpoint:
+        # SSRF prevention: validate endpoint before sending (allow localhost for dev)
+        if _validate_webhook_endpoint is not None:
+            try:
+                _validate_webhook_endpoint(endpoint, allow_localhost=True)
+            except ValueError as ssrf_err:
+                if config.get("verbose"):
+                    print(f"[roro] SECURITY: Blocked SSRF endpoint: {ssrf_err}")
+                endpoint = ""
+
     if endpoint:
         thread = threading.Thread(
             target=_send_event,
@@ -344,6 +511,15 @@ def emit(
             if "localhost" not in rick_endpoint and "127.0.0.1" not in rick_endpoint:
                 if config.get("verbose"):
                     print(f"[roro] SECURITY: Skipping non-HTTPS Rick endpoint: {rick_endpoint}")
+                rick_endpoint = None
+
+        # SSRF prevention: validate Rick Terminal endpoint before sending
+        if rick_endpoint and _validate_webhook_endpoint is not None:
+            try:
+                _validate_webhook_endpoint(rick_endpoint, allow_localhost=True)
+            except ValueError as ssrf_err:
+                if config.get("verbose"):
+                    print(f"[roro] SECURITY: Blocked SSRF Rick endpoint: {ssrf_err}")
                 rick_endpoint = None
 
         if rick_endpoint:
@@ -404,6 +580,31 @@ def emit_progress(
             "elapsed_seconds": round(elapsed_seconds, 1),
         },
         agent_id=resolved_id,
+        role=role,
+        team_id=team_id,
+    )
+
+
+def emit_stream_progress(
+    event_kind: str,
+    event_data: dict,
+    role: str = "rick",
+    team_id: Optional[str] = None,
+):
+    """Emit a cto.morty.progress event from a streaming claude agent event.
+
+    Called for tool_use and text_delta events in the stream-json output,
+    giving the Rick Terminal real-time visibility into agent activity.
+
+    Args:
+        event_kind: "tool_use" or "text_delta"
+        event_data: Event-specific data (e.g. {"tool": "Read"} or {"phase": "Reading files"})
+        role: Agent role for ID generation
+        team_id: Optional team session ID
+    """
+    emit(
+        "cto.morty.progress",
+        {"kind": event_kind, **event_data},
         role=role,
         team_id=team_id,
     )

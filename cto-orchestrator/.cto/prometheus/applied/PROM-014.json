@@ -11,8 +11,12 @@
     "scripts/delegate.py"
   ],
   "proposed_changes": "Add COMPLEXITY_GUIDANCE dict mapping XS-XL to specific effort rules (files to touch, test requirements, analysis depth). Inject into prompt based on ticket estimated_complexity.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-03-01T08:55:17.734333+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:36:48.268629+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-014-20260418T143604",
+  "reject_reason": null,
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

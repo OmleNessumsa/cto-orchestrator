@@ -13,8 +13,13 @@
     "scripts/roro_events.py"
   ],
   "proposed_changes": "Replace subprocess.run() with subprocess.Popen() in delegate_to_agent() and summon_meeseeks(), using `claude -p --output-format stream-json` to get streaming JSON events. Read stdout line-by-line in a loop, parsing each event. Emit intermediate roro events (cto.morty.progress) when tool_use or text_delta events arrive. This gives the Rick Terminal real-time visibility into what each Morty is doing. Add a `stream=True` parameter to delegate_to_agent() with fallback to blocking mode.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:44:54.704344+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:43:09.736182+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-054-20260418T143825",
+  "files_actually_changed": [
+    "scripts/meeseeks.py",
+    "scripts/delegate.py",
+    "scripts/roro_events.py"
+  ]
 }

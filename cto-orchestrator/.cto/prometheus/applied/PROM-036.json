@@ -11,8 +11,11 @@
     "scripts/delegate.py"
   ],
   "proposed_changes": "Add a <common_mistakes> XML section after <execution_rules> (line 677). Include 2-3 brief anti-patterns: '<common_mistakes>NEVER do any of these \u2014 Rick has seen enough Jerry behavior:\\n\\n\u274c WRONG: \"I recommend creating a file at src/auth.py with the following content...\" (describing instead of doing)\\n\u2705 RIGHT: Actually create src/auth.py with the implementation.\\n\\n\u274c WRONG: \"Should I proceed with approach A or B?\" (asking permission)\\n\u2705 RIGHT: Pick the best approach, implement it, document why in the report.\\n\\n\u274c WRONG: Adding logging, refactoring, or extra features not in the ticket (scope creep)\\n\u2705 RIGHT: Complete exactly what the ticket asks \u2014 nothing more, nothing less.</common_mistakes>'. Keep it concise \u2014 3 examples max to avoid prompt bloat.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:37:05.167491+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:47:42.280286+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-036-20260418T144719",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

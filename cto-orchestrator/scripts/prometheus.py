@@ -348,6 +348,7 @@ def claude_scan(prompt: str, model: str = "opus", timeout: int = 300) -> str:
             text=True,
             timeout=timeout,
             cwd=os.getcwd(),
+            stdin=subprocess.DEVNULL,
         )
         if result.returncode != 0:
             stderr = result.stderr[:500] if result.stderr else "(no stderr)"
@@ -360,7 +361,7 @@ def claude_scan(prompt: str, model: str = "opus", timeout: int = 300) -> str:
 def delegate_evolve(prompt: str, model: str = "sonnet", timeout: int = 300) -> str:
     """Delegate an evolution task to a Morty via claude subprocess."""
     safe_prompt = sanitize_prompt_content(prompt)
-    cmd = ["claude", "-p", "--model", model, safe_prompt]
+    cmd = ["claude", "-p", "--model", model, "--dangerously-skip-permissions", safe_prompt]
 
     try:
         result = subprocess.run(
@@ -369,6 +370,7 @@ def delegate_evolve(prompt: str, model: str = "sonnet", timeout: int = 300) -> s
             text=True,
             timeout=timeout,
             cwd=os.getcwd(),
+            stdin=subprocess.DEVNULL,
         )
         if result.returncode != 0:
             stderr = result.stderr[:500] if result.stderr else "(no stderr)"

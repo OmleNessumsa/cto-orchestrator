@@ -1,0 +1,22 @@
+{
+  "id": "PROM-068",
+  "title": "delegate.py: --thinking-budget flag onbekend in claude CLI",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Getest op 2026-04-17 tijdens Wave 1 dispatch van ZEA-043 (architect-morty, S complexity). ZEA-042 (backend, S) en ZEA-034 (per ongeluk als backend gelabeld) draaien prima zonder de flag.",
+  "description": "delegate.py voegt --thinking-budget toe voor architect-morty, security-morty en L/XL complexity tickets (zie scripts/delegate.py regel 1275-1276 en 1481-1485). De huidige claude CLI ondersteunt deze flag niet meer; subprocess crasht met: 'error: unknown option --thinking-budget'. Dit blokkeert elke architect/security ticket met complexity S/M, en elke L/XL ticket ongeacht agent. Workaround nu: tickets handmatig re-dispatchen met --agent backend-morty (skipt de branch bij S/M complexity). Echte fix: remove --thinking-budget call, of detecteer claude versie en conditioneel toevoegen.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Optie A: verwijder regels 1275-1276 en 1481-1485 in delegate.py compleet (Claude 4.x doet thinking automatisch). Optie B: wrap cmd.extend met try/except of claude --help check. Gerelateerd aan PROM-067 (--mcp-server) \u2014 zelfde klasse bug: verouderde CLI flags.",
+  "status": "rejected",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T13:12:21.859995+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-068-20260418T143323",
+  "reject_reason": "No files were actually modified (false success)"
+}

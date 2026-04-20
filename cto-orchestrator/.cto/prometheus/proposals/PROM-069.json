@@ -1,0 +1,21 @@
+{
+  "id": "PROM-069",
+  "title": "ticket.py create: --agent flag niet gepersisteerd",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Batch-creatie van 16 sub-tickets op 2026-04-17 in Zeasparkan project. Alle tickets met expliciete --agent architect-morty of --agent frontend-morty; niet bij alle gecheckt of de persistentie klopt, maar ZEA-034 bewezen wrong.",
+  "description": "ticket.py create met --agent architect-morty slaat in het ticket JSON assigned_agent=backend-morty op. Gezien op ZEA-034 (aangemaakt met --agent architect-morty, maar tickets/ZEA-034.json toont assigned_agent=backend-morty). Mogelijk wordt de --agent waarde overschreven door een default of door type/complexity-based inference.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/ticket.py"
+  ],
+  "proposed_changes": "Check ticket.py rond de create()-functie: wordt args.agent goed doorgegeven naar de JSON-writer? Staat er een overschrijving op basis van --type? Zou auto-inference moeten zijn een fallback voor lege agent, niet een override.",
+  "status": "pending",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-04-17T13:12:28.966948+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

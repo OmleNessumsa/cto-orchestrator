@@ -12,8 +12,12 @@
     "scripts/roro_events.py"
   ],
   "proposed_changes": "Uncomment and enhance SSRF prevention with private IP deny-list. Add validate_webhook_endpoint(). Apply in roro_events.py before HTTP requests.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-03-01T08:55:17.735233+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:46:48.109384+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-019-20260418T144452",
+  "files_actually_changed": [
+    "scripts/security_utils.py",
+    "scripts/roro_events.py"
+  ]
 }

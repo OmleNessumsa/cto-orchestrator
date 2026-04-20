@@ -42,6 +42,9 @@ except ImportError:
     def flush_events():
         pass
 
+# Flag set to True when security_utils is unavailable (set in except ImportError block below)
+SECURITY_DEGRADED = False
+
 # Import security utilities
 try:
     from security_utils import (
@@ -58,6 +61,15 @@ try:
         SANDWICH_REINFORCEMENT,
     )
 except ImportError:
+    # Security module unavailable — warn loudly and degrade gracefully
+    import sys as _sys
+    print(
+        "[SECURITY-CRITICAL] security_utils module not found — "
+        "running with DEGRADED security. Supply chain integrity cannot be verified.",
+        file=_sys.stderr,
+    )
+    SECURITY_DEGRADED = True
+
     class SecurityViolationError(Exception):
         def __init__(self, message, patterns=None, severity="high"):
             super().__init__(message)
@@ -203,6 +215,40 @@ def run_team_cmd(root: Path, *args) -> str:
     cmd = [sys.executable, str(scripts_dir() / "team.py")] + list(args)
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(root))
     return result.stdout + result.stderr
+
+
+# Import CostTracker from delegate for sprint-level budget enforcement
+try:
+    from delegate import CostTracker, _MODEL_PRICING_USD_PER_1M, _CHARS_PER_TOKEN
+except ImportError:
+    CostTracker = None  # type: ignore[assignment,misc]
+    _MODEL_PRICING_USD_PER_1M = {}
+    _CHARS_PER_TOKEN = 4
+
+
+def _estimate_ticket_cost_usd(ticket: dict, default_model: str = "sonnet") -> float:
+    """Rough cost estimate for a completed delegation using agent_output as proxy."""
+    output = ticket.get("agent_output") or ""
+    output_tokens = max(1, len(output) // _CHARS_PER_TOKEN)
+    pricing = _MODEL_PRICING_USD_PER_1M.get(default_model, {"input": 3.0, "output": 15.0})
+    # Use output tokens * output rate (dominant cost) as the approximation
+    return output_tokens * pricing["output"] / 1_000_000
+
+
+def _passes_quality_gate(ticket: dict) -> bool:
+    """Return True if a completed ticket passes the quality gate for auto-approval.
+
+    Requires: a terminal status from the agent, at least one file changed, and a
+    non-empty description. Tickets that miss any gate stay in_review for manual review.
+    """
+    status = ticket.get("status", "")
+    if status not in ("in_review", "completed", "needs_review"):
+        return False
+    if not (ticket.get("files_touched") or []):
+        return False
+    if not (ticket.get("agent_output") or "").strip():
+        return False
+    return True
 
 
 COMPLEXITY_TEAM_THRESHOLD = {"L": True, "XL": True}  # These need teams
@@ -894,8 +940,14 @@ def cmd_sprint(args):
     iteration = 0
     use_teams = not args.no_teams  # Enable teams by default
 
+    # Sprint cost budget
+    max_sprint_cost_usd: Optional[float] = cfg.get("max_sprint_cost_usd")
+    sprint_cost_usd: float = 0.0
+
     team_msg = " (team mode enabled)" if use_teams else " (solo mode)"
     console.print(f"[bold green]Wubba lubba dub dub! Sending the Morty's to work. (max {max_iterations} adventures){team_msg}[/bold green]")
+    if max_sprint_cost_usd is not None:
+        console.print(f"[dim]Sprint cost budget: ${max_sprint_cost_usd:.2f}[/dim]")
     append_log(root, {
         "timestamp": now_iso(),
         "ticket_id": None,
@@ -925,6 +977,19 @@ def cmd_sprint(args):
             "iteration": iteration,
             "max_iterations": max_iterations,
         }, role="rick")
+
+        # Enforce sprint cost budget
+        if max_sprint_cost_usd is not None and sprint_cost_usd >= max_sprint_cost_usd:
+            console.print(
+                f"\n  [red]Sprint cost budget exhausted — spent ~${sprint_cost_usd:.4f} "
+                f"of ${max_sprint_cost_usd:.2f} limit. Stopping sprint.[/red]"
+            )
+            emit("cto.cost.sprint.budget_exceeded", {
+                "sprint_cost_usd": round(sprint_cost_usd, 4),
+                "budget_usd": max_sprint_cost_usd,
+                "iteration": iteration,
+            }, role="rick")
+            break
 
         # Show current status
         tickets = all_tickets(root)
@@ -965,20 +1030,26 @@ def cmd_sprint(args):
                     # Reload ticket after review
                     rt = load_ticket(root, rt["id"])
                     if rt["status"] == "in_review":
-                        # Auto-approve if reviewer didn't change status
-                        rt["status"] = "done"
-                        rt["completed_at"] = now_iso()
-                        rt["updated_at"] = now_iso()
-                        save_ticket(root, rt)
-                        append_log(root, {
-                            "timestamp": now_iso(),
-                            "ticket_id": rt["id"],
-                            "agent": "rick",
-                            "action": "completed",
-                            "message": f"Reviewed and approved: {rt['title']}",
-                            "files_changed": [],
-                        })
-                        console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
+                        if _passes_quality_gate(rt):
+                            rt["status"] = "done"
+                            rt["completed_at"] = now_iso()
+                            rt["updated_at"] = now_iso()
+                            save_ticket(root, rt)
+                            sprint_cost_usd += _estimate_ticket_cost_usd(rt, cfg.get("default_model", "sonnet"))
+                            append_log(root, {
+                                "timestamp": now_iso(),
+                                "ticket_id": rt["id"],
+                                "agent": "rick",
+                                "action": "completed",
+                                "message": f"Reviewed and approved: {rt['title']}",
+                                "files_changed": [],
+                            })
+                            console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
+                        else:
+                            console.print(
+                                f"  [yellow]{rt['id']} → quality gate failed (missing files_changed or description) — "
+                                f"left in_review for manual review.[/yellow]"
+                            )
                 continue
 
             # Check blocked
@@ -1020,11 +1091,18 @@ def cmd_sprint(args):
                 try:
                     t = load_ticket(root, tid)
                     if t["status"] == "in_review":
-                        t["status"] = "done"
-                        t["completed_at"] = now_iso()
-                        t["updated_at"] = now_iso()
-                        save_ticket(root, t)
-                        console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+                        if _passes_quality_gate(t):
+                            t["status"] = "done"
+                            t["completed_at"] = now_iso()
+                            t["updated_at"] = now_iso()
+                            save_ticket(root, t)
+                            sprint_cost_usd += _estimate_ticket_cost_usd(t, cfg.get("default_model", "sonnet"))
+                            console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+                        else:
+                            console.print(
+                                f"  [yellow]{t['id']} → quality gate failed (missing files_changed or description) — "
+                                f"left in_review for manual review.[/yellow]"
+                            )
                     parsed_for_sprint = {
                         "status": t["status"],
                         "files_changed": t.get("files_touched", []),
@@ -1121,23 +1199,29 @@ def cmd_sprint(args):
             except Exception as e:
                 console.print(f"  [red]Delegation error: {e}[/red]")
 
-        # Check if ticket ended up in_review — auto-approve for sprint flow
+        # Check if ticket ended up in_review — quality gate before auto-approve
         t = load_ticket(root, ticket["id"])
         if t["status"] == "in_review":
-            # Quick review: mark as done (code-reviewer will catch issues in review phase)
-            t["status"] = "done"
-            t["completed_at"] = now_iso()
-            t["updated_at"] = now_iso()
-            save_ticket(root, t)
-            append_log(root, {
-                "timestamp": now_iso(),
-                "ticket_id": t["id"],
-                "agent": "rick",
-                "action": "completed",
-                "message": f"Good enough. Approved. *burp* {t['title']}",
-                "files_changed": t.get("files_touched", []),
-            })
-            console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+            if _passes_quality_gate(t):
+                t["status"] = "done"
+                t["completed_at"] = now_iso()
+                t["updated_at"] = now_iso()
+                save_ticket(root, t)
+                sprint_cost_usd += _estimate_ticket_cost_usd(t, cfg.get("default_model", "sonnet"))
+                append_log(root, {
+                    "timestamp": now_iso(),
+                    "ticket_id": t["id"],
+                    "agent": "rick",
+                    "action": "completed",
+                    "message": f"Good enough. Approved. *burp* {t['title']}",
+                    "files_changed": t.get("files_touched", []),
+                })
+                console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+            else:
+                console.print(
+                    f"  [yellow]{t['id']} → quality gate failed (missing files_changed or description) — "
+                    f"left in_review for manual review.[/yellow]"
+                )
 
         # Update sprint state with accumulated context (PROM-008)
         parsed_for_sprint = {
@@ -1193,6 +1277,16 @@ def cmd_sprint(args):
         "tickets_total": total,
         "completion_percentage": pct,
         "status_counts": status_counts,
+    }, role="rick")
+
+    # Emit sprint cost summary
+    console.print(f"  [dim]Sprint estimated cost: ~${sprint_cost_usd:.4f}[/dim]")
+    emit("cto.cost.sprint", {
+        "sprint_number": cfg.get("current_sprint", 1),
+        "sprint_cost_usd": round(sprint_cost_usd, 4),
+        "budget_usd": max_sprint_cost_usd,
+        "tickets_done": done,
+        "iterations": iteration,
     }, role="rick")
 
     # Flush pending events to prevent SIGSEGV on exit

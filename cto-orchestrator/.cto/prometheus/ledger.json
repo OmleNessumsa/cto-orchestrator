@@ -963,5 +963,209 @@
     "title": "ticket.py create: --agent flag niet gepersisteerd",
     "severity": "medium",
     "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-17T13:39:42.206335+00:00",
+    "proposal_id": "PROM-070",
+    "action": "self-reported",
+    "title": "delegate.py: --effort 'xhigh' wordt door claude CLI afgewezen",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-17T15:03:54.540330+00:00",
+    "proposal_id": "PROM-071",
+    "action": "self-reported",
+    "title": "delegate.py: --dangerously-skip-permissions nooit toegevoegd aan subprocess",
+    "severity": "critical",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-18T14:09:17.108698+00:00",
+    "proposal_id": "PROM-071",
+    "action": "failed",
+    "reason": "Evolve delegation failed: Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.\n"
+  },
+  {
+    "timestamp": "2026-04-18T14:09:21.040561+00:00",
+    "proposal_id": "PROM-068",
+    "action": "failed",
+    "reason": "Evolve delegation failed: Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.\n"
+  },
+  {
+    "timestamp": "2026-04-18T14:09:24.825748+00:00",
+    "proposal_id": "PROM-070",
+    "action": "failed",
+    "reason": "Evolve delegation failed: Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.\n"
+  },
+  {
+    "timestamp": "2026-04-18T14:09:38.703224+00:00",
+    "proposal_id": "PROM-034",
+    "action": "failed",
+    "reason": "Evolve delegation failed: Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.\n"
+  },
+  {
+    "timestamp": "2026-04-18T14:09:42.701880+00:00",
+    "proposal_id": "PROM-014",
+    "action": "failed",
+    "reason": "Evolve delegation failed: Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.\n"
+  },
+  {
+    "timestamp": "2026-04-18T14:09:46.468234+00:00",
+    "proposal_id": "PROM-055",
+    "action": "failed",
+    "reason": "Evolve delegation failed: Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.\n"
+  },
+  {
+    "timestamp": "2026-04-18T14:28:14.219405+00:00",
+    "proposal_id": "PROM-071",
+    "action": "applied",
+    "title": "delegate.py: --dangerously-skip-permissions nooit toegevoegd aan subprocess",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:33:44.722731+00:00",
+    "proposal_id": "PROM-068",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-04-18T14:34:21.105397+00:00",
+    "proposal_id": "PROM-070",
+    "action": "applied",
+    "title": "delegate.py: --effort 'xhigh' wordt door claude CLI afgewezen",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:35:53.642760+00:00",
+    "proposal_id": "PROM-034",
+    "action": "applied",
+    "title": "Add role-specific evaluation rubrics to agent prompts",
+    "target_files": [
+      "scripts/delegate.py",
+      "references/prompts.md"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:36:48.269872+00:00",
+    "proposal_id": "PROM-014",
+    "action": "applied",
+    "title": "Effort-scaling instructions to match task complexity",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:38:25.924852+00:00",
+    "proposal_id": "PROM-055",
+    "action": "applied",
+    "title": "Leverage extended thinking for architect-morty and security-morty",
+    "target_files": [
+      "scripts/delegate.py",
+      "agents/architect-morty.json",
+      "agents/security-morty.json"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:43:09.737550+00:00",
+    "proposal_id": "PROM-054",
+    "action": "applied",
+    "title": "Add streaming output for real-time Morty progress",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/roro_events.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:44:52.341799+00:00",
+    "proposal_id": "PROM-039",
+    "action": "applied",
+    "title": "Add Server-Sent Events (SSE) stream as alternative to fire-and-forget HTTP POST",
+    "target_files": [
+      "scripts/roro_events.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:46:48.111696+00:00",
+    "proposal_id": "PROM-019",
+    "action": "applied",
+    "title": "Add SSRF prevention and webhook endpoint validation",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/roro_events.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:47:08.775236+00:00",
+    "proposal_id": "PROM-023",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-04-18T14:47:42.282080+00:00",
+    "proposal_id": "PROM-036",
+    "action": "applied",
+    "title": "Add contextual negative examples for common failure modes",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:48:30.046899+00:00",
+    "proposal_id": "PROM-016",
+    "action": "applied",
+    "title": "Subagent delegation context with objective-format-tools-boundaries",
+    "target_files": [
+      "scripts/delegate.py",
+      "references/prompts.md"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:50:26.298630+00:00",
+    "proposal_id": "PROM-021",
+    "action": "applied",
+    "title": "Add dependency integrity verification and supply chain hardening",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py",
+      "scripts/meeseeks.py",
+      "scripts/orchestrate.py",
+      "scripts/unity.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:53:19.791535+00:00",
+    "proposal_id": "PROM-051",
+    "action": "applied",
+    "title": "Add --resume flag for interrupted agent sessions",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:54:36.321516+00:00",
+    "proposal_id": "PROM-031",
+    "action": "applied",
+    "title": "Agent Memory and Context Window Management",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-18T14:58:42.976659+00:00",
+    "proposal_id": "PROM-011",
+    "action": "applied",
+    "title": "Add bounded delegation with cost tracking and quality gates",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py",
+      "scripts/meeseeks.py"
+    ]
   }
 ]

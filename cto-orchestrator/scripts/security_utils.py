@@ -11,10 +11,12 @@ This module provides:
 - OWASP Top 10 mitigations
 """
 
+import ipaddress
 import os
 import re
 import html
 import shlex
+import urllib.parse
 from pathlib import Path
 from typing import Optional, Union
 
@@ -308,12 +310,12 @@ def validate_url(url: str, require_https: bool = False) -> bool:
     if not url:
         return False
 
-    # Basic URL pattern
+    # Tightened URL pattern — restricts path to safe URL characters
     url_pattern = re.compile(
-        r'^https?://'  # http or https
-        r'[a-zA-Z0-9.-]+'  # domain
-        r'(:[0-9]+)?'  # optional port
-        r'(/[^\s]*)?$'  # optional path
+        r'^https?://'                                        # http or https
+        r'[a-zA-Z0-9.\-]+'                                  # domain
+        r'(:[0-9]{1,5})?'                                   # optional port (1-5 digits)
+        r'(/[a-zA-Z0-9._~:/?#\[\]@!$&\'()*+,;%=-]*)?$'    # optional path/query (RFC 3986)
     )
 
     if not url_pattern.match(url):
@@ -322,12 +324,123 @@ def validate_url(url: str, require_https: bool = False) -> bool:
     if require_https and not url.startswith('https://'):
         return False
 
-    # Reject localhost/internal IPs in production contexts
-    # (uncomment if needed for SSRF prevention)
-    # forbidden_hosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1']
-    # for host in forbidden_hosts:
-    #     if host in url:
-    #         return False
+    # SSRF prevention: reject private/internal IP addresses and hostnames
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname or ""
+        if _is_private_ssrf_target(host):
+            return False
+    except Exception:
+        return False
+
+    return True
+
+
+# ── SSRF Prevention ───────────────────────────────────────────────────────────
+
+# Private and reserved IP networks that must not be targeted by outbound HTTP
+_SSRF_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),      # RFC 1918 class A
+    ipaddress.ip_network("172.16.0.0/12"),    # RFC 1918 class B
+    ipaddress.ip_network("192.168.0.0/16"),   # RFC 1918 class C
+    ipaddress.ip_network("169.254.0.0/16"),   # Link-local (incl. AWS IMDS 169.254.169.254)
+    ipaddress.ip_network("100.64.0.0/10"),    # Shared address space (RFC 6598)
+    ipaddress.ip_network("0.0.0.0/8"),        # "This" network
+    ipaddress.ip_network("fc00::/7"),         # IPv6 unique local
+    ipaddress.ip_network("fe80::/10"),        # IPv6 link-local
+]
+
+_SSRF_INTERNAL_HOSTNAME_PATTERN = re.compile(
+    r'^(.*\.local|.*\.internal|.*\.intranet|.*\.corp|metadata\.google\.internal)$',
+    re.IGNORECASE,
+)
+
+
+def _is_private_ssrf_target(host: str) -> bool:
+    """Check if a host is a private/internal address that indicates an SSRF risk.
+
+    Loopback addresses (localhost, 127.x, ::1) are NOT flagged here — callers
+    that need to block loopback should check separately (e.g. validate_webhook_endpoint).
+
+    Args:
+        host: Hostname or IP address string
+
+    Returns:
+        True if the host is a private/internal target (should be blocked)
+    """
+    if not host:
+        return False
+
+    clean = host.rstrip(".")
+
+    # Internal hostname patterns (not loopback — handled separately)
+    if _SSRF_INTERNAL_HOSTNAME_PATTERN.match(clean):
+        return True
+
+    # Try parsing as IP address
+    try:
+        addr = ipaddress.ip_address(clean)
+        if addr.is_loopback:
+            # Loopback decisions are left to the caller
+            return False
+        return any(addr in net for net in _SSRF_BLOCKED_NETWORKS)
+    except ValueError:
+        pass
+
+    return False
+
+
+def validate_webhook_endpoint(url: str, allow_localhost: bool = False) -> bool:
+    """Validate a webhook endpoint URL, preventing SSRF attacks.
+
+    Blocks RFC 1918 private ranges, link-local addresses (including AWS metadata
+    endpoint 169.254.169.254), and internal hostname patterns. Loopback addresses
+    are blocked by default but can be allowed for development via allow_localhost.
+
+    Args:
+        url: Webhook URL to validate
+        allow_localhost: If True, permit localhost/127.x endpoints (dev mode)
+
+    Returns:
+        True if the URL is valid and safe
+
+    Raises:
+        ValueError: If the URL is invalid or targets a private/internal address
+    """
+    if not url:
+        raise ValueError("Webhook endpoint URL cannot be empty")
+
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception as exc:
+        raise ValueError(f"Malformed webhook URL: {url}") from exc
+
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"Webhook URL must use http or https scheme, got: {parsed.scheme!r}"
+        )
+
+    host = parsed.hostname
+    if not host:
+        raise ValueError(f"Webhook URL has no valid hostname: {url}")
+
+    # Loopback check
+    is_loopback = (
+        host.lower() == "localhost"
+        or host.startswith("127.")
+        or host in ("::1", "0.0.0.0")
+    )
+    if is_loopback and not allow_localhost:
+        raise ValueError(
+            f"Webhook URL targets loopback address (SSRF risk): {host}. "
+            "Pass allow_localhost=True for development endpoints."
+        )
+
+    # Private/internal address check (covers RFC 1918, link-local, internal names)
+    if _is_private_ssrf_target(host):
+        raise ValueError(
+            f"Webhook URL targets a private/internal address (SSRF risk): {host}"
+        )
 
     return True
 
@@ -903,27 +1016,205 @@ def quarantine_prompt(
         f.write(json.dumps(entry) + "\n")
 
 
+# ── Module Integrity Verification ────────────────────────────────────────────
+
+def verify_module_integrity(
+    module_paths: list = None,
+    manifest_path: Optional[Union[str, Path]] = None,
+) -> dict:
+    """Verify SHA-256 integrity of own components against a stored manifest.
+
+    On first run (no manifest): computes hashes and writes the manifest.
+    On subsequent runs: compares current hashes to manifest and flags mismatches.
+
+    Args:
+        module_paths: List of file paths to hash. Defaults to the scripts in the
+                      same directory as this file.
+        manifest_path: Path to the JSON hash manifest. Defaults to
+                       <project_root>/.cto/security/module-hashes.json.
+
+    Returns:
+        Dict with keys:
+            "status"     — "ok" | "degraded" | "initialized"
+            "mismatches" — list of filenames whose hashes changed
+            "missing"    — list of filenames present in manifest but not on disk
+            "hashes"     — dict mapping filename → current SHA-256 hex digest
+    """
+    import hashlib
+    import json as _json
+
+    scripts_dir = Path(__file__).parent
+
+    if module_paths is None:
+        module_paths = [
+            scripts_dir / "security_utils.py",
+            scripts_dir / "delegate.py",
+            scripts_dir / "meeseeks.py",
+            scripts_dir / "orchestrate.py",
+            scripts_dir / "unity.py",
+        ]
+
+    # Resolve manifest path
+    if manifest_path is None:
+        # Walk up to find .cto dir
+        cwd = scripts_dir
+        while True:
+            candidate = cwd / ".cto" / "security" / "module-hashes.json"
+            if (cwd / ".cto").is_dir():
+                manifest_path = candidate
+                break
+            parent = cwd.parent
+            if parent == cwd:
+                manifest_path = scripts_dir / ".cto" / "security" / "module-hashes.json"
+                break
+            cwd = parent
+
+    manifest_path = Path(manifest_path)
+
+    # Compute current hashes
+    current_hashes: dict = {}
+    for mp in module_paths:
+        mp = Path(mp)
+        if mp.exists():
+            digest = hashlib.sha256(mp.read_bytes()).hexdigest()
+            current_hashes[mp.name] = digest
+
+    # First run: write manifest and return initialized status
+    if not manifest_path.exists():
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(_json.dumps(current_hashes, indent=2) + "\n")
+        return {
+            "status": "initialized",
+            "mismatches": [],
+            "missing": [],
+            "hashes": current_hashes,
+        }
+
+    # Load stored manifest
+    try:
+        stored_hashes: dict = _json.loads(manifest_path.read_text())
+    except Exception as exc:
+        audit_log_security_event(
+            "integrity_manifest_unreadable",
+            f"Cannot read module hash manifest at {manifest_path}: {exc}",
+            severity="warning",
+        )
+        return {
+            "status": "degraded",
+            "mismatches": [],
+            "missing": [],
+            "hashes": current_hashes,
+        }
+
+    mismatches = [
+        name for name, digest in stored_hashes.items()
+        if name in current_hashes and current_hashes[name] != digest
+    ]
+    missing = [
+        name for name in stored_hashes
+        if name not in current_hashes
+    ]
+
+    if mismatches or missing:
+        audit_log_security_event(
+            "integrity_check_failed",
+            f"Module integrity mismatch — changed: {mismatches}, missing: {missing}",
+            severity="critical",
+        )
+        return {
+            "status": "degraded",
+            "mismatches": mismatches,
+            "missing": missing,
+            "hashes": current_hashes,
+        }
+
+    return {
+        "status": "ok",
+        "mismatches": [],
+        "missing": [],
+        "hashes": current_hashes,
+    }
+
+
 if __name__ == "__main__":
-    # Self-test
-    print("Security utilities self-test...")
+    import argparse as _argparse
 
-    # Test path sanitization
-    try:
-        sanitize_ticket_id("../../../etc/passwd")
-        print("FAIL: Path traversal not detected")
-    except ValueError as e:
-        print(f"PASS: Path traversal detected: {e}")
+    _parser = _argparse.ArgumentParser(
+        prog="security_utils",
+        description="CTO Orchestrator security utilities",
+    )
+    _sub = _parser.add_subparsers(dest="command")
 
-    # Test valid ticket ID
-    try:
-        result = sanitize_ticket_id("PROJ-001")
-        print(f"PASS: Valid ticket ID accepted: {result}")
-    except ValueError as e:
-        print(f"FAIL: Valid ticket ID rejected: {e}")
+    _check_parser = _sub.add_parser(
+        "security-check",
+        help="Verify module integrity and run security self-tests",
+    )
+    _check_parser.add_argument(
+        "--update-manifest",
+        action="store_true",
+        help="Rewrite the hash manifest with current file hashes (use after intentional changes)",
+    )
 
-    # Test text sanitization
-    sanitized = sanitize_text_input("Hello\x00World\x00!")
-    assert '\x00' not in sanitized
-    print(f"PASS: Null bytes removed: {sanitized}")
+    _args = _parser.parse_args()
 
-    print("All tests passed!")
+    if _args.command == "security-check":
+        print("=== CTO Orchestrator — Security Check ===\n")
+
+        # Module integrity
+        if getattr(_args, "update_manifest", False):
+            # Delete existing manifest so verify_module_integrity re-initializes it
+            import json as _json
+            from pathlib import Path as _Path
+            _scripts_dir = _Path(__file__).parent
+            _cwd = _scripts_dir
+            while True:
+                _candidate = _cwd / ".cto" / "security" / "module-hashes.json"
+                if (_cwd / ".cto").is_dir():
+                    if _candidate.exists():
+                        _candidate.unlink()
+                    break
+                _parent = _cwd.parent
+                if _parent == _cwd:
+                    break
+                _cwd = _parent
+
+        integrity = verify_module_integrity()
+        print(f"Module integrity: {integrity['status'].upper()}")
+        if integrity["mismatches"]:
+            print(f"  CHANGED : {', '.join(integrity['mismatches'])}")
+        if integrity["missing"]:
+            print(f"  MISSING : {', '.join(integrity['missing'])}")
+        if integrity["status"] == "initialized":
+            print("  (Hash manifest created — run again to verify)")
+        elif integrity["status"] == "ok":
+            print(f"  All {len(integrity['hashes'])} modules verified OK")
+
+        print()
+
+        # Self-tests
+        print("--- Self-tests ---")
+        print("Security utilities self-test...")
+
+        # Test path sanitization
+        try:
+            sanitize_ticket_id("../../../etc/passwd")
+            print("FAIL: Path traversal not detected")
+        except ValueError as e:
+            print(f"PASS: Path traversal detected: {e}")
+
+        # Test valid ticket ID
+        try:
+            result = sanitize_ticket_id("PROJ-001")
+            print(f"PASS: Valid ticket ID accepted: {result}")
+        except ValueError as e:
+            print(f"FAIL: Valid ticket ID rejected: {e}")
+
+        # Test text sanitization
+        sanitized = sanitize_text_input("Hello\x00World\x00!")
+        assert '\x00' not in sanitized
+        print(f"PASS: Null bytes removed: {sanitized}")
+
+        print("\nAll tests passed!")
+    else:
+        # No subcommand — print usage
+        _parser.print_help()

@@ -12,8 +12,11 @@
     "scripts/orchestrate.py"
   ],
   "proposed_changes": "1. Create a `.cto/memory/` directory structure with per-role memory files (e.g. `backend-morty.jsonl`) that store condensed lessons from each completed ticket (ticket_id, key patterns discovered, mistakes made, conventions followed). 2. After each successful delegation in delegate.py, extract a memory entry by prompting Haiku: 'Summarize the key patterns, conventions, and lessons from this agent's work in 2-3 bullet points as JSON'. Append to the role's memory file. 3. In the prompt assembly section of delegate.py, load the last 10 memory entries for the agent's role and inject them as a `<agent_memory>` section in the prompt. 4. Cap memory files at 50 entries with a rotation policy (oldest entries dropped). This mirrors AutoGen's teachable agent pattern where agents accumulate domain knowledge across sessions.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:33:54.460036+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:54:36.320037+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-031-20260418T145319",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
 }

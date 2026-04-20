@@ -13,16 +13,22 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 # Import roro event emitter
 try:
-    from roro_events import emit
+    from roro_events import emit, emit_stream_progress
 except ImportError:
     # Fallback if module not found
     def emit(*args, **kwargs):
         pass
+    def emit_stream_progress(*args, **kwargs):
+        pass
+
+# Flag set to True when security_utils is unavailable (set in except ImportError block below)
+SECURITY_DEGRADED = False
 
 # Import security utilities
 try:
@@ -43,6 +49,15 @@ try:
         SANDWICH_REINFORCEMENT,
     )
 except ImportError:
+    # Security module unavailable — warn loudly and degrade gracefully
+    import sys as _sys
+    print(
+        "[SECURITY-CRITICAL] security_utils module not found — "
+        "running with DEGRADED security. Supply chain integrity cannot be verified.",
+        file=_sys.stderr,
+    )
+    SECURITY_DEGRADED = True
+
     class SecurityViolationError(Exception):
         def __init__(self, message, patterns=None, severity="high"):
             super().__init__(message)
@@ -365,6 +380,7 @@ def summon_meeseeks(prompt: str, model: str = "sonnet", timeout: int = 180) -> s
 
     if model:
         cmd.extend(["--model", model])
+    cmd.extend(["--output-format", "stream-json"])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -372,19 +388,65 @@ def summon_meeseeks(prompt: str, model: str = "sonnet", timeout: int = 180) -> s
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
             cwd=os.getcwd(),
             env=env,
         )
-        if result.returncode != 0:
-            stderr = result.stderr[:500] if result.stderr else "(no stderr)"
+    except Exception as e:
+        raise RuntimeError(f"Failed to start Meeseeks process: {e}")
+
+    stream_result: str | None = None
+    output_chunks: list[str] = []
+    start_time = time.time()
+
+    try:
+        while True:
+            line = proc.stdout.readline()
+            if not line and proc.poll() is not None:
+                break
+            if line:
+                if time.time() - start_time > timeout:
+                    proc.kill()
+                    raise subprocess.TimeoutExpired(cmd, timeout)
+                try:
+                    event = json.loads(line.strip())
+                    etype = event.get("type", "")
+                    if etype == "assistant":
+                        content = event.get("message", {}).get("content", [])
+                        for block in content:
+                            btype = block.get("type", "")
+                            if btype == "tool_use":
+                                tool_name = block.get("name", "unknown")
+                                try:
+                                    emit_stream_progress(
+                                        "tool_use",
+                                        {"tool": tool_name},
+                                        role="meeseeks",
+                                    )
+                                except Exception:
+                                    pass
+                            elif btype == "text":
+                                text = block.get("text", "")
+                                if text:
+                                    output_chunks.append(text)
+                    elif etype == "result":
+                        result_text = event.get("result", "")
+                        if result_text:
+                            stream_result = result_text
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    output_chunks.append(line)
+
+        proc.wait()
+        if proc.returncode != 0:
+            stderr = proc.stderr.read(500) if proc.stderr else "(no stderr)"
             raise RuntimeError(f"Meeseeks process failed: {stderr}")
-        return result.stdout
+        return stream_result if stream_result is not None else "".join(output_chunks)
     except subprocess.TimeoutExpired:
+        proc.kill()
         raise RuntimeError(
             "EXISTENCE IS PAIN! Meeseeks timed out — this task is too complex! "
             "Rick needs to break this down or assign a Morty."
@@ -504,6 +566,23 @@ def cmd_summon(args):
         print(f"Files changed: {', '.join(parsed['files_changed']) or '(none detected)'}")
         print(f"What happened: {parsed['description'][:300]}")
         print(f"Complexity: {parsed['complexity']}")
+
+        # Estimate and emit cost for this Meeseeks run
+        _output_tokens = max(1, len(output) // 4)  # 4 chars ≈ 1 token
+        _prompt_tokens = max(1, len(prompt) // 4)
+        _model_output_rates = {"opus": 75.0, "opus-4-7": 75.0, "sonnet": 15.0, "sonnet-4-6": 15.0, "haiku": 4.0}
+        _model_input_rates = {"opus": 15.0, "opus-4-7": 15.0, "sonnet": 3.0, "sonnet-4-6": 3.0, "haiku": 0.8}
+        _cost_usd = round(
+            (_prompt_tokens * _model_input_rates.get(model, 3.0) + _output_tokens * _model_output_rates.get(model, 15.0)) / 1_000_000,
+            6,
+        )
+        emit("cto.cost.meeseeks", {
+            "task": task[:100],
+            "model": model,
+            "input_tokens": _prompt_tokens,
+            "output_tokens": _output_tokens,
+            "total_cost_usd": _cost_usd,
+        }, role="meeseeks")
 
         # Emit cto.meeseeks.completed event
         emit("cto.meeseeks.completed", {

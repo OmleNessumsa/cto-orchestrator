@@ -13,8 +13,14 @@
     "agents/security-morty.json"
   ],
   "proposed_changes": "When delegating to architect-morty or security-morty (the Opus-tier agents in AGENT_MODELS), add `--thinking` or the equivalent extended thinking parameter to the claude subprocess call. In delegate.py's delegate_to_agent(), check if the model is 'opus' and the agent is in a reasoning-heavy role, then enable extended thinking. Update the agent JSON configs to include a 'use_extended_thinking: true' flag. Parse and optionally log the thinking blocks separately from the final output for debugging/audit purposes.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:44:54.705558+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-18T14:38:25.923130+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-055-20260418T143648",
+  "reject_reason": null,
+  "files_actually_changed": [
+    "agents/security-morty.json",
+    "scripts/delegate.py",
+    "agents/architect-morty.json"
+  ]
 }

@@ -403,6 +403,65 @@ You review ticket {ticket_id}: "{ticket_title}".
 
 ---
 
+## Subagent Delegation Context Blocks
+
+Every agent prompt assembled by `build_prompt()` in `scripts/delegate.py` contains two XML blocks that tell the agent what tools it may use and which files are in scope.
+
+### `<available_tools>`
+
+```xml
+<available_tools>
+You have permission to use these tools: Read, Write, Edit, Bash, Grep, Glob.
+Do not attempt tools outside this list.
+</available_tools>
+```
+
+Sourced from the agent card's `allowed_tools` array (`agents/<role>.json`). Falls back to `["Read", "Write", "Edit", "Bash", "Grep", "Glob"]` if the card does not specify tools.
+
+### `<task_boundaries>`
+
+```xml
+<task_boundaries>
+Safe-to-modify files for this ticket: src/auth.py, tests/test_auth.py.
+Focus your changes on these files unless the task explicitly requires modifying others.
+Do NOT modify files outside this list without a clear reason documented in your report.
+</task_boundaries>
+```
+
+Sourced from the ticket's `target_files` field (array of relative file paths). Omitted entirely when `target_files` is absent or empty, so existing tickets without the field are unaffected.
+
+**Ticket schema addition** — to populate `<task_boundaries>`, add `target_files` to a ticket:
+
+```json
+{
+  "id": "TICKET-042",
+  "title": "Harden auth middleware",
+  "target_files": ["src/auth.py", "tests/test_auth.py"],
+  ...
+}
+```
+
+---
+
+## Self-Evaluation Rubrics
+
+Each role receives a `<self_evaluation>` block appended to its system prompt by the delegation engine (sourced from `ROLE_RUBRICS` in `scripts/delegate.py`). Agents are expected to run through this checklist internally before submitting their report. This is more specific than the generic `reasoning_protocol` and creates an implicit verify step.
+
+| Role | Focus |
+|------|-------|
+| `backend-morty` | Acceptance criteria, error handling on external calls, unit tests (happy + edge), no hardcoded secrets, code conventions |
+| `frontend-morty` | Acceptance criteria, loading/error/empty states, no hardcoded strings, keyboard accessibility + ARIA, component conventions |
+| `fullstack-morty` | Combined backend + frontend checks, no secrets anywhere, tests |
+| `architect-morty` | Interface completeness (inputs/outputs/errors), ADRs for decisions, no contradictions with existing ADRs, downstream implementability |
+| `security-morty` | OWASP Top 10 A01–A09 mapped checks; each item rated PASS/FAIL with evidence; all FAILs fixed before report |
+| `reviewer-morty` | Every changed file read and reviewed, acceptance criteria verified against code, bug/security/maintainability/performance checks |
+| `tester-morty` | All criteria covered, happy + edge + error scenarios, deterministic tests, passing suite |
+| `devops-morty` | Acceptance criteria, no hardcoded secrets, idempotency, rollback path, least-privilege permissions |
+
+Roles without a rubric entry (e.g. `professor-morty`, `mr-meeseeks`) receive no `<self_evaluation>` block.
+
+---
+
 ## Mr. Meeseeks Prompt
 
 ```
