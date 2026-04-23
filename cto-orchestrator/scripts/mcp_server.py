@@ -10,6 +10,7 @@ Usage: claude -p --mcp-config '{"mcpServers":{"cto-orchestrator":{"command":"pyt
 
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -341,6 +342,537 @@ def read_adr(name: str) -> str:
         return f"ADR '{name}' not found. Available: {available}"
 
     return fp.read_text()
+
+
+# ---------------------------------------------------------------------------
+# IDE-driven orchestrator tools (Rick IDE surface).
+#
+# The tools above were designed for Morty agents mid-execution: read a ticket,
+# update status, post team messages. The tools below give an IDE session or
+# top-level Claude conversation the full orchestrator keyboard: list tickets,
+# create/close, inspect Sleepy/Prometheus/Unity state, fire delegate/meeseeks,
+# explain code.
+#
+# Read-only tools return JSON synchronously. Mutating tools write to .cto/
+# directly when safe (create/close ticket). Long-running actions (delegate,
+# meeseeks, prometheus.scan, unity.scan, explain) are spawned detached and
+# return a PID + log path the caller can poll.
+# ---------------------------------------------------------------------------
+
+
+def _scripts_dir() -> Path:
+    return Path(__file__).parent
+
+
+def _run_script(script: str, args: list[str], timeout: int = 20) -> dict:
+    """Run an orchestrator script synchronously and return stdout/stderr/rc."""
+    root = _find_cto_root()
+    fp = _scripts_dir() / script
+    try:
+        result = subprocess.run(
+            ["python3", str(fp), *args],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return {
+            "ok": result.returncode == 0,
+            "returncode": result.returncode,
+            "stdout": (result.stdout or "")[:8000],
+            "stderr": (result.stderr or "")[:2000],
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"timeout after {timeout}s"}
+    except FileNotFoundError:
+        return {"ok": False, "error": f"script not found: {fp}"}
+
+
+def _spawn_detached(script: str, args: list[str], log_name: str) -> dict:
+    """Spawn an orchestrator script as a detached process and return pid+log."""
+    root = _find_cto_root()
+    fp = _scripts_dir() / script
+    if not fp.exists():
+        return {"ok": False, "error": f"script not found: {fp}"}
+    logs_dir = root / ".cto" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_path = logs_dir / log_name
+    log = open(log_path, "w")
+    proc = subprocess.Popen(
+        ["python3", str(fp), *args],
+        cwd=str(root),
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    return {
+        "ok": True,
+        "pid": proc.pid,
+        "log": str(log_path.relative_to(root)),
+        "command": f"python3 {script} {' '.join(args)}",
+    }
+
+
+def _tickets_dir() -> Path:
+    return _find_cto_root() / ".cto" / "tickets"
+
+
+def _load_config() -> dict:
+    cfg = _find_cto_root() / ".cto" / "config.json"
+    return _load_json(cfg) if cfg.exists() else {}
+
+
+# -------------------- Ticket management --------------------
+
+@mcp.tool()
+def list_tickets(status: str = "", agent: str = "", limit: int = 50) -> str:
+    """List tickets in the current project, optionally filtered.
+
+    Args:
+        status: Filter by status (todo, in_progress, needs_review, blocked, completed). Empty = all.
+        agent: Filter by assigned agent (e.g. backend-morty). Empty = all.
+        limit: Max tickets to return (default 50).
+
+    Returns:
+        JSON array of ticket summaries (id, title, status, agent, priority, type).
+    """
+    td = _tickets_dir()
+    if not td.exists():
+        return json.dumps({"tickets": [], "note": "No tickets directory yet. Run init_project.sh."})
+    rows = []
+    for fp in sorted(td.glob("*.json")):
+        try:
+            t = _load_json(fp)
+        except Exception:
+            continue
+        if status and t.get("status") != status:
+            continue
+        if agent and t.get("agent") != agent:
+            continue
+        rows.append({
+            "id": t.get("id"),
+            "title": t.get("title"),
+            "status": t.get("status"),
+            "agent": t.get("agent"),
+            "priority": t.get("priority"),
+            "type": t.get("type"),
+            "complexity": t.get("complexity"),
+            "dependencies": t.get("dependencies") or [],
+        })
+        if len(rows) >= limit:
+            break
+    return json.dumps({"count": len(rows), "tickets": rows}, indent=2)
+
+
+@mcp.tool()
+def board() -> str:
+    """Kanban board view — tickets grouped by status.
+
+    Returns:
+        JSON with columns {todo, in_progress, needs_review, blocked, completed},
+        each holding an array of {id, title, agent, priority}.
+    """
+    td = _tickets_dir()
+    columns = {"todo": [], "in_progress": [], "needs_review": [], "blocked": [], "completed": []}
+    if td.exists():
+        for fp in sorted(td.glob("*.json")):
+            try:
+                t = _load_json(fp)
+            except Exception:
+                continue
+            col = t.get("status", "todo")
+            if col in columns:
+                columns[col].append({
+                    "id": t.get("id"),
+                    "title": t.get("title"),
+                    "agent": t.get("agent"),
+                    "priority": t.get("priority"),
+                })
+    totals = {k: len(v) for k, v in columns.items()}
+    return json.dumps({"totals": totals, "columns": columns}, indent=2)
+
+
+@mcp.tool()
+def create_ticket(
+    title: str,
+    description: str = "",
+    ticket_type: str = "feature",
+    priority: str = "medium",
+    agent: str = "",
+    dependencies: list[str] | None = None,
+    complexity: str = "M",
+) -> str:
+    """Create a new ticket in the current project.
+
+    Args:
+        title: Ticket title (required, <=200 chars).
+        description: Longer description / acceptance criteria.
+        ticket_type: feature | bug | chore | spike | test | docs.
+        priority: low | medium | high | critical.
+        agent: Assigned Morty role (empty = unassigned).
+        dependencies: List of ticket IDs this depends on.
+        complexity: XS | S | M | L | XL.
+
+    Returns:
+        JSON with the created ticket's id + path.
+    """
+    if not title or len(title) > 200:
+        return json.dumps({"error": "title must be 1-200 chars"})
+    if priority not in {"low", "medium", "high", "critical"}:
+        return json.dumps({"error": "priority must be low|medium|high|critical"})
+    if complexity not in {"XS", "S", "M", "L", "XL"}:
+        return json.dumps({"error": "complexity must be XS|S|M|L|XL"})
+
+    cfg = _load_config()
+    prefix = cfg.get("ticket_prefix", "TKT")
+    next_num = int(cfg.get("next_ticket_number", 1))
+
+    ticket_id = f"{prefix}-{next_num:03d}"
+    ticket = {
+        "id": ticket_id,
+        "title": title[:200],
+        "description": description[:5000],
+        "type": ticket_type,
+        "priority": priority,
+        "complexity": complexity,
+        "status": "todo",
+        "agent": agent or None,
+        "dependencies": dependencies or [],
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+    }
+
+    td = _tickets_dir()
+    td.mkdir(parents=True, exist_ok=True)
+    fp = td / f"{ticket_id}.json"
+    _save_json(fp, ticket)
+
+    cfg["next_ticket_number"] = next_num + 1
+    _save_json(_find_cto_root() / ".cto" / "config.json", cfg)
+
+    return json.dumps({"ok": True, "ticket_id": ticket_id, "path": str(fp.relative_to(_find_cto_root()))})
+
+
+@mcp.tool()
+def close_ticket(ticket_id: str, output: str = "") -> str:
+    """Close a ticket (mark completed) with a final output summary.
+
+    Args:
+        ticket_id: Ticket to close.
+        output: Summary of what was done.
+
+    Returns:
+        JSON confirming closure.
+    """
+    if not ticket_id or len(ticket_id) > 20:
+        return json.dumps({"error": f"invalid ticket id: {ticket_id}"})
+    fp = _tickets_dir() / f"{ticket_id}.json"
+    if not fp.exists():
+        return json.dumps({"error": f"ticket {ticket_id} not found"})
+    t = _load_json(fp)
+    t["status"] = "completed"
+    t["updated_at"] = _now_iso()
+    t["closed_at"] = _now_iso()
+    if output:
+        t["agent_output"] = output[:5000]
+    _save_json(fp, t)
+    return json.dumps({"ok": True, "ticket_id": ticket_id, "status": "completed"})
+
+
+@mcp.tool()
+def project_status() -> str:
+    """Overall project dashboard — config, ticket counts by status, sprint.
+
+    Returns:
+        JSON snapshot of project_name, prefix, current_sprint, default_model,
+        ticket counts per column, and last activity timestamp.
+    """
+    cfg = _load_config()
+    td = _tickets_dir()
+    counts = {"todo": 0, "in_progress": 0, "needs_review": 0, "blocked": 0, "completed": 0}
+    last_updated = None
+    if td.exists():
+        for fp in td.glob("*.json"):
+            try:
+                t = _load_json(fp)
+            except Exception:
+                continue
+            s = t.get("status", "todo")
+            if s in counts:
+                counts[s] += 1
+            upd = t.get("updated_at")
+            if upd and (last_updated is None or upd > last_updated):
+                last_updated = upd
+    return json.dumps({
+        "project_name": cfg.get("project_name"),
+        "ticket_prefix": cfg.get("ticket_prefix"),
+        "current_sprint": cfg.get("current_sprint"),
+        "default_model": cfg.get("default_model"),
+        "next_ticket_number": cfg.get("next_ticket_number"),
+        "ticket_counts": counts,
+        "last_activity": last_updated,
+    }, indent=2)
+
+
+@mcp.tool()
+def list_active_teams() -> str:
+    """List active team sessions (parallel Morty collaborations).
+
+    Returns:
+        JSON array of active team sessions with parent ticket + members.
+    """
+    root = _find_cto_root()
+    td = root / ".cto" / "teams" / "active"
+    out = []
+    if td.exists():
+        for fp in sorted(td.glob("*.json")):
+            try:
+                t = _load_json(fp)
+            except Exception:
+                continue
+            out.append({
+                "team_id": t.get("team_id") or fp.stem,
+                "parent_ticket": t.get("parent_ticket"),
+                "status": t.get("status"),
+                "members": [m.get("role") if isinstance(m, dict) else m for m in t.get("members", [])],
+                "coordination_mode": (t.get("coordination") or {}).get("mode"),
+            })
+    return json.dumps({"count": len(out), "teams": out}, indent=2)
+
+
+# -------------------- Sleepy Mode --------------------
+
+@mcp.tool()
+def sleepy_status() -> str:
+    """Sleepy Mode dashboard — budget, iteration count, queue depth, state.
+
+    Returns:
+        JSON with sleepy state (running/idle), budget usage, iterations,
+        current ticket, review queue depth.
+    """
+    root = _find_cto_root()
+    sdir = root / ".cto" / "sleepy"
+    if not sdir.exists():
+        return json.dumps({"initialized": False, "hint": "Run sleepy.py init to scaffold .cto/sleepy/"})
+
+    state_fp = sdir / "state.json"
+    state = _load_json(state_fp) if state_fp.exists() else {}
+
+    queue_fp = sdir / "QUEUE.md"
+    queue_depth = 0
+    if queue_fp.exists():
+        for ln in queue_fp.read_text().splitlines():
+            if ln.strip().startswith("- [ ]") or ln.strip().startswith("- sleepy/"):
+                queue_depth += 1
+
+    return json.dumps({
+        "initialized": True,
+        "state": state,
+        "queue_depth": queue_depth,
+    }, indent=2)
+
+
+@mcp.tool()
+def sleepy_queue() -> str:
+    """Pending sleepy review branches awaiting apply/discard.
+
+    Returns:
+        Markdown contents of .cto/sleepy/QUEUE.md (or empty note).
+    """
+    root = _find_cto_root()
+    q = root / ".cto" / "sleepy" / "QUEUE.md"
+    if not q.exists():
+        return json.dumps({"queue": "", "note": "no sleepy queue yet"})
+    return json.dumps({"queue": q.read_text()[:8000]})
+
+
+# -------------------- Prometheus self-evolution --------------------
+
+@mcp.tool()
+def prometheus_status() -> str:
+    """Prometheus dashboard — pending/applied/rejected proposals + ledger tail.
+
+    Returns:
+        JSON with counts per status and the most recent 10 ledger entries.
+    """
+    root = _find_cto_root()
+    pdir = root / ".cto" / "prometheus"
+    if not pdir.exists():
+        # Fall back to the orchestrator's own prometheus dir if project has none.
+        pdir = _scripts_dir().parent / ".cto" / "prometheus"
+    if not pdir.exists():
+        return json.dumps({"initialized": False})
+
+    counts = {"pending": 0, "applied": 0, "rejected": 0, "rolled_back": 0}
+    proposals_dir = pdir / "proposals"
+    if proposals_dir.exists():
+        for fp in proposals_dir.glob("*.json"):
+            try:
+                p = _load_json(fp)
+            except Exception:
+                continue
+            s = p.get("status", "pending")
+            if s in counts:
+                counts[s] += 1
+
+    ledger_fp = pdir / "ledger.json"
+    tail = []
+    if ledger_fp.exists():
+        try:
+            led = _load_json(ledger_fp)
+            entries = led.get("entries") if isinstance(led, dict) else led
+            if isinstance(entries, list):
+                tail = entries[-10:]
+        except Exception:
+            pass
+
+    return json.dumps({
+        "initialized": True,
+        "counts": counts,
+        "ledger_tail": tail,
+    }, indent=2)
+
+
+# -------------------- Unity security --------------------
+
+@mcp.tool()
+def unity_list() -> str:
+    """List all Unity security scans (code + pentest + Greenlight compliance).
+
+    Returns:
+        stdout from `unity.py list`.
+    """
+    return json.dumps(_run_script("unity.py", ["list"], timeout=15))
+
+
+# -------------------- Long-running spawns --------------------
+
+@mcp.tool()
+def delegate(ticket_id: str, agent: str, model: str = "", detached: bool = True) -> str:
+    """Spawn a Morty to work a ticket.
+
+    Args:
+        ticket_id: Ticket to work on.
+        agent: Morty role (architect-morty, backend-morty, etc.).
+        model: Override model (default comes from config).
+        detached: If true, fire-and-return with PID + log path.
+
+    Returns:
+        JSON with PID + log (detached) or stdout (sync, may take minutes).
+    """
+    if not ticket_id or not agent:
+        return json.dumps({"error": "ticket_id and agent required"})
+    args = [ticket_id, "--agent", agent]
+    if model:
+        args.extend(["--model", model])
+    if detached:
+        return json.dumps(_spawn_detached("delegate.py", args, f"delegate-{ticket_id}-{_now_iso().replace(':', '-')}.log"))
+    return json.dumps(_run_script("delegate.py", args, timeout=600))
+
+
+@mcp.tool()
+def meeseeks(task: str, files: list[str] | None = None, detached: bool = True) -> str:
+    """Summon a Mr. Meeseeks for a quick one-shot task (no ticket needed).
+
+    Args:
+        task: What the Meeseeks should do.
+        files: Optional list of files to target.
+        detached: If true, fire-and-return with PID + log path.
+
+    Returns:
+        JSON with PID + log (detached) or stdout (sync).
+    """
+    if not task:
+        return json.dumps({"error": "task required"})
+    args = [task]
+    if files:
+        args.extend(["--files", *files])
+    if detached:
+        return json.dumps(_spawn_detached("meeseeks.py", args, f"meeseeks-{_now_iso().replace(':', '-')}.log"))
+    return json.dumps(_run_script("meeseeks.py", args, timeout=600))
+
+
+@mcp.tool()
+def prometheus_scan(categories: str = "") -> str:
+    """Trigger a Prometheus scan for self-evolution proposals (detached).
+
+    Args:
+        categories: Comma-separated categories (agent-patterns, prompt-engineering,
+                    ui-ux, security, tooling, claude-features). Empty = all.
+
+    Returns:
+        JSON with PID + log path.
+    """
+    args = ["scan"]
+    if categories:
+        args.extend(["--categories", categories])
+    return json.dumps(_spawn_detached("prometheus.py", args, f"prometheus-scan-{_now_iso().replace(':', '-')}.log"))
+
+
+@mcp.tool()
+def unity_scan(repo_path: str = ".", url: str = "") -> str:
+    """Trigger a Unity security scan (code or live pentest, detached).
+
+    Args:
+        repo_path: Path to scan (default cwd). Ignored if url is set.
+        url: Target URL for live pentest. Empty = static code scan.
+
+    Returns:
+        JSON with PID + log path.
+    """
+    if url:
+        args = ["scan", "--url", url]
+    else:
+        args = ["scan", "--repo", repo_path]
+    return json.dumps(_spawn_detached("unity.py", args, f"unity-scan-{_now_iso().replace(':', '-')}.log"))
+
+
+@mcp.tool()
+def explain_code(path: str, level: int = 3, lang: str = "nl") -> str:
+    """Have Professor-Morty explain a file at a given Morty-level.
+
+    Args:
+        path: File to explain (relative to project root).
+        level: 1 (total Morty) .. 5 (almost-Rick).
+        lang: nl | en.
+
+    Returns:
+        stdout from `explain.py code`.
+    """
+    if not path:
+        return json.dumps({"error": "path required"})
+    if level < 1 or level > 5:
+        return json.dumps({"error": "level must be 1-5"})
+    if lang not in {"nl", "en"}:
+        return json.dumps({"error": "lang must be nl or en"})
+    return json.dumps(_run_script(
+        "explain.py",
+        ["code", path, "--level", str(level), "--lang", lang],
+        timeout=180,
+    ))
+
+
+@mcp.tool()
+def explain_concept(topic: str, level: int = 3, lang: str = "nl") -> str:
+    """Professor-Morty explains a concept (e.g. 'dependency injection').
+
+    Args:
+        topic: The concept to explain.
+        level: 1..5 Morty-level.
+        lang: nl | en.
+
+    Returns:
+        stdout from `explain.py concept`.
+    """
+    if not topic:
+        return json.dumps({"error": "topic required"})
+    if level < 1 or level > 5:
+        return json.dumps({"error": "level must be 1-5"})
+    return json.dumps(_run_script(
+        "explain.py",
+        ["concept", topic, "--level", str(level), "--lang", lang],
+        timeout=180,
+    ))
 
 
 if __name__ == "__main__":
