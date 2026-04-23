@@ -24,3 +24,9 @@ rick-terminal/build/
 
 # Backups
 *.tar.gz
+
+# rick-terminal is now its own git repo (private fork of vibeyard → OmleNessumsa/rick-ide)
+rick-terminal/
+
+# Old rick-terminal archived on 2026-04-23
+rick-terminal.archived-*/
