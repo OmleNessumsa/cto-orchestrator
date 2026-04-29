@@ -1225,5 +1225,22 @@
     "target_files": [
       "scripts/visual.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-29T13:40:25.851852+00:00",
+    "proposal_id": "PROM-056",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-04-29T13:41:52.658941+00:00",
+    "proposal_id": "PROM-050",
+    "action": "applied",
+    "title": "Add agent execution hooks for pre/post delegation",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/hooks.py",
+      ".cto/config.json"
+    ]
   }
 ]

@@ -40,6 +40,13 @@ except ImportError:
     def get_agent_id(role, team_id=None):
         return f"cto:{role}"
 
+# Import hook runner
+try:
+    from hooks import run_hooks
+except ImportError:
+    def run_hooks(hook_point, ticket, agent, output=None, root=None):
+        return True
+
 # Import security utilities
 try:
     from security_utils import (
@@ -2022,10 +2029,12 @@ def cmd_delegate(args):
         thinking_budget = 5000
 
     # Execute
+    run_hooks("pre_delegate", ticket, agent, root=root)
     try:
         output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, session_id=resume_session_id)
     except RuntimeError as e:
         error_msg = str(e)
+        run_hooks("on_failure", ticket, agent, root=root)
         console.print(f"[red]Ugh, {agent} screwed up: {error_msg}[/red]")
         ticket["status"] = "blocked"
         ticket["review_notes"] = f"AGENT FAILURE: {error_msg}"
@@ -2077,6 +2086,8 @@ def cmd_delegate(args):
                 "team_id": team_id,
             }, role=agent, team_id=team_id)
         return
+
+    run_hooks("post_delegate", ticket, agent, output=output, root=root)
 
     # Parse output
     parsed = parse_agent_output(output)
@@ -2182,6 +2193,7 @@ def cmd_delegate(args):
         ticket["status"] = "blocked"
     elif agent_status == "needs_review":
         ticket["status"] = "in_review"
+        run_hooks("on_review", ticket, agent, output=output, root=root)
     else:
         ticket["status"] = "in_review"
 

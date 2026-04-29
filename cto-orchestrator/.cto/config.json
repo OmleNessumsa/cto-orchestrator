@@ -6,6 +6,12 @@
   "agents_used": [],
   "current_sprint": 1,
   "default_model": "opus-4-7",
+  "hooks": {
+    "pre_delegate": [],
+    "post_delegate": [],
+    "on_failure": [],
+    "on_review": []
+  },
   "roro": {
     "enabled": true,
     "endpoint": "http://localhost:3067/hooks/agent-event",

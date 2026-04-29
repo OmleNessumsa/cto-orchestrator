@@ -12,8 +12,9 @@
     "scripts/meeseeks.py"
   ],
   "proposed_changes": "Split build_prompt() in delegate.py into two parts: (1) a system prompt containing the agent persona, role instructions, security boundaries, and SANDWICH_REINFORCEMENT, and (2) a user prompt containing only the task description, ticket context, and project structure. Pass the system prompt via `--append-system-prompt` flag in the claude subprocess call. This cleanly separates trusted instructions from potentially untrusted task content, improving the effectiveness of the existing prompt injection defenses in security_utils.py.",
-  "status": "pending",
+  "status": "rejected",
   "created_at": "2026-04-06T09:44:54.706683+00:00",
   "applied_at": null,
-  "rollback_snapshot": null
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-056-20260429T133525",
+  "reject_reason": "Apply failed: Evolve timed out after 300s"
 }

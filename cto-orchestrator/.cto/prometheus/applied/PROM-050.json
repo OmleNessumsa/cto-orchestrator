@@ -13,8 +13,13 @@
     ".cto/config.json"
   ],
   "proposed_changes": "Create `scripts/hooks.py` with a hook runner that loads hook definitions from `.cto/config.json` under a `hooks` key. Support these hook points: (1) `pre_delegate` \u2014 runs before agent execution (e.g., validate ticket has acceptance criteria, check no conflicting in-progress tickets); (2) `post_delegate` \u2014 runs after successful completion (e.g., auto-run tests, update metrics dashboard); (3) `on_failure` \u2014 runs on agent failure (e.g., retry with different model, notify via roro event); (4) `on_review` \u2014 runs during review phase. Each hook is a shell command or Python callable. In delegate.py, add hook invocations around the `delegate_to_agent()` call in `main()` (around line 925): call `run_hooks('pre_delegate', ticket, agent)` before execution and `run_hooks('post_delegate', ticket, agent, output)` after. Add hook config examples to `.cto/config.json`.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:43:38.777326+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-29T13:41:52.632096+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-050-20260429T134025",
+  "files_actually_changed": [
+    ".cto/config.json",
+    "scripts/hooks.py",
+    "scripts/delegate.py"
+  ]
 }
