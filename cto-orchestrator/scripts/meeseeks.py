@@ -233,11 +233,14 @@ def build_meeseeks_prompt(task: str, target_files: list[str] | None, root: Path)
         files_text = "\n".join(f"- {f}" for f in validated)
 
     safe_files = wrap_untrusted_content(files_text, label="TARGET_FILES")
+    anchoring_cue = (
+        "\n\n---\nNow execute the ticket. After completing all work, your FINAL output must be the JSON report block — no text after it.\n\nBegin:\n"
+    )
     return MEESEEKS_PROMPT.format(
         task_description=safe_task,
         target_files=safe_files,
         project_root=root,
-    ) + SANDWICH_REINFORCEMENT
+    ) + anchoring_cue + SANDWICH_REINFORCEMENT
 
 
 def _extract_json_from_output(output: str) -> dict | None:

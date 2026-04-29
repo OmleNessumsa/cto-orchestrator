@@ -1197,5 +1197,33 @@
       "scripts/delegate.py",
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-29T13:26:33.425510+00:00",
+    "proposal_id": "PROM-035",
+    "action": "applied",
+    "title": "Structured prefill anchoring for JSON output extraction",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/meeseeks.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-29T13:27:53.875976+00:00",
+    "proposal_id": "PROM-041",
+    "action": "applied",
+    "title": "Add dark/light theme support and ANSI color coding to terminal output",
+    "target_files": [
+      "scripts/visual.py"
+    ]
+  },
+  {
+    "timestamp": "2026-04-29T13:28:46.030459+00:00",
+    "proposal_id": "PROM-040",
+    "action": "applied",
+    "title": "Fix emoji-width alignment bugs in visual.py box rendering",
+    "target_files": [
+      "scripts/visual.py"
+    ]
   }
 ]

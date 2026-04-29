@@ -11,8 +11,11 @@
     "scripts/visual.py"
   ],
   "proposed_changes": "Add a `display_width(s: str) -> int` helper using unicodedata.east_asian_width() to calculate true terminal display width of strings containing emoji. Then add `pad_to_width(s: str, width: int) -> str` that pads with spaces based on display width instead of character count. Replace all ljust() calls in render_team_board(), render_sprint_dashboard(), and render_morty_box() with pad_to_width(). Alternatively, add `wcwidth` as an optional dependency for more accurate width calculation. This immediately fixes the broken box borders visible in every visual.py output.",
-  "status": "pending",
+  "status": "applied",
   "created_at": "2026-04-06T09:39:45.813185+00:00",
-  "applied_at": null,
-  "rollback_snapshot": null
+  "applied_at": "2026-04-29T13:28:46.028127+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-040-20260429T132753",
+  "files_actually_changed": [
+    "scripts/visual.py"
+  ]
 }

@@ -1462,6 +1462,11 @@ End your work with a JSON report block in EXACTLY this format — no other summa
 }
 ```
 </output_format>
+
+---
+Now execute the ticket. After completing all work, your FINAL output must be the JSON report block — no text after it.
+
+Begin:
 """
     return prompt
 

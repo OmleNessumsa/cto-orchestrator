@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -28,7 +29,90 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-console = Console()
+# ── Unicode Display Width Helpers ─────────────────────────────────────────────
+
+def display_width(s: str) -> int:
+    """Return the terminal display width of *s*, counting emoji as 2 columns."""
+    width = 0
+    for ch in s:
+        eaw = unicodedata.east_asian_width(ch)
+        # W (wide) and F (fullwidth) occupy 2 columns; everything else 1.
+        width += 2 if eaw in ("W", "F") else 1
+    return width
+
+
+def pad_to_width(s: str, width: int) -> str:
+    """Pad *s* with trailing spaces so its display width equals *width*."""
+    current = display_width(s)
+    if current >= width:
+        return s
+    return s + " " * (width - current)
+
+
+# ── ANSI Color Module ─────────────────────────────────────────────────────────
+
+_ANSI_RESET = "\033[0m"
+
+STATUS_COLORS = {
+    "completed":   "\033[32m",   # green
+    "done":        "\033[32m",   # green
+    "working":     "\033[33m",   # yellow
+    "in_progress": "\033[33m",   # yellow
+    "active":      "\033[33m",   # yellow
+    "blocked":     "\033[31m",   # red
+    "failed":      "\033[31m",   # red
+    "in_review":   "\033[36m",   # cyan
+    "testing":     "\033[35m",   # magenta
+    "pending":     "\033[2m",    # dim
+}
+
+# Resolved once at startup; can be overridden by --no-color flag.
+_USE_COLOR: bool = (
+    "NO_COLOR" not in os.environ
+    and sys.stdout.isatty()
+)
+
+
+def colorize(text: str, status: str) -> str:
+    """Wrap *text* in ANSI color for *status*.  No-ops when colors disabled."""
+    if not _USE_COLOR:
+        return text
+    code = STATUS_COLORS.get(status, "")
+    if not code:
+        return text
+    return f"{code}{text}{_ANSI_RESET}"
+
+
+def _progress_color(pct: int) -> str:
+    """Return Rich color name for a progress percentage."""
+    if pct >= 80:
+        return "green"
+    if pct >= 40:
+        return "yellow"
+    return "red"
+
+
+def _border_style(status: str) -> str:
+    """Return Rich border style based on agent status."""
+    if status in ("completed", "done"):
+        return "green"
+    if status in ("working", "in_progress", "active"):
+        return "bright_yellow"
+    if status == "blocked":
+        return "red"
+    if status == "in_review":
+        return "cyan"
+    if status == "testing":
+        return "magenta"
+    return "dim"  # pending / unknown
+
+
+def _make_console_live() -> Console:
+    """Return a Console appropriate for the current color/TTY settings."""
+    return Console(no_color=not _USE_COLOR)
+
+
+console = _make_console_live()
 
 
 def find_cto_root(start: Optional[str] = None) -> Path:
@@ -182,9 +266,12 @@ def render_morty_box(
         if progress is not None:
             filled = int(progress / 10)
             progress_bar = f"[{'█' * filled}{'░' * (10 - filled)}]"
-        return f"│ {icon} {short_role} {status_icon} {progress_bar} │"
+        padded_role = pad_to_width(short_role, 12)
+        padded_icon = pad_to_width(status_icon, 2)
+        return f"│ {icon} {padded_role} {padded_icon} {progress_bar} │"
 
     sc = _status_color(status)
+    bs = _border_style(status)
     content = Text()
     content.append(f"{icon}  {short_role}\n", style="bold")
     content.append("Status: ", style="dim")
@@ -194,9 +281,10 @@ def render_morty_box(
     if progress is not None:
         filled = int(progress / 5)
         empty = 20 - filled
-        content.append(f"\n[{'█' * filled}{'░' * empty}] {progress}%")
+        bar_color = _progress_color(progress)
+        content.append(f"\n[{bar_color}]{'█' * filled}[/{bar_color}]{'░' * empty} {progress}%")
 
-    console.print(Panel(content, border_style=sc))
+    console.print(Panel(content, border_style=bs))
     return ""
 
 
@@ -329,15 +417,16 @@ def _render_team_board_impl(team: dict, con: Console) -> None:
                 )
         con.print(table)
 
+    bar_col = _progress_color(progress)
     with Progress(
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(bar_width=50, style="green", complete_style="bright_green"),
-        TextColumn("[cyan]{task.percentage:>3.0f}%[/cyan]"),
+        BarColumn(bar_width=50, style="dim", complete_style=bar_col),
+        TextColumn(f"[{bar_col}]{{task.percentage:>3.0f}}%[/{bar_col}]"),
         console=con,
         transient=False,
     ) as prog:
         prog.add_task(
-            f"[cyan]Team Progress ({completed}/{total})[/cyan]",
+            f"[{bar_col}]Team Progress ({completed}/{total})[/{bar_col}]",
             total=100,
             completed=progress,
         )
@@ -408,15 +497,16 @@ def _render_sprint_dashboard_impl(
 
     con.print(table)
 
+    bar_col = _progress_color(progress)
     with Progress(
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(bar_width=50, style="cyan", complete_style="bright_cyan"),
-        TextColumn("[cyan]{task.percentage:>3.0f}%[/cyan]"),
+        BarColumn(bar_width=50, style="dim", complete_style=bar_col),
+        TextColumn(f"[{bar_col}]{{task.percentage:>3.0f}}%[/{bar_col}]"),
         console=con,
         transient=False,
     ) as prog:
         prog.add_task(
-            f"[cyan]Overall Progress ({done}/{total})[/cyan]",
+            f"[{bar_col}]Overall Progress ({done}/{total})[/{bar_col}]",
             total=100,
             completed=progress,
         )
@@ -569,6 +659,12 @@ def build_parser():
         prog="visual",
         description="Rick's Visual ASCII Renderer — *burp* Making things look good"
     )
+    p.add_argument(
+        "--no-color",
+        action="store_true",
+        default=False,
+        help="Disable ANSI color output (also honoured via NO_COLOR env var)",
+    )
     sub = p.add_subparsers(dest="command", required=True)
 
     # team
@@ -598,8 +694,14 @@ def build_parser():
 
 
 def main():
+    global _USE_COLOR, console
+
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.no_color:
+        _USE_COLOR = False
+        console = _make_console_live()
 
     dispatch = {
         "team": cmd_team_board,
