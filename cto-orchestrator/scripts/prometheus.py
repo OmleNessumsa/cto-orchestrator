@@ -605,8 +605,28 @@ def cmd_evolve(args):
             print(f"  REJECTED (self-protection)")
             continue
 
-        # Create pre-upgrade snapshot
+        # Reject proposals with empty target_files BEFORE delegating. Without
+        # concrete files to modify, the implementation Morty has nothing to
+        # work on and routinely hallucinates a successful apply (see PROM-072
+        # which failed twice in a row this way). Such proposals usually
+        # describe knowledge / documentation that belongs in another system,
+        # not in the orchestrator's self-evolution pipeline.
         target_files = proposal.get("target_files", [])
+        if not target_files:
+            proposal["status"] = "rejected"
+            proposal["reject_reason"] = (
+                "No target_files specified — Prometheus cannot delegate a "
+                "concrete modification. Proposal likely belongs in a "
+                "knowledge base or decision log, not the evolution queue."
+            )
+            save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+            prop_fp = dirs["proposals"] / f"{prom_id}.json"
+            if prop_fp.exists():
+                prop_fp.unlink()
+            print(f"  REJECTED (no target_files)")
+            continue
+
+        # Create pre-upgrade snapshot
         snap_dir = create_snapshot(root, dirs, prom_id, target_files)
         if snap_dir:
             print(f"  Snapshot created: {snap_dir.name}")

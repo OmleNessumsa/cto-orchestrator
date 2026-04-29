@@ -18,5 +18,5 @@
   "created_at": "2026-04-17T13:12:28.966948+00:00",
   "applied_at": null,
   "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-069-20260429T120354",
-  "reject_reason": "Apply failed: Evolve timed out after 300s"
+  "reject_reason": "Apply failed: Evolve timed out after 300s. Manual investigation 2026-04-29 by Rick: scripts/ticket.py:205 reads getattr(args, 'agent', None) correctly into assigned_agent — no override path in cmd_create. ZEAS-034 in current state shows assigned_agent='frontend-morty' (not 'backend-morty' as reported). Either the bug was fixed in a prior commit or the original report referenced a different ticket. Cannot reproduce — closing rejected."
 }
