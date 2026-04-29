@@ -675,6 +675,57 @@ def _keyword_select_agent(ticket: dict) -> str:
     return "fullstack-morty"
 
 
+def smart_select_agent(ticket: dict, root: Optional[Path] = None) -> tuple:
+    """Select agent role and estimate complexity using Haiku.
+
+    Calls Haiku with ticket details and requests a JSON routing response.
+    Returns (agent_name, complexity) tuple. Falls back to keyword matching
+    with complexity from ticket on any error.
+    """
+    fallback_agent = _keyword_select_agent(ticket)
+    fallback_complexity = ticket.get("estimated_complexity", "M")
+
+    title = (ticket.get("title") or "").strip()
+    desc = (ticket.get("description") or "").strip()
+    ttype = ticket.get("type", "task")
+    ticket_text = f"Type: {ttype}\nTitle: {title}\nDescription: {desc[:400]}"
+
+    routing_prompt = (
+        f"You are a ticket routing system. Given this software ticket, respond with ONLY a JSON object.\n\n"
+        f"{ticket_text}\n\n"
+        f"Available agents: architect-morty (architecture/design), frontend-morty (UI/frontend), "
+        f"backend-morty (API/database/server), tester-morty (testing/QA), "
+        f"security-morty (security/auth), devops-morty (CI/CD/infra), fullstack-morty (general).\n\n"
+        f"Complexity scale: XS (trivial), S (small), M (medium), L (large), XL (very large).\n\n"
+        f'Respond with ONLY: {{"agent": "<agent-id>", "complexity": "<XS|S|M|L|XL>"}}'
+    )
+
+    try:
+        result = subprocess.run(
+            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", routing_prompt],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        raw = result.stdout.strip()
+        match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
+        if match:
+            data = json.loads(match.group())
+            agent = data.get("agent", "").strip()
+            complexity = data.get("complexity", "").upper().strip()
+            valid_agents = {
+                "architect-morty", "frontend-morty", "backend-morty",
+                "fullstack-morty", "tester-morty", "security-morty", "devops-morty",
+            }
+            valid_complexities = {"XS", "S", "M", "L", "XL"}
+            if agent in valid_agents and complexity in valid_complexities:
+                return agent, complexity
+    except Exception:
+        pass
+
+    return fallback_agent, fallback_complexity
+
+
 def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
     """Select agent role by scoring agent cards against the ticket.
 
@@ -1830,7 +1881,15 @@ def cmd_delegate(args):
         sys.exit(1)
 
     ticket = load_ticket(root, safe_ticket_id)
-    agent = args.agent or match_agent_cards(ticket, root=root)
+    if not args.agent and getattr(args, 'smart_routing', False):
+        agent, smart_complexity = smart_select_agent(ticket, root=root)
+        # Persist Haiku complexity estimate back to ticket if not already set
+        if not ticket.get("estimated_complexity"):
+            ticket["estimated_complexity"] = smart_complexity
+            ticket["updated_at"] = now_iso()
+            save_ticket(root, ticket)
+    else:
+        agent = args.agent or match_agent_cards(ticket, root=root)
     model = args.model or load_agent_card(agent, root=root).get("model", "sonnet")
 
     # Sanitize team ID if provided
@@ -2193,6 +2252,8 @@ def build_parser():
     p.add_argument("--resume", action="store_true",
                    help="Resume an interrupted session using the stored session_id in the ticket. "
                         "Use after a timeout; the agent continues from where it left off.")
+    p.add_argument("--smart-routing", action="store_true",
+                   help="Use Haiku-powered smart routing for agent selection instead of keyword matching.")
     return p
 
 

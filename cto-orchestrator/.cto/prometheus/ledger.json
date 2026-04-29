@@ -1167,5 +1167,35 @@
       "scripts/orchestrate.py",
       "scripts/meeseeks.py"
     ]
+  },
+  {
+    "timestamp": "2026-04-21T07:20:34.145682+00:00",
+    "proposal_id": "PROM-072",
+    "action": "self-reported",
+    "title": "Schema reset instructie mist grants-restore",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-04-29T12:03:54.733512+00:00",
+    "proposal_id": "PROM-072",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-04-29T12:08:54.756683+00:00",
+    "proposal_id": "PROM-069",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-04-29T12:11:00.458481+00:00",
+    "proposal_id": "PROM-025",
+    "action": "applied",
+    "title": "Use Haiku 4.5 for smart ticket routing and triage",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ]
   }
 ]

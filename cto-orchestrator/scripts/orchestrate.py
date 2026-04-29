@@ -190,7 +190,7 @@ def run_ticket_cmd(root: Path, *args) -> str:
     return result.stdout + result.stderr
 
 
-def run_delegate(root: Path, ticket_id: str, agent: str = None, dry_run: bool = False, timeout: int = 600, team_id: str = None) -> str:
+def run_delegate(root: Path, ticket_id: str, agent: str = None, dry_run: bool = False, timeout: int = 600, team_id: str = None, smart_routing: bool = False) -> str:
     cmd = [sys.executable, str(scripts_dir() / "delegate.py"), ticket_id]
     if agent:
         cmd.extend(["--agent", agent])
@@ -199,6 +199,8 @@ def run_delegate(root: Path, ticket_id: str, agent: str = None, dry_run: bool = 
     cmd.extend(["--timeout", str(timeout)])
     if team_id:
         cmd.extend(["--team-id", team_id])
+    if smart_routing:
+        cmd.append("--smart-routing")
     # Strip CLAUDECODE env var so delegate.py can spawn claude subprocess
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(root), timeout=timeout + 60, env=env)
@@ -939,6 +941,7 @@ def cmd_sprint(args):
     max_iterations = args.max_iterations
     iteration = 0
     use_teams = not args.no_teams  # Enable teams by default
+    smart_routing = getattr(args, 'smart_routing', False)
 
     # Sprint cost budget
     max_sprint_cost_usd: Optional[float] = cfg.get("max_sprint_cost_usd")
@@ -1133,6 +1136,18 @@ def cmd_sprint(args):
         # Check if this ticket needs a team
         team_template = None
         if use_teams:
+            # When smart routing is enabled, use Haiku to estimate complexity
+            # before team need detection so the estimate informs team selection
+            if smart_routing:
+                try:
+                    from delegate import smart_select_agent
+                    _, smart_complexity = smart_select_agent(ticket, root=root)
+                    if not ticket.get("estimated_complexity"):
+                        ticket["estimated_complexity"] = smart_complexity
+                        ticket["updated_at"] = now_iso()
+                        save_ticket(root, ticket)
+                except Exception:
+                    pass
             # Check explicit team settings first
             if ticket.get("team_mode") == "collaborative":
                 team_template = ticket.get("team_template")
@@ -1180,14 +1195,14 @@ def cmd_sprint(args):
                 # Fallback to solo mode
                 console.print("    [yellow]Falling back to solo delegation...[/yellow]")
                 try:
-                    output = run_delegate(root, ticket["id"], timeout=600)
+                    output = run_delegate(root, ticket["id"], timeout=600, smart_routing=smart_routing)
                     console.print(f"  [dim]Delegate output (last 300 chars): ...{output[-300:]}[/dim]")
                 except Exception as e2:
                     console.print(f"  [red]Solo delegation also failed: {e2}[/red]")
         else:
             # Solo mode (original behavior)
             try:
-                output = run_delegate(root, ticket["id"], timeout=600)
+                output = run_delegate(root, ticket["id"], timeout=600, smart_routing=smart_routing)
                 console.print(f"  [dim]Delegate output (last 300 chars): ...{output[-300:]}[/dim]")
             except subprocess.TimeoutExpired:
                 console.print(f"  [red]Delegation timed out for {ticket['id']}[/red]")
@@ -1483,6 +1498,7 @@ def build_parser():
     sp.add_argument("--auto", action="store_true", default=True, help="Fully automatic (default)")
     sp.add_argument("--max-iterations", type=int, default=50, help="Max iterations (default: 50)")
     sp.add_argument("--no-teams", action="store_true", help="Disable team collaboration (solo mode only)")
+    sp.add_argument("--smart-routing", action="store_true", help="Use Haiku-powered smart routing for agent selection and complexity estimation")
 
     # review
     sub.add_parser("review", help="Review all completed tickets")

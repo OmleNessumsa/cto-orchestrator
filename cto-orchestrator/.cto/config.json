@@ -5,11 +5,13 @@
   "created_at": "2026-03-08T19:51:55.610923+00:00",
   "agents_used": [],
   "current_sprint": 1,
-  "default_model": "sonnet",
+  "default_model": "opus-4-7",
   "roro": {
     "enabled": true,
     "endpoint": "http://localhost:3067/hooks/agent-event",
     "timeout": 2.0,
-    "verbose": false
+    "verbose": false,
+    "sse_enabled": false,
+    "sse_port": 3069
   }
 }
