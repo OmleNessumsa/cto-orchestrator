@@ -1,0 +1,21 @@
+{
+  "id": "PROM-076",
+  "title": "graph command double-brackets status labels",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "",
+  "description": "PROM-073's cmd_graph renders status as [[BLOCKED] / [[BACKLOG] etc \u2014 the inner [BLOCKED] is meant as a literal label but rich console interprets the outer [ as a markup tag opener and adds a second [ when escaping. Should use plain console.print or escape via square-bracket-equivalent (e.g. (BLOCKED) or backslash-escape).",
+  "impact_score": 4,
+  "risk_score": 2,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "In cmd_graph, replace [{status}] formatting with parentheses or use rich's escape() helper from rich.markup.",
+  "status": "pending",
+  "severity": "low",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-10T12:18:38.986508+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

@@ -1242,5 +1242,41 @@
       "scripts/hooks.py",
       ".cto/config.json"
     ]
+  },
+  {
+    "timestamp": "2026-05-10T11:57:49.265837+00:00",
+    "proposal_id": "PROM-074",
+    "action": "applied",
+    "title": "Trajectory store + retrieval for planner few-shot context",
+    "target_files": [
+      "scripts/ticket.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-05-10T11:59:51.183060+00:00",
+    "proposal_id": "PROM-073",
+    "action": "applied",
+    "title": "GOAP-lite: ticket precondition/effect tags + dependency graph view",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-05-10T12:00:58.269452+00:00",
+    "proposal_id": "PROM-075",
+    "action": "applied",
+    "title": "Background workers \u2014 auto-triggered maintenance daemon (lite)",
+    "target_files": [
+      "scripts/workers.py"
+    ]
+  },
+  {
+    "timestamp": "2026-05-10T12:18:38.987983+00:00",
+    "proposal_id": "PROM-076",
+    "action": "self-reported",
+    "title": "graph command double-brackets status labels",
+    "severity": "low",
+    "category": "self-diagnosed"
   }
 ]

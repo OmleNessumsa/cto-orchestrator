@@ -1,0 +1,21 @@
+{
+  "id": "PROM-073",
+  "title": "GOAP-lite: ticket precondition/effect tags + dependency graph view",
+  "category": "agent-patterns",
+  "source": "ruvnet/ruflo \u2014 GOAP A* planner at goal.ruv.io. Each action has preconditions and effects; planner runs A* search through state space to derive an executable DAG. Adapted to our scale: skip the full A* search (overkill for 66 tickets) but adopt the precondition/effect modeling and DAG visualization so sprint dispatch can run independent tickets in parallel waves instead of serial one-at-a-time.",
+  "description": "Rick's planner currently emits tickets with `dependency_indices` (positional refs to the same plan array). This breaks down across plan calls \u2014 a follow-up plan can't reference earlier tickets, and there's no semantic meaning to dependencies. Inspired by ruflo's GOAP model, add stable string tags: each ticket declares `provides` (a capability it produces, e.g. 'auth.endpoints') and `requires` (capabilities it needs, e.g. ['db.schema', 'auth.middleware']). Tags are durable across plan runs. Add a `graph` command to render the DAG as ASCII so Rick can eyeball the dependency structure. This is the foundation; parallel-wave dispatch is a follow-up proposal once tags are populated.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Extend `cmd_plan` and the actionable-ticket logic in `scripts/orchestrate.py`:\n\n1. In the `plan_prompt` string inside `cmd_plan` (around line 651), extend the JSON schema doc-block so each ticket also has two optional fields:\n   - `\"provides\": \"string-tag-or-null\"` \u2014 a stable capability tag this ticket produces (e.g. 'db.schema', 'auth.middleware', 'frontend.layout'). Use lowercase dotted names. null if the ticket produces no reusable capability.\n   - `\"requires\": [\"tag1\", \"tag2\"]` \u2014 list of capability tags this ticket needs before it can start. Empty list if no semantic deps.\n   Add a Rules bullet: 'Use semantic tags in `provides`/`requires` to express real dependencies. Reserve `dependency_indices` only for sibling-order constraints inside the same plan.'\n\n2. After the plan JSON is parsed and tickets are persisted (look for the loop that calls something like `cmd_create` or saves ticket files in `cmd_plan`), persist `provides` and `requires` onto each ticket dict. Keep the existing `dependency_indices` behavior for backward compat.\n\n3. Add a new function `def build_capability_index(root: Path) -> dict[str, str]` that scans all tickets and returns a map of `provides_tag -> ticket_id` (only includes tickets whose status is 'done').\n\n4. Modify `get_actionable_tickets(root)` (existing function in this file): a ticket is actionable only if BOTH conditions hold: existing dependency_indices logic passes AND every tag in its `requires` list is present in `build_capability_index(root)` (i.e. some done ticket provides it). Skip the requires check if `requires` field is missing/empty.\n\n5. Add a new CLI command `cmd_graph(args)` registered as the `graph` subcommand in the argparse setup. It prints an ASCII DAG: for each non-done ticket, show `[STATUS] TICKET-ID title` then indented under it `requires: tag1 \u2713 (TICKET-X done), tag2 \u2717 (blocked)`. Use rich console with cyan for tags satisfied and red for unsatisfied. Wire it into the main argparse `subparsers.add_parser('graph', help='Show ticket dependency DAG')`.\n\n6. In `cmd_status` (if it exists) or wherever the progress dashboard prints, add a one-line summary: `Capability tags: N produced, M required, K blocked-by-missing-tags`.\n\nDo not touch prometheus.py. Do not change the existing dependency_indices semantics. Keep all changes additive and backward-compatible (tickets without provides/requires fields behave exactly as today).",
+  "status": "applied",
+  "created_at": "2026-05-10T00:00:00+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-073-20260510T115749",
+  "applied_at": "2026-05-10T11:59:51.181195+00:00",
+  "files_actually_changed": [
+    "scripts/orchestrate.py"
+  ]
+}

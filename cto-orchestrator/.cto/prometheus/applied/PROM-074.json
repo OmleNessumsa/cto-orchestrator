@@ -1,0 +1,23 @@
+{
+  "id": "PROM-074",
+  "title": "Trajectory store + retrieval for planner few-shot context",
+  "category": "agent-patterns",
+  "source": "ruvnet/ruflo \u2014 SONA self-learning + ReasoningBank. Ruflo logs every successful agent trajectory (what was attempted, what worked, what failed, files changed) and retrieves top-K similar past trajectories via HNSW vector search when planning new work. Adapted to our scale: skip embeddings (overkill for ~hundreds of tickets), use TF-IDF-style keyword overlap with stdlib only. Result: Rick's planner gets steadily smarter as more tickets close, because each new plan sees a few-shot block of relevant past tickets.",
+  "description": "Today every closed ticket lives in `.cto/tickets/TICKET-ID.json` but the planner never looks at past work \u2014 every plan is generated cold. Inspired by ruflo's ReasoningBank, capture a compact 'trajectory record' for each closed ticket and inject the top-K most-similar past trajectories into the planner prompt as few-shot examples. No embeddings, no DB \u2014 just stdlib JSON files plus simple keyword-overlap scoring. The planner's output quality compounds over time as the trajectory corpus grows.",
+  "impact_score": 8,
+  "risk_score": 2,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/ticket.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Add a trajectory store and wire it into ticket close + plan:\n\n1. In `scripts/ticket.py`, add a helper `def write_trajectory(root: Path, ticket: dict) -> None` that writes a compact record to `.cto/trajectories/<TICKET-ID>.json`. Create the dir if missing. Record schema:\n   {\n     \"ticket_id\": str,\n     \"title\": str,\n     \"description\": str (truncated to 600 chars),\n     \"type\": str,\n     \"agent\": str (assigned morty),\n     \"complexity\": str,\n     \"files_changed\": list[str],\n     \"summary\": str (from ticket close output, truncated to 400 chars),\n     \"closed_at\": ISO timestamp,\n     \"keywords\": list[str] (extracted via the helper below)\n   }\n   Do NOT include `acceptance_criteria` or full agent output \u2014 keep records small.\n\n2. Add a helper `def extract_keywords(text: str) -> list[str]` in `scripts/ticket.py`: lowercase the text, split on non-word chars, drop a small built-in STOPWORDS set (the, a, an, and, or, but, in, on, at, to, for, of, with, is, was, be, this, that, etc.), drop tokens of length < 4, return the unique top-30 by frequency.\n\n3. Modify `cmd_close` in `scripts/ticket.py`: after the ticket status is set to 'done' and saved, call `write_trajectory(root, ticket)`. Wrap in try/except \u2014 trajectory write must never block ticket close.\n\n4. In `scripts/orchestrate.py`, add a helper `def retrieve_similar_trajectories(root: Path, query_text: str, k: int = 5) -> list[dict]`:\n   - Glob `.cto/trajectories/*.json`. Return [] if none.\n   - Compute query_keywords = set(extract_keywords(query_text)) (import from ticket.py).\n   - For each trajectory, score = len(set(traj['keywords']) & query_keywords) / max(len(traj['keywords']), 1).\n   - Sort by score desc, return top-k with score > 0.\n\n5. In `cmd_plan` (around line 639-700 of `scripts/orchestrate.py`), BEFORE building `plan_prompt`: call `similar = retrieve_similar_trajectories(root, args.description, k=5)`. If non-empty, build a `trajectories_block` string formatted like:\n   \n   ## Past Similar Tickets (for reference)\n   These tickets were closed previously and their patterns may inform this plan:\n   - [TICKET-12 | feature | M] Add user CRUD endpoints \u2014 files: api/users.py, db/models.py \u2014 outcome: 4 endpoints with auth middleware\n   - ...\n   \n   Inject `trajectories_block` into `plan_prompt` after `## Project Description` and before `## Project Root`. If `similar` is empty, inject nothing.\n\n6. Add `python scripts/ticket.py trajectories` subcommand: lists trajectory count, top 10 most-recent, and top 5 most-frequent keywords across the corpus. Useful for inspection.\n\n7. Print one line at the start of `cmd_plan`: `[dim]Loaded {N} similar past trajectories as context[/dim]` so the user sees the retrieval working.\n\nDo not touch prometheus.py. Keep additive \u2014 never block a ticket close on trajectory write failure. No external deps, stdlib only.",
+  "status": "applied",
+  "created_at": "2026-05-10T00:00:01+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-074-20260510T115542",
+  "applied_at": "2026-05-10T11:57:49.264673+00:00",
+  "files_actually_changed": [
+    "scripts/orchestrate.py",
+    "scripts/ticket.py"
+  ]
+}

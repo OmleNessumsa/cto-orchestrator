@@ -42,35 +42,6 @@ except ImportError:
     def flush_events():
         pass
 
-try:
-    import sys as _sys_ticket
-    import os as _os_ticket
-    _scripts_dir = str(Path(__file__).parent.resolve())
-    if _scripts_dir not in _sys_ticket.path:
-        _sys_ticket.path.insert(0, _scripts_dir)
-    from ticket import extract_keywords as _extract_keywords
-    def extract_keywords(text: str) -> list[str]:
-        return _extract_keywords(text)
-except Exception:
-    import re as _re
-    _STOPWORDS = {
-        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-        "of", "with", "is", "was", "be", "this", "that", "it", "its", "are",
-        "have", "has", "had", "from", "by", "not", "as", "if", "then", "else",
-        "when", "all", "any", "each", "both", "into", "than", "more", "also",
-        "up", "out", "so", "do", "does", "did", "been", "will", "would", "could",
-        "should", "may", "might", "shall", "can", "we", "they", "you", "he",
-        "she", "our", "their", "your", "his", "her", "my", "i",
-    }
-    def extract_keywords(text: str) -> list[str]:
-        tokens = _re.split(r'\W+', (text or "").lower())
-        freq: dict[str, int] = {}
-        for tok in tokens:
-            if len(tok) >= 4 and tok not in _STOPWORDS:
-                freq[tok] = freq.get(tok, 0) + 1
-        sorted_tokens = sorted(freq, key=lambda k: freq[k], reverse=True)
-        return sorted_tokens[:30]
-
 # Flag set to True when security_utils is unavailable (set in except ImportError block below)
 SECURITY_DEGRADED = False
 
@@ -663,30 +634,6 @@ def claude_prompt(prompt: str, model: str = "opus-4-7", thinking_budget: int = N
     return result.stdout
 
 
-# ── Trajectory retrieval ─────────────────────────────────────────────────────
-
-def retrieve_similar_trajectories(root: Path, query_text: str, k: int = 5) -> list[dict]:
-    """Return top-k past trajectories most similar to query_text by keyword overlap."""
-    tdir = root / ".cto" / "trajectories"
-    fps = list(tdir.glob("*.json")) if tdir.exists() else []
-    if not fps:
-        return []
-    query_keywords = set(extract_keywords(query_text))
-    scored = []
-    for fp in fps:
-        try:
-            with open(fp) as f:
-                traj = json.load(f)
-        except Exception:
-            continue
-        traj_kws = set(traj.get("keywords") or [])
-        score = len(traj_kws & query_keywords) / max(len(traj_kws), 1)
-        if score > 0:
-            scored.append((score, traj))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [t for _, t in scored[:k]]
-
-
 # ── Plan command ────────────────────────────────────────────────────────────
 
 def cmd_plan(args):
@@ -699,24 +646,7 @@ def cmd_plan(args):
     console.print(f"[dim]Project:[/dim] {description[:80]}")
     console.print("[cyan]Generating architecture plan via claude (architect agent)...[/cyan]")
 
-    similar = retrieve_similar_trajectories(root, description, k=5)
-    console.print(f"[dim]Loaded {len(similar)} similar past trajectories as context[/dim]")
-
     safe_description = wrap_untrusted_content(description, label="PROJECT_DESCRIPTION")
-
-    if similar:
-        lines = ["## Past Similar Tickets (for reference)",
-                 "These tickets were closed previously and their patterns may inform this plan:"]
-        for t in similar:
-            files_str = ", ".join(t.get("files_changed") or []) or "—"
-            summary = (t.get("summary") or "").replace("\n", " ")[:120]
-            lines.append(
-                f"- [{t['ticket_id']} | {t.get('type','?')} | {t.get('complexity','?')}] "
-                f"{t['title']} — files: {files_str} — outcome: {summary}"
-            )
-        trajectories_block = "\n".join(lines) + "\n"
-    else:
-        trajectories_block = ""
 
     plan_prompt = f"""You are Rick Sanchez, the smartest CTO in the multiverse. *burp* Your task is to create a detailed project plan with tickets for your Morty army to execute.
 
@@ -724,7 +654,6 @@ def cmd_plan(args):
 {safe_description}
 {SANDWICH_REINFORCEMENT}
 
-{trajectories_block}
 ## Project Root
 {root}
 
@@ -747,9 +676,7 @@ Return a JSON array of ticket objects. Each ticket must have EXACTLY these field
     "complexity": "XS|S|M|L|XL",
     "parent_index": null or integer index of parent ticket in this array,
     "dependency_indices": [integer indices of tickets this depends on],
-    "acceptance_criteria": ["criterion 1", "criterion 2"],
-    "provides": "string-tag-or-null",
-    "requires": ["tag1", "tag2"]
+    "acceptance_criteria": ["criterion 1", "criterion 2"]
   }}
 ]
 ```
@@ -762,7 +689,6 @@ Rules:
 - Include testing and security review tickets
 - Be specific in descriptions — these will be delegated to Morty's (AI agents)
 - Return ONLY the JSON array, no other text
-- Use semantic tags in `provides`/`requires` to express real dependencies (e.g. 'db.schema', 'auth.middleware', 'frontend.layout'). Use lowercase dotted names. Set `provides` to null if the ticket produces no reusable capability. Set `requires` to [] if there are no semantic deps. Reserve `dependency_indices` only for sibling-order constraints inside the same plan.
 
 Output the JSON array now:"""
 
@@ -849,20 +775,14 @@ Output the JSON array now:"""
             created_ids.append(f"UNKNOWN-{i}")
             console.print(f"  [yellow]Warning: could not parse ID from:[/yellow] {out}")
 
-    # Set all non-epic tickets to "todo" and persist provides/requires tags
-    for i, (tid, item) in enumerate(zip(created_ids, plan)):
+    # Set all non-epic tickets to "todo"
+    for tid in created_ids:
         try:
             t = load_ticket(root, tid)
             if t["type"] != "epic":
                 t["status"] = "todo"
                 t["updated_at"] = now_iso()
-            provides_tag = item.get("provides")
-            requires_tags = item.get("requires") or []
-            if provides_tag:
-                t["provides"] = provides_tag
-            if requires_tags:
-                t["requires"] = requires_tags
-            save_ticket(root, t)
+                save_ticket(root, t)
         except Exception:
             pass
 
@@ -995,23 +915,11 @@ def build_sprint_context(root: Path) -> str:
 PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
-def build_capability_index(root: Path) -> dict[str, str]:
-    """Return a map of provides_tag -> ticket_id for all done tickets."""
-    index: dict[str, str] = {}
-    for t in all_tickets(root):
-        if t.get("status") == "done":
-            tag = t.get("provides")
-            if tag:
-                index[tag] = t["id"]
-    return index
-
-
 def get_actionable_tickets(root: Path) -> list[dict]:
     """Get tickets that can be worked on (todo/backlog with met dependencies)."""
     tickets = all_tickets(root)
     done_ids = {t["id"] for t in tickets if t["status"] in ("done", "in_review", "testing")}
     in_progress_ids = {t["id"] for t in tickets if t["status"] == "in_progress"}
-    cap_index = build_capability_index(root)
 
     candidates = []
     for t in tickets:
@@ -1020,43 +928,11 @@ def get_actionable_tickets(root: Path) -> list[dict]:
         if t["type"] == "epic":
             continue  # epics are tracked via sub-tickets
         deps = t.get("dependencies") or []
-        if not all(d in done_ids for d in deps):
-            continue
-        requires = t.get("requires") or []
-        if requires and not all(tag in cap_index for tag in requires):
-            continue
-        candidates.append(t)
+        if all(d in done_ids for d in deps):
+            candidates.append(t)
 
     candidates.sort(key=lambda t: PRIORITY_ORDER.get(t["priority"], 99))
     return candidates
-
-
-def cmd_graph(args):
-    root = find_cto_root()
-    tickets = all_tickets(root)
-    cap_index = build_capability_index(root)
-
-    non_done = [t for t in tickets if t.get("status") != "done" and t.get("type") != "epic"]
-    if not non_done:
-        console.print("[green]All tickets are done. Nothing to graph.[/green]")
-        return
-
-    console.print("[bold cyan]Ticket Dependency DAG[/bold cyan]\n")
-    for t in non_done:
-        status = t.get("status", "?")
-        tid = t["id"]
-        title = t.get("title", "")[:60]
-        console.print(f"[bold][[{status.upper()}][/bold] [yellow]{tid}[/yellow] {title}")
-
-        requires = t.get("requires") or []
-        if requires:
-            for tag in requires:
-                if tag in cap_index:
-                    provider = cap_index[tag]
-                    console.print(f"    requires: [cyan]{tag}[/cyan] ✓ ({provider} done)")
-                else:
-                    console.print(f"    requires: [red]{tag}[/red] ✗ (blocked)")
-        console.print("")
 
 
 def cmd_sprint(args):
@@ -1582,15 +1458,6 @@ def cmd_status(args):
     ) as prog:
         prog.add_task(f"[cyan]Morty Progress ({done}/{total})[/cyan]", total=100, completed=pct)
 
-    # Capability tag summary
-    cap_index = build_capability_index(root)
-    all_requires = [tag for t in tickets for tag in (t.get("requires") or [])]
-    produced = len(cap_index)
-    required = len(set(all_requires))
-    blocked_tags = len(set(tag for tag in all_requires if tag not in cap_index))
-    if required > 0 or produced > 0:
-        console.print(f"\n  [dim]Capability tags:[/dim] {produced} produced, {required} required, [red]{blocked_tags}[/red] blocked-by-missing-tags")
-
     # Show blocked items if any
     if blocked:
         console.print("\n  [red]Morty's that are stuck:[/red]")
@@ -1639,9 +1506,6 @@ def build_parser():
     # status
     sub.add_parser("status", help="Show project dashboard")
 
-    # graph
-    sub.add_parser("graph", help="Show ticket dependency DAG")
-
     return p
 
 
@@ -1654,7 +1518,6 @@ def main():
         "sprint": cmd_sprint,
         "review": cmd_review,
         "status": cmd_status,
-        "graph": cmd_graph,
     }
     dispatch[args.command](args)
 

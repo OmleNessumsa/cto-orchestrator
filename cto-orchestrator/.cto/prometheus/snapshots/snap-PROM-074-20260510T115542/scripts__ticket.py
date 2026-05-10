@@ -143,93 +143,6 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ── Trajectory store ─────────────────────────────────────────────────────────
-
-STOPWORDS = {
-    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "is", "was", "be", "this", "that", "it", "its", "are",
-    "have", "has", "had", "from", "by", "not", "as", "if", "then", "else",
-    "when", "all", "any", "each", "both", "into", "than", "more", "also",
-    "up", "out", "so", "do", "does", "did", "been", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "we", "they", "you", "he",
-    "she", "our", "their", "your", "his", "her", "my", "i",
-}
-
-
-def extract_keywords(text: str) -> list[str]:
-    """Extract top-30 unique keywords from text by frequency."""
-    tokens = re.split(r'\W+', (text or "").lower())
-    freq: dict[str, int] = {}
-    for tok in tokens:
-        if len(tok) >= 4 and tok not in STOPWORDS:
-            freq[tok] = freq.get(tok, 0) + 1
-    sorted_tokens = sorted(freq, key=lambda k: freq[k], reverse=True)
-    return sorted_tokens[:30]
-
-
-def trajectories_dir(root: Path) -> Path:
-    return root / ".cto" / "trajectories"
-
-
-def write_trajectory(root: Path, ticket: dict) -> None:
-    """Write a compact trajectory record for a closed ticket."""
-    tdir = trajectories_dir(root)
-    tdir.mkdir(parents=True, exist_ok=True)
-    tid = ticket.get("id", "UNKNOWN")
-    combined_text = " ".join(filter(None, [
-        ticket.get("title", ""),
-        ticket.get("description", ""),
-        ticket.get("agent_output", ""),
-    ]))
-    record = {
-        "ticket_id": tid,
-        "title": ticket.get("title", ""),
-        "description": (ticket.get("description") or "")[:600],
-        "type": ticket.get("type", ""),
-        "agent": ticket.get("assigned_agent", ""),
-        "complexity": ticket.get("estimated_complexity", ""),
-        "files_changed": ticket.get("files_touched") or [],
-        "summary": (ticket.get("agent_output") or "")[:400],
-        "closed_at": ticket.get("completed_at") or now_iso(),
-        "keywords": extract_keywords(combined_text),
-    }
-    fp = tdir / f"{tid}.json"
-    with open(fp, "w") as f:
-        json.dump(record, f, indent=2)
-
-
-def cmd_trajectories(args):
-    root = find_cto_root()
-    tdir = trajectories_dir(root)
-    if not tdir.exists():
-        print("No trajectories yet. Close some tickets first, Morty.")
-        return
-    records = []
-    for fp in sorted(tdir.glob("*.json")):
-        with open(fp) as f:
-            records.append(json.load(f))
-    if not records:
-        print("No trajectories yet. Close some tickets first, Morty.")
-        return
-
-    print(f"Trajectory corpus: {len(records)} record(s)\n")
-
-    # Top 10 most-recent
-    sorted_by_date = sorted(records, key=lambda r: r.get("closed_at", ""), reverse=True)
-    print("Most recent (up to 10):")
-    for r in sorted_by_date[:10]:
-        closed = r.get("closed_at", "?")[:10]
-        print(f"  {r['ticket_id']:<12} [{r.get('type','?'):<8}] {closed}  {r['title'][:60]}")
-
-    # Top 5 most-frequent keywords across corpus
-    kw_freq: dict[str, int] = {}
-    for r in records:
-        for kw in r.get("keywords", []):
-            kw_freq[kw] = kw_freq.get(kw, 0) + 1
-    top_kw = sorted(kw_freq, key=lambda k: kw_freq[k], reverse=True)[:5]
-    print(f"\nTop keywords: {', '.join(top_kw)}")
-
-
 # Maps old-style agent names to their Morty equivalents for display
 MORTY_NAMES = {
     "architect": "architect-morty",
@@ -489,11 +402,6 @@ def cmd_close(args):
         "files_touched": ticket.get("files_touched", []),
     }, role="rick")
 
-    try:
-        write_trajectory(root, ticket)
-    except Exception:
-        pass  # trajectory write must never block ticket close
-
     print(f"About time. Closed {args.ticket_id}. Wubba lubba dub dub!")
 
 
@@ -584,9 +492,6 @@ def build_parser():
     bl.add_argument("ticket_id")
     bl.add_argument("--reason", required=True)
 
-    # trajectories
-    sub.add_parser("trajectories", help="Inspect trajectory corpus")
-
     return p
 
 
@@ -604,7 +509,6 @@ def main():
         "next": cmd_next,
         "close": cmd_close,
         "blocked": cmd_blocked,
-        "trajectories": cmd_trajectories,
     }
     dispatch[args.command](args)
 
