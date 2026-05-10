@@ -1046,7 +1046,7 @@ def cmd_graph(args):
         status = t.get("status", "?")
         tid = t["id"]
         title = t.get("title", "")[:60]
-        console.print(f"[bold]({status.upper()})[/bold] [yellow]{tid}[/yellow] {title}")
+        console.print(f"[bold][[{status.upper()}][/bold] [yellow]{tid}[/yellow] {title}")
 
         requires = t.get("requires") or []
         if requires:

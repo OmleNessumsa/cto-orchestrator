@@ -1278,5 +1278,14 @@
     "title": "graph command double-brackets status labels",
     "severity": "low",
     "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-10T12:39:44.966765+00:00",
+    "proposal_id": "PROM-076",
+    "action": "applied",
+    "title": "graph command double-brackets status labels",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
   }
 ]
