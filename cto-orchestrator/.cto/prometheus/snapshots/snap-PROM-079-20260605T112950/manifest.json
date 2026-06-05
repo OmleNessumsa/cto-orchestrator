@@ -1,0 +1,10 @@
+{
+  "proposal_id": "PROM-079",
+  "created_at": "2026-06-05T11:29:50.963157+00:00",
+  "files": {
+    "scripts/orchestrate.py": {
+      "snapshot_name": "scripts__orchestrate.py",
+      "original_size": 67874
+    }
+  }
+}

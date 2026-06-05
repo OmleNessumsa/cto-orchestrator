@@ -255,27 +255,6 @@ def morty_display(agent: Optional[str]) -> str:
 
 TEAM_TEMPLATES = ["fullstack-team", "api-team", "security-team", "devops-team"]
 
-# ── Scheduler AC checklist ───────────────────────────────────────────────────
-
-_SCHEDULER_KEYWORDS = {
-    "scheduler", "schedule", "scheduled", "cron", "launchd", "launchctl",
-    "crontab", "periodic", "recurring", "cadence", "interval", "timer",
-    "mcp__scheduled", "schedule_setup",
-}
-
-SCHEDULER_AC = [
-    "Job is actually registered in launchd/cron — verify with `launchctl list | grep <label>` or `crontab -l | grep <pattern>`",
-    "Scheduler tool is invoked (not just payload printed) — confirm via tool response, not stdout",
-    "First run executes on schedule and produces expected output",
-    "Job survives a reboot / session restart",
-]
-
-
-def _is_scheduler_ticket(title: str, description: str) -> bool:
-    """Return True if the ticket appears to be about scheduling or cron jobs."""
-    combined = (title + " " + (description or "")).lower()
-    return any(kw in combined for kw in _SCHEDULER_KEYWORDS)
-
 
 def cmd_create(args):
     root = find_cto_root()
@@ -303,14 +282,6 @@ def cmd_create(args):
         sys.exit(1)
     safe_description = sanitize_text_input(args.description or "", max_length=5000)
 
-    base_criteria = [c.strip() for c in args.criteria.split("|")] if args.criteria else []
-    if _is_scheduler_ticket(safe_title, safe_description):
-        existing_set = {c.lower() for c in base_criteria}
-        for ac in SCHEDULER_AC:
-            if ac.lower() not in existing_set:
-                base_criteria.append(ac)
-        print("  [scheduler] Added runtime-verification AC items (CMO-009 fix). Confirm job is actually loaded, not just printed.")
-
     ticket = {
         "id": tid,
         "title": safe_title,
@@ -321,7 +292,7 @@ def cmd_create(args):
         "assigned_agent": getattr(args, 'agent', None),
         "parent_ticket": args.parent or None,
         "dependencies": [d.strip() for d in args.depends.split(",")] if args.depends else [],
-        "acceptance_criteria": base_criteria,
+        "acceptance_criteria": [c.strip() for c in args.criteria.split("|")] if args.criteria else [],
         "estimated_complexity": args.complexity or "M",
         # Team collaboration fields
         "team_mode": team_mode,

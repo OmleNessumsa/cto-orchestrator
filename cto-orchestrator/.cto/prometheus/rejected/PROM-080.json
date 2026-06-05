@@ -1,0 +1,20 @@
+{
+  "id": "PROM-080",
+  "title": "notify_slack.py monthly/quarterly path = broken UX",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Aangetroffen tijdens CMO-015 (DE churn casefile shake-down) in iBOOD CMO orchestrator project. Reflectie op default UX-patronen voor cross-system notify modules.",
+  "description": "src/notify_slack.py viel voor monthly/quarterly memos terug op een 'summary + path note' fallback in plaats van te chunken. De path verwees naar het filesystem van de zender \u2014 useless voor de Slack-ontvanger. Twee bugs in \u00e9\u00e9n code-pad: (1) relative_to crash op relatieve paden, (2) UX-fout dat de hele full memo niet in Slack landde. Beide gepatched in CMO orchestrator project, maar het generieke leerpunt is: een 'this is too long for the channel' fallback moet ALTIJD chunken, nooit naar disk verwijzen, omdat de ontvanger niet bij die disk kan.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [],
+  "proposed_changes": "Als jullie ergens vergelijkbare notify_slack/email/etc. genereren via Morty-templates: maak de default 'chunk inline' i.p.v. 'path note'. Path-note alleen als chunking faalt en logging mode is dev/debug.",
+  "status": "rejected",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-12T16:10:27.163124+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No target_files specified \u2014 Prometheus cannot delegate a concrete modification. Proposal likely belongs in a knowledge base or decision log, not the evolution queue."
+}

@@ -1287,5 +1287,169 @@
     "target_files": [
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-05-10T13:33:41.976345+00:00",
+    "proposal_id": "PROM-077",
+    "action": "self-reported",
+    "title": "delegate.py: --model opus-4-7/sonnet-4-6 fails with installed claude CLI 2.1.x",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-11T01:58:08.138197+00:00",
+    "proposal_id": "PROM-078",
+    "action": "self-reported",
+    "title": "sleepy.py: 'no-op' false positive when Morty produces uncommitted work",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-12T14:28:39.326171+00:00",
+    "proposal_id": "PROM-079",
+    "action": "self-reported",
+    "title": "orchestrate.py plan crasht op --thinking-budget flag",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-12T16:10:27.164229+00:00",
+    "proposal_id": "PROM-080",
+    "action": "self-reported",
+    "title": "notify_slack.py monthly/quarterly path = broken UX",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-12T18:05:43.697101+00:00",
+    "proposal_id": "PROM-081",
+    "action": "self-reported",
+    "title": "Backend agents miss Next.js middleware auth-allowlist",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-13T05:32:12.171001+00:00",
+    "proposal_id": "PROM-082",
+    "action": "self-reported",
+    "title": "Frontend Mortys miss CSS-Grid min-width:auto edge-case",
+    "severity": "low",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-13T05:35:15.990267+00:00",
+    "proposal_id": "PROM-083",
+    "action": "self-reported",
+    "title": "Frontend agents leak literal markdown tokens in plain-text cells",
+    "severity": "low",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-13T07:36:49.336350+00:00",
+    "proposal_id": "PROM-084",
+    "action": "self-reported",
+    "title": "Memo's met substantial mock-data kunnen verkeerde diagnose suggereren",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-20T20:03:00.604353+00:00",
+    "proposal_id": "PROM-085",
+    "action": "self-reported",
+    "title": "publish_memo + propose_tasks flow mist re-publish op memo-edit",
+    "severity": "low",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-05-23T06:52:51.567286+00:00",
+    "proposal_id": "PROM-086",
+    "action": "self-reported",
+    "title": "sprint crashes when delegate produces no parsed_output",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-06-01T11:33:28.590604+00:00",
+    "proposal_id": "PROM-087",
+    "action": "self-reported",
+    "title": "CMO-009 scheduler-installer prints but never installs",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-06-05T11:14:14.997387+00:00",
+    "proposal_id": "PROM-088",
+    "action": "self-reported",
+    "title": "Sprint stuck in review-loop: reviewer-morty re-reviews same in_review tickets each iteration instead of marking blocked after N failed gates",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-06-05T11:14:23.599838+00:00",
+    "proposal_id": "PROM-089",
+    "action": "self-reported",
+    "title": "Delegated Morty's submit ticket completions without files_changed metadata, triggering quality-gate rejections",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-06-05T11:28:51.112597+00:00",
+    "proposal_id": "PROM-086",
+    "action": "applied",
+    "title": "sprint crashes when delegate produces no parsed_output",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-05T11:29:50.960973+00:00",
+    "proposal_id": "PROM-087",
+    "action": "applied",
+    "title": "CMO-009 scheduler-installer prints but never installs",
+    "target_files": [
+      "scripts/ticket.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-05T11:30:12.922681+00:00",
+    "proposal_id": "PROM-079",
+    "action": "applied",
+    "title": "orchestrate.py plan crasht op --thinking-budget flag",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-05T11:40:13.338694+00:00",
+    "proposal_id": "PROM-078",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-06-05T11:42:39.046686+00:00",
+    "proposal_id": "PROM-077",
+    "action": "applied",
+    "title": "delegate.py: --model opus-4-7/sonnet-4-6 fails with installed claude CLI 2.1.x",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-05T11:43:44.576784+00:00",
+    "proposal_id": "PROM-088",
+    "action": "applied",
+    "title": "Sprint stuck in review-loop: reviewer-morty re-reviews same in_review tickets each iteration instead of marking blocked after N failed gates",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-05T11:45:00.854892+00:00",
+    "proposal_id": "PROM-089",
+    "action": "applied",
+    "title": "Delegated Morty's submit ticket completions without files_changed metadata, triggering quality-gate rejections",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
   }
 ]

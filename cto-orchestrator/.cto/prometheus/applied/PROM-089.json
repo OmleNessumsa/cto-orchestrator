@@ -1,0 +1,24 @@
+{
+  "id": "PROM-089",
+  "title": "Delegated Morty's submit ticket completions without files_changed metadata, triggering quality-gate rejections",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Affected tickets: RICK-017 (orchestrator core), RICK-018 (codex shim), RICK-019 (adjudicator). All three landed in in_review with rejector message: 'missing files_changed or description'. Real code may still be on disk in rick-terminal/src/main/counsel/ \u2014 needs manual inspection.",
+  "description": "Observed in RickIDE sprint 2026-06-05. Backend-morty (RICK-017, 018) and architect-morty (RICK-019) closed their tickets via delegate.py wrapper, but the submitted output object lacks 'files_changed' and/or 'description' fields. Reviewer-morty quality-gate rejects on this metadata absence, even when actual code exists in the repo. Either: (1) the delegate.py post-execution hook is not collecting git diff output into files_changed, or (2) the Morty's system prompt doesn't instruct them to emit a structured completion summary that the wrapper can parse.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "After Morty subprocess exits, capture git status --porcelain + git diff --stat from the cwd into files_changed automatically. Don't trust the Morty to self-report \u2014 derive metadata from filesystem reality. Also: prompt template should ask Morty to emit a final '## Files changed' markdown block as a backup signal.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-06-05T11:14:23.598827+00:00",
+  "applied_at": "2026-06-05T11:45:00.853066+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-089-20260605T114349",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

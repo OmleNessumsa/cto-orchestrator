@@ -40,13 +40,6 @@ except ImportError:
     def get_agent_id(role, team_id=None):
         return f"cto:{role}"
 
-# Import hook runner
-try:
-    from hooks import run_hooks
-except ImportError:
-    def run_hooks(hook_point, ticket, agent, output=None, root=None):
-        return True
-
 # Import security utilities
 try:
     from security_utils import (
@@ -149,71 +142,6 @@ except ImportError:
     def validate_agent_output_schema(output, schema):
         """Fallback: no schema validation available without security_utils."""
         return True, []
-
-
-# ── Cost Tracking ────────────────────────────────────────────────────────────
-
-# Rough model pricing per 1M tokens (USD) — estimates only, not billed amounts
-_MODEL_PRICING_USD_PER_1M: dict[str, dict[str, float]] = {
-    "opus": {"input": 15.0, "output": 75.0},
-    "opus-4-7": {"input": 15.0, "output": 75.0},
-    "sonnet": {"input": 3.0, "output": 15.0},
-    "sonnet-4-6": {"input": 3.0, "output": 15.0},
-    "haiku": {"input": 0.8, "output": 4.0},
-    "claude-haiku-4-5-20251001": {"input": 0.8, "output": 4.0},
-}
-_CHARS_PER_TOKEN = 4  # rough approximation: 4 chars ≈ 1 token
-
-
-class CostTracker:
-    """Estimates and accumulates token costs for agent delegations.
-
-    Uses character-count heuristics (4 chars ≈ 1 token) to approximate
-    spend without calling the billing API. Intended for sprint budget gating,
-    not accounting.
-    """
-
-    def __init__(self, budget_usd: Optional[float] = None):
-        self.budget_usd = budget_usd
-        self.total_cost_usd: float = 0.0
-        self.total_input_tokens: int = 0
-        self.total_output_tokens: int = 0
-        self.delegations: list[dict] = []
-
-    def estimate(self, prompt: str, output: str, model: str) -> dict:
-        """Return a cost breakdown dict for a single prompt/output pair."""
-        input_tokens = max(1, len(prompt) // _CHARS_PER_TOKEN)
-        output_tokens = max(1, len(output) // _CHARS_PER_TOKEN)
-        pricing = _MODEL_PRICING_USD_PER_1M.get(model, _MODEL_PRICING_USD_PER_1M["sonnet"])
-        input_cost = input_tokens * pricing["input"] / 1_000_000
-        output_cost = output_tokens * pricing["output"] / 1_000_000
-        return {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "input_cost_usd": round(input_cost, 6),
-            "output_cost_usd": round(output_cost, 6),
-            "total_cost_usd": round(input_cost + output_cost, 6),
-            "model": model,
-        }
-
-    def record(self, ticket_id: str, agent: str, prompt: str, output: str, model: str) -> dict:
-        """Estimate and accumulate cost; return the breakdown."""
-        breakdown = self.estimate(prompt, output, model)
-        self.total_cost_usd += breakdown["total_cost_usd"]
-        self.total_input_tokens += breakdown["input_tokens"]
-        self.total_output_tokens += breakdown["output_tokens"]
-        self.delegations.append({"ticket_id": ticket_id, "agent": agent, **breakdown})
-        return breakdown
-
-    def budget_exceeded(self) -> bool:
-        """Return True if accumulated cost has hit or exceeded the budget."""
-        return self.budget_usd is not None and self.total_cost_usd >= self.budget_usd
-
-    def remaining_usd(self) -> Optional[float]:
-        """Return remaining budget in USD, or None if no budget is set."""
-        if self.budget_usd is None:
-            return None
-        return max(0.0, self.budget_usd - self.total_cost_usd)
 
 
 def find_cto_root(start=None) -> Path:
@@ -682,57 +610,6 @@ def _keyword_select_agent(ticket: dict) -> str:
     return "fullstack-morty"
 
 
-def smart_select_agent(ticket: dict, root: Optional[Path] = None) -> tuple:
-    """Select agent role and estimate complexity using Haiku.
-
-    Calls Haiku with ticket details and requests a JSON routing response.
-    Returns (agent_name, complexity) tuple. Falls back to keyword matching
-    with complexity from ticket on any error.
-    """
-    fallback_agent = _keyword_select_agent(ticket)
-    fallback_complexity = ticket.get("estimated_complexity", "M")
-
-    title = (ticket.get("title") or "").strip()
-    desc = (ticket.get("description") or "").strip()
-    ttype = ticket.get("type", "task")
-    ticket_text = f"Type: {ttype}\nTitle: {title}\nDescription: {desc[:400]}"
-
-    routing_prompt = (
-        f"You are a ticket routing system. Given this software ticket, respond with ONLY a JSON object.\n\n"
-        f"{ticket_text}\n\n"
-        f"Available agents: architect-morty (architecture/design), frontend-morty (UI/frontend), "
-        f"backend-morty (API/database/server), tester-morty (testing/QA), "
-        f"security-morty (security/auth), devops-morty (CI/CD/infra), fullstack-morty (general).\n\n"
-        f"Complexity scale: XS (trivial), S (small), M (medium), L (large), XL (very large).\n\n"
-        f'Respond with ONLY: {{"agent": "<agent-id>", "complexity": "<XS|S|M|L|XL>"}}'
-    )
-
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", routing_prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        raw = result.stdout.strip()
-        match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
-        if match:
-            data = json.loads(match.group())
-            agent = data.get("agent", "").strip()
-            complexity = data.get("complexity", "").upper().strip()
-            valid_agents = {
-                "architect-morty", "frontend-morty", "backend-morty",
-                "fullstack-morty", "tester-morty", "security-morty", "devops-morty",
-            }
-            valid_complexities = {"XS", "S", "M", "L", "XL"}
-            if agent in valid_agents and complexity in valid_complexities:
-                return agent, complexity
-    except Exception:
-        pass
-
-    return fallback_agent, fallback_complexity
-
-
 def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
     """Select agent role by scoring agent cards against the ticket.
 
@@ -1182,54 +1059,6 @@ _claude_effort_supported: Optional[bool] = None
 _claude_thinking_supported: Optional[bool] = None
 _last_session_id: Optional[str] = None
 
-# Maps versioned model aliases to the short names accepted by claude CLI 2.1.x.
-# CLI ≤2.1.x rejects aliases like "opus-4-7"; only "opus/sonnet/haiku" work.
-_VERSIONED_MODEL_ALIASES: dict[str, str] = {
-    "opus-4-7":                  "opus",
-    "claude-opus-4-7":           "opus",
-    "sonnet-4-6":                "sonnet",
-    "claude-sonnet-4-6":         "sonnet",
-    "haiku-4-5":                 "haiku",
-    "claude-haiku-4-5":          "haiku",
-    "claude-haiku-4-5-20251001": "haiku",
-}
-
-_claude_version_string: Optional[str] = None
-
-
-def _get_claude_version() -> str:
-    """Return the installed claude CLI version string (cached)."""
-    global _claude_version_string
-    if _claude_version_string is not None:
-        return _claude_version_string
-    try:
-        result = subprocess.run(
-            ["claude", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        _claude_version_string = result.stdout.strip()
-    except Exception:
-        _claude_version_string = ""
-    return _claude_version_string
-
-
-def _resolve_model_for_cli(model: str) -> str:
-    """Resolve a model string to an alias the installed claude CLI accepts.
-
-    Probes claude --version for context, then maps versioned aliases like
-    opus-4-7 or claude-sonnet-4-6 to the short aliases (opus/sonnet/haiku)
-    that CLI 2.1.x requires. Short aliases pass through unchanged.
-    """
-    if not model or model in ("opus", "sonnet", "haiku"):
-        return model
-    resolved = _VERSIONED_MODEL_ALIASES.get(model)
-    if resolved:
-        _get_claude_version()  # probe for diagnostic context; mapping always applies
-        return resolved
-    return model
-
 
 def _check_claude_effort_support() -> bool:
     """Return True if the installed claude CLI supports --effort."""
@@ -1516,19 +1345,7 @@ End your work with a JSON report block in EXACTLY this format — no other summa
   "next_steps": ["optional follow-up actions, or empty array"]
 }
 ```
-
-IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
-As a backup, also emit a `## Files changed` markdown block listing every file you touched:
-
-## Files changed
-- path/to/file1.py
-- path/to/file2.py
 </output_format>
-
----
-Now execute the ticket. After completing all work, your FINAL output must be the JSON report block — no text after it.
-
-Begin:
 """
     return prompt
 
@@ -1674,35 +1491,6 @@ def reflect_on_output(output: str, criteria: list, ticket_id: str = "") -> dict:
     return {"criteria_met": criteria, "criteria_missed": [], "pass": True}
 
 
-# ── Git Metadata Collection ─────────────────────────────────────────────────
-
-def _collect_git_changed_files(cwd: str) -> list[str]:
-    """Derive changed files from git status --porcelain after a Morty subprocess exits.
-
-    Called as a fallback when the agent's JSON output lacks files_changed — derives
-    metadata from filesystem reality rather than trusting self-reporting.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=cwd,
-        )
-        files = []
-        for line in result.stdout.splitlines():
-            if len(line) > 3:
-                path = line[3:].strip()
-                # Handle renames: "oldname -> newname"
-                if " -> " in path:
-                    path = path.split(" -> ")[-1]
-                files.append(path)
-        return files
-    except Exception:
-        return []
-
-
 # ── Progress Phase Detection ─────────────────────────────────────────────────
 
 _PHASE_MARKERS = [
@@ -1805,7 +1593,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.extend(["--mcp-config", mcp_config])
 
     if model:
-        cmd.extend(["--model", _resolve_model_for_cli(model)])
+        cmd.extend(["--model", model])
     # Enable extended thinking for reasoning-heavy Opus agents (architect-morty, security-morty).
     # Uses --thinking flag if supported by the installed CLI; silently skips if not.
     if (thinking_budget is not None
@@ -1819,8 +1607,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         else:
             safe_prompt = f"## EFFORT LEVEL: {effort} — reason accordingly.\n\n{safe_prompt}"
     if stream:
-        # Recent Claude CLI requires --verbose alongside stream-json under --print.
-        cmd.extend(["--output-format", "stream-json", "--verbose"])
+        cmd.extend(["--output-format", "stream-json"])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -1834,7 +1621,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     start_time = time.time()
     output_chunks: list[str] = []
     stream_result: Optional[str] = None
-    stream_errors: list[str] = []
     current_step = "Starting"
     lines_since_progress = 0
 
@@ -1901,19 +1687,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                             result_text = event.get("result", "")
                             if result_text:
                                 stream_result = result_text
-                            if event.get("is_error") and result_text:
-                                stream_errors.append(result_text)
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
-                        elif etype == "error":
-                            err_obj = event.get("error", {})
-                            if isinstance(err_obj, dict):
-                                err_text = err_obj.get("message", "") or json.dumps(err_obj)[:200]
-                            else:
-                                err_text = str(err_obj)[:200]
-                            if err_text:
-                                stream_errors.append(err_text)
                         elif etype == "system":
                             sid = event.get("session_id")
                             if sid:
@@ -1956,12 +1732,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         proc.wait()
         if proc.returncode != 0:
             stderr = proc.stderr.read(500) if proc.stderr else "(no stderr)"
-            if stream and stream_errors:
-                stream_detail = "; ".join(stream_errors[:3])
-                raise RuntimeError(
-                    f"Agent process exited with code {proc.returncode}: {stderr}"
-                    f" | stream errors: {stream_detail}"
-                )
             raise RuntimeError(f"Agent process exited with code {proc.returncode}: {stderr}")
         full_output = stream_result if (stream and stream_result is not None) else "".join(output_chunks)
         # Extract and audit-log thinking blocks from extended thinking agents
@@ -1995,15 +1765,7 @@ def cmd_delegate(args):
         sys.exit(1)
 
     ticket = load_ticket(root, safe_ticket_id)
-    if not args.agent and getattr(args, 'smart_routing', False):
-        agent, smart_complexity = smart_select_agent(ticket, root=root)
-        # Persist Haiku complexity estimate back to ticket if not already set
-        if not ticket.get("estimated_complexity"):
-            ticket["estimated_complexity"] = smart_complexity
-            ticket["updated_at"] = now_iso()
-            save_ticket(root, ticket)
-    else:
-        agent = args.agent or match_agent_cards(ticket, root=root)
+    agent = args.agent or match_agent_cards(ticket, root=root)
     model = args.model or load_agent_card(agent, root=root).get("model", "sonnet")
 
     # Sanitize team ID if provided
@@ -2131,12 +1893,10 @@ def cmd_delegate(args):
         thinking_budget = 5000
 
     # Execute
-    run_hooks("pre_delegate", ticket, agent, root=root)
     try:
         output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, session_id=resume_session_id)
     except RuntimeError as e:
         error_msg = str(e)
-        run_hooks("on_failure", ticket, agent, root=root)
         console.print(f"[red]Ugh, {agent} screwed up: {error_msg}[/red]")
         ticket["status"] = "blocked"
         ticket["review_notes"] = f"AGENT FAILURE: {error_msg}"
@@ -2189,32 +1949,8 @@ def cmd_delegate(args):
             }, role=agent, team_id=team_id)
         return
 
-    run_hooks("post_delegate", ticket, agent, output=output, root=root)
-
     # Parse output
     parsed = parse_agent_output(output)
-
-    # Backfill files_changed from git when agent didn't self-report — derive from
-    # filesystem reality so reviewer-morty quality-gate never rejects on missing metadata.
-    if not parsed.get("files_changed"):
-        git_files = _collect_git_changed_files(str(root))
-        if git_files:
-            parsed["files_changed"] = git_files
-            console.print(f"[dim]files_changed auto-collected from git ({len(git_files)} file(s))[/dim]")
-
-    # Estimate and emit cost for this delegation
-    _cost_tracker = CostTracker()
-    cost_breakdown = _cost_tracker.record(ticket["id"], agent, prompt, output, model)
-    emit("cto.cost.delegation", {
-        "ticket_id": ticket["id"],
-        "agent": agent,
-        "model": model,
-        **cost_breakdown,
-    }, role=agent, team_id=team_id)
-    console.print(
-        f"[dim]Estimated cost: ${cost_breakdown['total_cost_usd']:.4f} "
-        f"({cost_breakdown['input_tokens']:,} in / {cost_breakdown['output_tokens']:,} out tokens)[/dim]"
-    )
 
     # Reflection pass — check output against acceptance criteria (optional, skip with --no-reflect)
     no_reflect = getattr(args, 'no_reflect', False)
@@ -2303,7 +2039,6 @@ def cmd_delegate(args):
         ticket["status"] = "blocked"
     elif agent_status == "needs_review":
         ticket["status"] = "in_review"
-        run_hooks("on_review", ticket, agent, output=output, root=root)
     else:
         ticket["status"] = "in_review"
 
@@ -2379,8 +2114,6 @@ def build_parser():
     p.add_argument("--resume", action="store_true",
                    help="Resume an interrupted session using the stored session_id in the ticket. "
                         "Use after a timeout; the agent continues from where it left off.")
-    p.add_argument("--smart-routing", action="store_true",
-                   help="Use Haiku-powered smart routing for agent selection instead of keyword matching.")
     return p
 
 

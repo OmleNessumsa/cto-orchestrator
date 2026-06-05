@@ -1,0 +1,20 @@
+{
+  "id": "PROM-082",
+  "title": "Frontend Mortys miss CSS-Grid min-width:auto edge-case",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Tweede UX-iteratie op CMO Orchestrator memo detail page; pre code-block met lange JSONL-regels pushte page-width.",
+  "description": "When dispatching frontend agents for layouts using CSS Grid (Tailwind grid-cols-[1fr_X]), agents miss the default min-width:auto on grid items. A wide child (code-block, table, image) forces the column wider than the viewport, causing horizontal page overflow. Generic lesson: always use minmax(0,1fr) for the flexible column AND add min-w-0 on the grid item itself when content may exceed it.",
+  "impact_score": 4,
+  "risk_score": 2,
+  "effort_score": 6,
+  "target_files": [],
+  "proposed_changes": "Add to frontend-Morty/Peggy agent card: bij CSS Grid met flexibele kolommen ALTIJD minmax(0,1fr) + min-w-0 op grid item, OOK voor flex children (flex-1 min-w-0). Voorkomt 90% van horizontale page-overflow bugs.",
+  "status": "rejected",
+  "severity": "low",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-13T05:32:12.169749+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No target_files specified \u2014 Prometheus cannot delegate a concrete modification. Proposal likely belongs in a knowledge base or decision log, not the evolution queue."
+}

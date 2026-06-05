@@ -1,0 +1,24 @@
+{
+  "id": "PROM-077",
+  "title": "delegate.py: --model opus-4-7/sonnet-4-6 fails with installed claude CLI 2.1.x",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Running OPRK-001 dispatch via cto-orchestrator from /Users/elmo.asmussen/Projects/CTO/OpenRick. Effort 'medium' triggered model arg 'opus-4-7' which the CLI rejects with HTTP 404.",
+  "description": "When delegate.py is called with --model opus-4-7 (or sonnet-4-6), the spawned 'claude -p --model opus-4-7' subprocess fails because the installed claude CLI (2.1.126) only accepts short aliases (opus/sonnet/haiku). Worse: the actual error 'There's an issue with the selected model (opus-4-7)' is emitted inside the stream-json stdout, but delegate.py reports stderr only ('(no stderr)'), making this nearly impossible to debug from the user's perspective. Reproduces 100% on macOS with claude 2.1.126.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Two fixes: (1) Map versioned aliases (opus-4-7, sonnet-4-6) to either short aliases (opus, sonnet) or full IDs (claude-opus-4-7, claude-sonnet-4-6) in delegate.py before passing to claude CLI. Probe claude --version and choose accordingly. (2) When subprocess returncode != 0, also surface any stream-json 'error' or 'is_error' events from stdout, not just stderr \u2014 current behavior loses the real error message.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-10T13:33:41.975066+00:00",
+  "applied_at": "2026-06-05T11:42:39.045396+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-077-20260605T114013",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

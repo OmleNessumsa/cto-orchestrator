@@ -1,0 +1,14 @@
+{
+  "proposal_id": "PROM-034",
+  "created_at": "2026-04-18T14:34:21.107149+00:00",
+  "files": {
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 68083
+    },
+    "references/prompts.md": {
+      "snapshot_name": "references__prompts.md",
+      "original_size": 16088
+    }
+  }
+}

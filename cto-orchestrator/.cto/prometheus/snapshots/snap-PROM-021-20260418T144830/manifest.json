@@ -1,0 +1,26 @@
+{
+  "proposal_id": "PROM-021",
+  "created_at": "2026-04-18T14:48:30.048926+00:00",
+  "files": {
+    "scripts/security_utils.py": {
+      "snapshot_name": "scripts__security_utils.py",
+      "original_size": 34391
+    },
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 81777
+    },
+    "scripts/meeseeks.py": {
+      "snapshot_name": "scripts__meeseeks.py",
+      "original_size": 23222
+    },
+    "scripts/orchestrate.py": {
+      "snapshot_name": "scripts__orchestrate.py",
+      "original_size": 56212
+    },
+    "scripts/unity.py": {
+      "snapshot_name": "scripts__unity.py",
+      "original_size": 47392
+    }
+  }
+}

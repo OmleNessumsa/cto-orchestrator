@@ -1,0 +1,20 @@
+{
+  "id": "PROM-085",
+  "title": "publish_memo + propose_tasks flow mist re-publish op memo-edit",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "CMO Orchestrator EU-monthly memo iteratie 20 mei \u2014 Elmo zag oude versie in hub na rewrite + re-push tasks.",
+  "description": "Wanneer Don het memo lokaal herziet na een eerste publication, en je vervolgens propose_tasks --commit doet, raakt de hub uit sync met het lokale memo. De tasks linken naar 'context op de hub' maar de hub toont nog de vorige versie. Generieke fix: detect file mtime > last publish ts, of force publish bij propose_tasks --commit.",
+  "impact_score": 4,
+  "risk_score": 2,
+  "effort_score": 6,
+  "target_files": [],
+  "proposed_changes": "Voeg aan scripts/propose_tasks.py een check: vergelijk memo mtime met DB-timestamp (vraag GET /api/agents/cmo/memos/{slug}.created_at). Bij mismatch, auto-trigger publish_memo --force voor de --commit-stap.",
+  "status": "rejected",
+  "severity": "low",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-20T20:03:00.602784+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No target_files specified \u2014 Prometheus cannot delegate a concrete modification. Proposal likely belongs in a knowledge base or decision log, not the evolution queue."
+}

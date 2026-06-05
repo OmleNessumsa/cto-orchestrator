@@ -1102,10 +1102,6 @@ def cmd_sprint(args):
         "project_name": cfg.get("project_name"),
     }, role="rick")
 
-    # Track consecutive quality-gate failures per ticket to detect stuck review loops
-    review_fail_counts: dict[str, int] = {}
-    MAX_REVIEW_FAILURES = 3
-
     while iteration < max_iterations:
         iteration += 1
         console.print(f"\n[cyan]{'═' * 60}[/cyan]")
@@ -1172,7 +1168,6 @@ def cmd_sprint(args):
                     rt = load_ticket(root, rt["id"])
                     if rt["status"] == "in_review":
                         if _passes_quality_gate(rt):
-                            review_fail_counts.pop(rt["id"], None)
                             rt["status"] = "done"
                             rt["completed_at"] = now_iso()
                             rt["updated_at"] = now_iso()
@@ -1188,34 +1183,10 @@ def cmd_sprint(args):
                             })
                             console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
                         else:
-                            review_fail_counts[rt["id"]] = review_fail_counts.get(rt["id"], 0) + 1
-                            fail_count = review_fail_counts[rt["id"]]
-                            if fail_count >= MAX_REVIEW_FAILURES:
-                                gate_reason = "quality gate: missing files_changed or description"
-                                rt["status"] = "blocked"
-                                rt["blocked_reason"] = "review_loop"
-                                rt["review_notes"] = (
-                                    f"BLOCKED: {gate_reason} — {fail_count} consecutive review failures"
-                                )
-                                rt["updated_at"] = now_iso()
-                                save_ticket(root, rt)
-                                append_log(root, {
-                                    "timestamp": now_iso(),
-                                    "ticket_id": rt["id"],
-                                    "agent": "rick",
-                                    "action": "blocked",
-                                    "message": f"Auto-blocked after {fail_count} consecutive review failures: {gate_reason}",
-                                    "files_changed": [],
-                                })
-                                console.print(
-                                    f"  [red]{rt['id']} → BLOCKED after {fail_count} consecutive review failures "
-                                    f"(quality gate: missing files_changed or description). Freeing sprint.[/red]"
-                                )
-                            else:
-                                console.print(
-                                    f"  [yellow]{rt['id']} → quality gate failed (missing files_changed or description) — "
-                                    f"attempt {fail_count}/{MAX_REVIEW_FAILURES} before auto-block.[/yellow]"
-                                )
+                            console.print(
+                                f"  [yellow]{rt['id']} → quality gate failed (missing files_changed or description) — "
+                                f"left in_review for manual review.[/yellow]"
+                            )
                 continue
 
             # Check blocked

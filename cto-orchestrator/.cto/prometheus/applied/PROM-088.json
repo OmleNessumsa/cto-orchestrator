@@ -1,0 +1,24 @@
+{
+  "id": "PROM-088",
+  "title": "Sprint stuck in review-loop: reviewer-morty re-reviews same in_review tickets each iteration instead of marking blocked after N failed gates",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "sprint --auto --smart-routing on RickIDE project, 19 todos, 3 done before loop started, then 0 progress for iters 11-13",
+  "description": "Observed in RickIDE sprint 2026-06-05 (full sprint, 50 iter cap). Iterations #11-13 all show identical sequence: reviewer-morty inspects RICK-017/018/019, fails 'quality gate: missing files_changed or description', leaves status as 'in_review'. Next iteration: same three tickets, same failure, same outcome. Sprint burns iters with zero progress. Should: detect N>2 consecutive review failures on same ticket and auto-move to BLOCKED with reviewer's reason, freeing the sprint to pick up other todos.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Track per-ticket review_attempt_count in orchestrate.py sprint loop. After 2-3 consecutive failures with same gate-reason, call ticket.py blocked --reason=last_gate_msg and skip ticket for the rest of the sprint.",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-06-05T11:14:14.996352+00:00",
+  "applied_at": "2026-06-05T11:43:44.575810+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-088-20260605T114239",
+  "files_actually_changed": [
+    "scripts/orchestrate.py"
+  ]
+}

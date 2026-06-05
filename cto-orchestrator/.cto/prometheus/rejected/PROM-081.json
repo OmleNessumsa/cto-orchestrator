@@ -1,0 +1,20 @@
+{
+  "id": "PROM-081",
+  "title": "Backend agents miss Next.js middleware auth-allowlist",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Aangetroffen tijdens CMO Orchestrator hub integration first deploy. Backend Morty prompts moeten een 'check middleware.ts for auth-allowlist' stap krijgen bij Next.js targets.",
+  "description": "CMO-017 (backend agent) wrote a service-key-authed POST endpoint maar middleware.ts auth-blocks alle /api/* behalve een handvol allowlisted paths. Resultaat: 307 redirect to /login op POST tijdens eerste end-to-end test. Generieke les: bij Next.js + Supabase auth-middleware moeten nieuwe service-auth API routes EXPLICIET in de middleware allowlist.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [],
+  "proposed_changes": "Voeg aan backend-Morty/Joan agent card OR delegate.py template een check toe: bij Next.js routes, lees middleware.ts en voeg path toe aan allowlist als route eigen auth doet.",
+  "status": "rejected",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-12T18:05:43.696117+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No target_files specified \u2014 Prometheus cannot delegate a concrete modification. Proposal likely belongs in a knowledge base or decision log, not the evolution queue."
+}

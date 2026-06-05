@@ -40,13 +40,6 @@ except ImportError:
     def get_agent_id(role, team_id=None):
         return f"cto:{role}"
 
-# Import hook runner
-try:
-    from hooks import run_hooks
-except ImportError:
-    def run_hooks(hook_point, ticket, agent, output=None, root=None):
-        return True
-
 # Import security utilities
 try:
     from security_utils import (
@@ -1182,54 +1175,6 @@ _claude_effort_supported: Optional[bool] = None
 _claude_thinking_supported: Optional[bool] = None
 _last_session_id: Optional[str] = None
 
-# Maps versioned model aliases to the short names accepted by claude CLI 2.1.x.
-# CLI ≤2.1.x rejects aliases like "opus-4-7"; only "opus/sonnet/haiku" work.
-_VERSIONED_MODEL_ALIASES: dict[str, str] = {
-    "opus-4-7":                  "opus",
-    "claude-opus-4-7":           "opus",
-    "sonnet-4-6":                "sonnet",
-    "claude-sonnet-4-6":         "sonnet",
-    "haiku-4-5":                 "haiku",
-    "claude-haiku-4-5":          "haiku",
-    "claude-haiku-4-5-20251001": "haiku",
-}
-
-_claude_version_string: Optional[str] = None
-
-
-def _get_claude_version() -> str:
-    """Return the installed claude CLI version string (cached)."""
-    global _claude_version_string
-    if _claude_version_string is not None:
-        return _claude_version_string
-    try:
-        result = subprocess.run(
-            ["claude", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        _claude_version_string = result.stdout.strip()
-    except Exception:
-        _claude_version_string = ""
-    return _claude_version_string
-
-
-def _resolve_model_for_cli(model: str) -> str:
-    """Resolve a model string to an alias the installed claude CLI accepts.
-
-    Probes claude --version for context, then maps versioned aliases like
-    opus-4-7 or claude-sonnet-4-6 to the short aliases (opus/sonnet/haiku)
-    that CLI 2.1.x requires. Short aliases pass through unchanged.
-    """
-    if not model or model in ("opus", "sonnet", "haiku"):
-        return model
-    resolved = _VERSIONED_MODEL_ALIASES.get(model)
-    if resolved:
-        _get_claude_version()  # probe for diagnostic context; mapping always applies
-        return resolved
-    return model
-
 
 def _check_claude_effort_support() -> bool:
     """Return True if the installed claude CLI supports --effort."""
@@ -1516,13 +1461,6 @@ End your work with a JSON report block in EXACTLY this format — no other summa
   "next_steps": ["optional follow-up actions, or empty array"]
 }
 ```
-
-IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
-As a backup, also emit a `## Files changed` markdown block listing every file you touched:
-
-## Files changed
-- path/to/file1.py
-- path/to/file2.py
 </output_format>
 
 ---
@@ -1674,35 +1612,6 @@ def reflect_on_output(output: str, criteria: list, ticket_id: str = "") -> dict:
     return {"criteria_met": criteria, "criteria_missed": [], "pass": True}
 
 
-# ── Git Metadata Collection ─────────────────────────────────────────────────
-
-def _collect_git_changed_files(cwd: str) -> list[str]:
-    """Derive changed files from git status --porcelain after a Morty subprocess exits.
-
-    Called as a fallback when the agent's JSON output lacks files_changed — derives
-    metadata from filesystem reality rather than trusting self-reporting.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=cwd,
-        )
-        files = []
-        for line in result.stdout.splitlines():
-            if len(line) > 3:
-                path = line[3:].strip()
-                # Handle renames: "oldname -> newname"
-                if " -> " in path:
-                    path = path.split(" -> ")[-1]
-                files.append(path)
-        return files
-    except Exception:
-        return []
-
-
 # ── Progress Phase Detection ─────────────────────────────────────────────────
 
 _PHASE_MARKERS = [
@@ -1805,7 +1714,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.extend(["--mcp-config", mcp_config])
 
     if model:
-        cmd.extend(["--model", _resolve_model_for_cli(model)])
+        cmd.extend(["--model", model])
     # Enable extended thinking for reasoning-heavy Opus agents (architect-morty, security-morty).
     # Uses --thinking flag if supported by the installed CLI; silently skips if not.
     if (thinking_budget is not None
@@ -1819,8 +1728,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         else:
             safe_prompt = f"## EFFORT LEVEL: {effort} — reason accordingly.\n\n{safe_prompt}"
     if stream:
-        # Recent Claude CLI requires --verbose alongside stream-json under --print.
-        cmd.extend(["--output-format", "stream-json", "--verbose"])
+        cmd.extend(["--output-format", "stream-json"])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -1834,7 +1742,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     start_time = time.time()
     output_chunks: list[str] = []
     stream_result: Optional[str] = None
-    stream_errors: list[str] = []
     current_step = "Starting"
     lines_since_progress = 0
 
@@ -1901,19 +1808,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                             result_text = event.get("result", "")
                             if result_text:
                                 stream_result = result_text
-                            if event.get("is_error") and result_text:
-                                stream_errors.append(result_text)
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
-                        elif etype == "error":
-                            err_obj = event.get("error", {})
-                            if isinstance(err_obj, dict):
-                                err_text = err_obj.get("message", "") or json.dumps(err_obj)[:200]
-                            else:
-                                err_text = str(err_obj)[:200]
-                            if err_text:
-                                stream_errors.append(err_text)
                         elif etype == "system":
                             sid = event.get("session_id")
                             if sid:
@@ -1956,12 +1853,6 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         proc.wait()
         if proc.returncode != 0:
             stderr = proc.stderr.read(500) if proc.stderr else "(no stderr)"
-            if stream and stream_errors:
-                stream_detail = "; ".join(stream_errors[:3])
-                raise RuntimeError(
-                    f"Agent process exited with code {proc.returncode}: {stderr}"
-                    f" | stream errors: {stream_detail}"
-                )
             raise RuntimeError(f"Agent process exited with code {proc.returncode}: {stderr}")
         full_output = stream_result if (stream and stream_result is not None) else "".join(output_chunks)
         # Extract and audit-log thinking blocks from extended thinking agents
@@ -2131,12 +2022,10 @@ def cmd_delegate(args):
         thinking_budget = 5000
 
     # Execute
-    run_hooks("pre_delegate", ticket, agent, root=root)
     try:
         output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, session_id=resume_session_id)
     except RuntimeError as e:
         error_msg = str(e)
-        run_hooks("on_failure", ticket, agent, root=root)
         console.print(f"[red]Ugh, {agent} screwed up: {error_msg}[/red]")
         ticket["status"] = "blocked"
         ticket["review_notes"] = f"AGENT FAILURE: {error_msg}"
@@ -2189,18 +2078,8 @@ def cmd_delegate(args):
             }, role=agent, team_id=team_id)
         return
 
-    run_hooks("post_delegate", ticket, agent, output=output, root=root)
-
     # Parse output
     parsed = parse_agent_output(output)
-
-    # Backfill files_changed from git when agent didn't self-report — derive from
-    # filesystem reality so reviewer-morty quality-gate never rejects on missing metadata.
-    if not parsed.get("files_changed"):
-        git_files = _collect_git_changed_files(str(root))
-        if git_files:
-            parsed["files_changed"] = git_files
-            console.print(f"[dim]files_changed auto-collected from git ({len(git_files)} file(s))[/dim]")
 
     # Estimate and emit cost for this delegation
     _cost_tracker = CostTracker()
@@ -2303,7 +2182,6 @@ def cmd_delegate(args):
         ticket["status"] = "blocked"
     elif agent_status == "needs_review":
         ticket["status"] = "in_review"
-        run_hooks("on_review", ticket, agent, output=output, root=root)
     else:
         ticket["status"] = "in_review"
 

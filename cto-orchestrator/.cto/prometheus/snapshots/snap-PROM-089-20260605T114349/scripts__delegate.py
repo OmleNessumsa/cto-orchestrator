@@ -1516,13 +1516,6 @@ End your work with a JSON report block in EXACTLY this format — no other summa
   "next_steps": ["optional follow-up actions, or empty array"]
 }
 ```
-
-IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
-As a backup, also emit a `## Files changed` markdown block listing every file you touched:
-
-## Files changed
-- path/to/file1.py
-- path/to/file2.py
 </output_format>
 
 ---
@@ -1672,35 +1665,6 @@ def reflect_on_output(output: str, criteria: list, ticket_id: str = "") -> dict:
 
     # Default to pass to avoid blocking the pipeline when reflection itself fails
     return {"criteria_met": criteria, "criteria_missed": [], "pass": True}
-
-
-# ── Git Metadata Collection ─────────────────────────────────────────────────
-
-def _collect_git_changed_files(cwd: str) -> list[str]:
-    """Derive changed files from git status --porcelain after a Morty subprocess exits.
-
-    Called as a fallback when the agent's JSON output lacks files_changed — derives
-    metadata from filesystem reality rather than trusting self-reporting.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=cwd,
-        )
-        files = []
-        for line in result.stdout.splitlines():
-            if len(line) > 3:
-                path = line[3:].strip()
-                # Handle renames: "oldname -> newname"
-                if " -> " in path:
-                    path = path.split(" -> ")[-1]
-                files.append(path)
-        return files
-    except Exception:
-        return []
 
 
 # ── Progress Phase Detection ─────────────────────────────────────────────────
@@ -2193,14 +2157,6 @@ def cmd_delegate(args):
 
     # Parse output
     parsed = parse_agent_output(output)
-
-    # Backfill files_changed from git when agent didn't self-report — derive from
-    # filesystem reality so reviewer-morty quality-gate never rejects on missing metadata.
-    if not parsed.get("files_changed"):
-        git_files = _collect_git_changed_files(str(root))
-        if git_files:
-            parsed["files_changed"] = git_files
-            console.print(f"[dim]files_changed auto-collected from git ({len(git_files)} file(s))[/dim]")
 
     # Estimate and emit cost for this delegation
     _cost_tracker = CostTracker()

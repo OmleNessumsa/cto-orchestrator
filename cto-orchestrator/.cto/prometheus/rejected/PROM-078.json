@@ -1,0 +1,22 @@
+{
+  "id": "PROM-078",
+  "title": "sleepy.py: 'no-op' false positive when Morty produces uncommitted work",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "OpenRick project, OPRK-010 overnight, 7m41s wall time, ~20k tokens spent per sleepy's burn estimate",
+  "description": "During an overnight sleepy run on OPRK-010, architect-morty produced a valid event-bus refactor (new core/events.py, refactored agent.py + cli.py, ADR-001, +16 tests, all gates green) but never invoked git commit. Sleepy's outcome check ('post_sha == pre_sha \u2192 no-op, delete branch') deleted the sleepy/OPRK-010 branch. The unstaged changes carried over to main on the subsequent 'git checkout main'. Net result: 7h41m of work labelled no-op, no branch in QUEUE.md, no token attribution, no review path. The pre-commit hook stash-conflict pattern (also seen during foreground dispatches) is the suspected root cause of the missed commit.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/sleepy.py"
+  ],
+  "proposed_changes": "Three fixes: (1) Before declaring no-op, also check 'git diff --quiet' and 'git diff --cached --quiet'. If either shows uncommitted work, stage + commit it on the sleepy branch with a synthetic message like 'OPRK-NNN: [sleepy auto-commit \u2014 Morty did not commit]' before queueing. (2) Stamp the delegate prompt with a 'COMMIT YOUR WORK' reminder + a final 'git status' echo so the Morty knows to commit before exiting. (3) Make sleepy run delegate from inside the sleepy branch with HEAD detached or use stash+pop to guarantee changes don't escape branch context.",
+  "status": "rejected",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-11T01:58:08.137247+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-078-20260605T113513",
+  "reject_reason": "Apply failed: Evolve timed out after 300s"
+}

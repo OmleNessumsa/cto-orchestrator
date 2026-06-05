@@ -1,0 +1,20 @@
+{
+  "id": "PROM-083",
+  "title": "Frontend agents leak literal markdown tokens in plain-text cells",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Derde iteratie op CMO Orchestrator memo detail page; gebruiker zag **-12,9%** ipv -12,9% in KPI severity pills.",
+  "description": "Bij het renderen van velden die markdown KUNNEN bevatten (kpi_delta values, status labels, sidebar entries) tonen frontend agents vaak letterlijke **bold** / *italic* tokens omdat hun strip-helper alleen emojis aanpakt. Generieke les: een 'clean-for-display' helper moet ALTIJD emoji + inline markdown + inline code samen aanpakken.",
+  "impact_score": 4,
+  "risk_score": 2,
+  "effort_score": 6,
+  "target_files": [],
+  "proposed_changes": "Standaardiseer een 'stripPlainTextNoise(s)' helper template in frontend-Morty card die emoji + **bold** + *italic* + `code` samen strip. Gebruik op ALLE non-markdown render-sites.",
+  "status": "rejected",
+  "severity": "low",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-13T05:35:15.988502+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No target_files specified \u2014 Prometheus cannot delegate a concrete modification. Proposal likely belongs in a knowledge base or decision log, not the evolution queue."
+}

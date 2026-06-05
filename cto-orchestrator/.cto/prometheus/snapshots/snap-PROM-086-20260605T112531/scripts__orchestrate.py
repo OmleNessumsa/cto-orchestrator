@@ -647,15 +647,8 @@ def claude_prompt(prompt: str, model: str = "opus-4-7", thinking_budget: int = N
         })
         cmd.extend(["--mcp-config", mcp_config])
 
-    # --thinking-budget was removed from Claude CLI; inject extended-thinking
-    # intent via the prompt prefix instead so the model still prioritises
-    # deep step-by-step reasoning when a budget was requested.
     if thinking_budget is not None:
-        safe_prompt = (
-            f"[Extended thinking enabled — budget ~{thinking_budget} tokens. "
-            "Reason carefully and step-by-step before answering.]\n\n"
-            + safe_prompt
-        )
+        cmd.extend(["--thinking-budget", str(thinking_budget)])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -924,9 +917,6 @@ def update_sprint_state(root: Path, ticket: dict, parsed_output: dict, agent: st
     Accumulates context that downstream agents can use to understand
     what upstream agents produced — enabling dynamic replanning.
     """
-    if parsed_output is None:
-        parsed_output = {}
-
     state = load_sprint_state(root)
 
     ticket_id = ticket["id"]
@@ -946,7 +936,7 @@ def update_sprint_state(root: Path, ticket: dict, parsed_output: dict, agent: st
     state["agent_outputs"][ticket_id] = {
         "agent": agent,
         "status": status,
-        "description": (parsed_output.get("description") or "")[:300],
+        "description": parsed_output.get("description", "")[:300],
         "files": parsed_output.get("files_changed", []),
     }
 
@@ -1102,10 +1092,6 @@ def cmd_sprint(args):
         "project_name": cfg.get("project_name"),
     }, role="rick")
 
-    # Track consecutive quality-gate failures per ticket to detect stuck review loops
-    review_fail_counts: dict[str, int] = {}
-    MAX_REVIEW_FAILURES = 3
-
     while iteration < max_iterations:
         iteration += 1
         console.print(f"\n[cyan]{'═' * 60}[/cyan]")
@@ -1172,7 +1158,6 @@ def cmd_sprint(args):
                     rt = load_ticket(root, rt["id"])
                     if rt["status"] == "in_review":
                         if _passes_quality_gate(rt):
-                            review_fail_counts.pop(rt["id"], None)
                             rt["status"] = "done"
                             rt["completed_at"] = now_iso()
                             rt["updated_at"] = now_iso()
@@ -1188,34 +1173,10 @@ def cmd_sprint(args):
                             })
                             console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
                         else:
-                            review_fail_counts[rt["id"]] = review_fail_counts.get(rt["id"], 0) + 1
-                            fail_count = review_fail_counts[rt["id"]]
-                            if fail_count >= MAX_REVIEW_FAILURES:
-                                gate_reason = "quality gate: missing files_changed or description"
-                                rt["status"] = "blocked"
-                                rt["blocked_reason"] = "review_loop"
-                                rt["review_notes"] = (
-                                    f"BLOCKED: {gate_reason} — {fail_count} consecutive review failures"
-                                )
-                                rt["updated_at"] = now_iso()
-                                save_ticket(root, rt)
-                                append_log(root, {
-                                    "timestamp": now_iso(),
-                                    "ticket_id": rt["id"],
-                                    "agent": "rick",
-                                    "action": "blocked",
-                                    "message": f"Auto-blocked after {fail_count} consecutive review failures: {gate_reason}",
-                                    "files_changed": [],
-                                })
-                                console.print(
-                                    f"  [red]{rt['id']} → BLOCKED after {fail_count} consecutive review failures "
-                                    f"(quality gate: missing files_changed or description). Freeing sprint.[/red]"
-                                )
-                            else:
-                                console.print(
-                                    f"  [yellow]{rt['id']} → quality gate failed (missing files_changed or description) — "
-                                    f"attempt {fail_count}/{MAX_REVIEW_FAILURES} before auto-block.[/yellow]"
-                                )
+                            console.print(
+                                f"  [yellow]{rt['id']} → quality gate failed (missing files_changed or description) — "
+                                f"left in_review for manual review.[/yellow]"
+                            )
                 continue
 
             # Check blocked
@@ -1371,10 +1332,8 @@ def cmd_sprint(args):
                 console.print(f"  [red]Delegation timed out for {ticket['id']}[/red]")
                 t = load_ticket(root, ticket["id"])
                 t["status"] = "blocked"
-                t["blocked_reason"] = "timeout"
                 t["review_notes"] = "TIMEOUT: Agent timed out. Consider splitting this ticket."
                 t["updated_at"] = now_iso()
-                # Preserve any session_id saved by delegate.py before the kill so --resume still works
                 save_ticket(root, t)
             except Exception as e:
                 console.print(f"  [red]Delegation error: {e}[/red]")

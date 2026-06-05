@@ -1,0 +1,22 @@
+{
+  "proposal_id": "PROM-045",
+  "created_at": "2026-04-17T10:09:41.285029+00:00",
+  "files": {
+    "scripts/security_utils.py": {
+      "snapshot_name": "scripts__security_utils.py",
+      "original_size": 25718
+    },
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 54506
+    },
+    "scripts/meeseeks.py": {
+      "snapshot_name": "scripts__meeseeks.py",
+      "original_size": 19587
+    },
+    "scripts/schemas.py": {
+      "snapshot_name": "scripts__schemas.py",
+      "original_size": 5985
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "PROM-084",
+  "title": "Memo's met substantial mock-data kunnen verkeerde diagnose suggereren",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "CMO Orchestrator DE-casefile, gegenereerd op mocks, live-data-validation onthulde fundamenteel andere diagnose.",
+  "description": "Don's eerste DE-casefile was gebaseerd op Peggy mock-data. Memo was intern consistent, theoretisch goed onderbouwd, maar de hypothese 'kapotte DE welcome-loop op 8%' was mock-fictie. Live data (88,8% globaal, geen DE-split bestaat) wees op een fundamenteel ander probleem: geen DE-gelokaliseerde infrastructuur. Generieke les: een per-cel [MOCK]-tag is niet voldoende. Memo's met >30% mock-data moeten een prominent header-disclaimer hebben EN aanbevelingen die afhangen van mock-data moeten conditioneel zijn.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [],
+  "proposed_changes": "Voeg aan Don's SKILL.md self-improvement protocol toe: aan begin van elke memo, count mock-vs-live cellen. Bij >30% mock OR bij MOCK-data die de hoofd-hypothese drijft \u2192 prominent disclaimer + conditional language op aanbevelingen. Bij volgende live-update: expliciet markeren WELKE diagnose-elementen veranderd zijn.",
+  "status": "rejected",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-05-13T07:36:49.335140+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No target_files specified \u2014 Prometheus cannot delegate a concrete modification. Proposal likely belongs in a knowledge base or decision log, not the evolution queue."
+}
