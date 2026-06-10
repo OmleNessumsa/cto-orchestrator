@@ -21,6 +21,7 @@ import importlib
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -126,3 +127,140 @@ def run_hooks(
         all_ok = all_ok and ok
 
     return all_ok
+
+
+# ── Claude Code PreToolUse Guardrail Hook ─────────────────────────────────────
+
+def _find_repo_root(cwd: str) -> Path:
+    """Walk up from cwd to find the project root (.git or .cto directory)."""
+    p = Path(cwd).resolve()
+    while True:
+        if (p / ".git").is_dir() or (p / ".cto").is_dir():
+            return p
+        parent = p.parent
+        if parent == p:
+            return Path(cwd).resolve()
+        p = parent
+
+
+def _load_all_reservations(root: Path) -> dict[str, list[str]]:
+    """Return merged role -> [absolute_file_paths] from all active team files."""
+    reservations: dict[str, list[str]] = {}
+    teams_dir = root / ".cto" / "teams" / "active"
+    if not teams_dir.is_dir():
+        return reservations
+    for team_file in teams_dir.glob("*.json"):
+        try:
+            with open(team_file) as f:
+                team = json.load(f)
+            for role, paths in team.get("files_reserved", {}).items():
+                existing = reservations.setdefault(role, [])
+                for p in paths:
+                    abs_p = (
+                        str((root / p).resolve())
+                        if not os.path.isabs(p)
+                        else str(Path(p).resolve())
+                    )
+                    if abs_p not in existing:
+                        existing.append(abs_p)
+        except Exception:
+            pass
+    return reservations
+
+
+def _emit_guardrail_block(event_data: dict) -> None:
+    """Fire-and-forget guardrail.block event to roro (best-effort)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from roro_events import emit
+        emit("guardrail.block", event_data)
+    except Exception:
+        pass
+
+
+def guardrail_hook() -> None:
+    """Claude Code PreToolUse hook entry point.
+
+    Reads the hook JSON payload from stdin and enforces:
+    - Sensitive-path denylist for Edit/Write (blocks .env, keys, escaping root)
+    - File-reservation enforcement for Edit/Write (blocks cross-Morty conflicts)
+    - Dangerous-command scanner for Bash
+
+    Exits 0 to allow; exits 2 to block (reason written to stderr so Claude
+    receives it as feedback).
+    """
+    sys.path.insert(0, str(Path(__file__).parent))
+
+    try:
+        from security_utils import is_path_in_denylist, scan_bash_command
+    except ImportError:
+        sys.exit(0)  # fail open if security_utils unavailable
+
+    try:
+        raw = sys.stdin.read()
+        hook_input = json.loads(raw) if raw.strip() else {}
+    except Exception:
+        sys.exit(0)  # malformed stdin — fail open
+
+    tool_name = hook_input.get("tool_name", "")
+    tool_input = hook_input.get("tool_input", {})
+    cwd = hook_input.get("cwd", os.getcwd())
+    session_id = hook_input.get("session_id", "")
+
+    root = _find_repo_root(cwd)
+    caller_role = os.environ.get("CTO_AGENT_ROLE", "")
+
+    def block(reason: str, context: dict | None = None) -> None:
+        _emit_guardrail_block({
+            "tool_name": tool_name,
+            "reason": reason,
+            "session_id": session_id,
+            "caller_role": caller_role,
+            **(context or {}),
+        })
+        print(reason, file=sys.stderr)
+        sys.exit(2)
+
+    if tool_name in ("Edit", "Write"):
+        file_path = tool_input.get("file_path") or tool_input.get("path", "")
+        if not file_path:
+            sys.exit(0)
+
+        abs_path = (
+            str((root / file_path).resolve())
+            if not os.path.isabs(file_path)
+            else str(Path(file_path).resolve())
+        )
+
+        # Security denylist: .env, keys, paths outside repo root
+        blocked, reason = is_path_in_denylist(abs_path, repo_root=root)
+        if blocked:
+            block(f"GUARDRAIL: {reason}", {"file_path": file_path})
+
+        # File reservation: block cross-Morty writes when a role is identified
+        if caller_role:
+            for owner_role, reserved_paths in _load_all_reservations(root).items():
+                if owner_role == caller_role:
+                    continue
+                for rp in reserved_paths:
+                    if abs_path == rp or abs_path.startswith(rp + os.sep):
+                        block(
+                            f"GUARDRAIL: '{file_path}' is reserved by '{owner_role}'. "
+                            f"You are '{caller_role}'. Coordinate via reserve_files() or wait.",
+                            {"file_path": file_path, "owner_role": owner_role},
+                        )
+
+    elif tool_name == "Bash":
+        command = tool_input.get("command", "")
+        if not command:
+            sys.exit(0)
+
+        dangerous, reason = scan_bash_command(command)
+        if dangerous:
+            block(f"GUARDRAIL: {reason}", {"command": command[:200]})
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    guardrail_hook()

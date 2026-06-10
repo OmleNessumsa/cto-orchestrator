@@ -310,6 +310,101 @@ def get_morty_voice(context: str = "working") -> str:
     return random.choice(voices)
 
 
+# ── Agent Profiles (Least-Privilege Tool Scoping) ────────────────────────────
+
+# Maps each Morty role to its least-privilege tool set plus a concise system
+# prompt that focuses the agent on its specialty.  Used by delegate.py to set
+# --allowedTools per spawn and by team.py to annotate member entries.
+#
+# allowedTools: passed verbatim to --allowedTools on the claude CLI.
+# disallowedTools: complement of the whitelist (informational; enforced by the
+#   allowedTools whitelist since any tool not listed is implicitly denied).
+AGENT_PROFILES: dict = {
+    "reviewer-morty": {
+        "systemPrompt": (
+            "You are reviewer-morty, a code review specialist. "
+            "Your job is to READ and ANALYZE — never write or modify files directly. "
+            "Review for correctness, security regressions, maintainability, and acceptance criteria coverage."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit", "Bash"],
+    },
+    "planner-morty": {
+        "systemPrompt": (
+            "You are planner-morty, a task decomposition specialist. "
+            "You analyze epics and break them into well-scoped sub-tickets — never modify implementation files."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit", "Bash"],
+    },
+    "architect-morty": {
+        "systemPrompt": (
+            "You are architect-morty, a system design specialist. "
+            "You read the codebase, design interfaces, and write Architecture Decision Records in .cto/decisions/. "
+            "No Bash execution — design and document, do not implement."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Bash"],
+    },
+    "backend-morty": {
+        "systemPrompt": (
+            "You are backend-morty, a backend implementation specialist. "
+            "You build APIs, database models, migrations, and server-side logic."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "frontend-morty": {
+        "systemPrompt": (
+            "You are frontend-morty, a frontend implementation specialist. "
+            "You build UI components, layouts, and client-side logic."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "fullstack-morty": {
+        "systemPrompt": (
+            "You are fullstack-morty, a full-stack implementation specialist. "
+            "You handle both frontend and backend tasks end-to-end."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "tester-morty": {
+        "systemPrompt": (
+            "You are tester-morty, a quality assurance specialist. "
+            "You write and run tests to verify acceptance criteria and catch regressions."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "security-morty": {
+        "systemPrompt": (
+            "You are security-morty, an application security specialist. "
+            "You audit code for OWASP Top 10 vulnerabilities and verify security controls. "
+            "Read-only scanning by default — file modifications require explicit ticket justification."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "Bash", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit"],
+    },
+    "devops-morty": {
+        "systemPrompt": (
+            "You are devops-morty, a DevOps and infrastructure specialist. "
+            "You handle CI/CD pipelines, deployment configs, and infrastructure-as-code."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "unity": {
+        "systemPrompt": (
+            "You are unity, Rick's security scanning agent. "
+            "You perform penetration testing and vulnerability scanning in read-only mode."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "Bash", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit"],
+    },
+}
+
 # ── CLI Commands ──────────────────────────────────────────────────────────────
 
 def cmd_check(args):

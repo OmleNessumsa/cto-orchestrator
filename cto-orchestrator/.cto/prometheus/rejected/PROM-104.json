@@ -1,0 +1,19 @@
+{
+  "id": "PROM-104",
+  "title": "macOS HIG compliance: semantic colors, reduce-motion, Dynamic Type",
+  "category": "ui-ux",
+  "source": "Apple Human Interface Guidelines for macOS \u2014 semantic/system colors, Reduce Motion & Increase Contrast accessibility settings, Dynamic Type (knowledge through Jan 2026)",
+  "description": "A polished native macOS feel for the Rick Terminal means respecting system appearance and accessibility settings rather than hardcoding the Rick green-on-black theme. Using semantic system colors (so light/dark and Increase Contrast work), honoring Reduce Motion for the portal/animation flourishes, and supporting Dynamic Type makes the app feel native and usable for everyone while preserving the themed accent where appropriate.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "RickTerminal/"
+  ],
+  "proposed_changes": "In the SwiftUI app, replace hardcoded Color(hex:) values with semantic colors (Color.primary, .secondary, asset-catalog colors with light/dark variants) and gate the Rick accent behind an asset color that adapts to Increase Contrast. Read @Environment(\\.accessibilityReduceMotion) to disable or simplify portal/spinner animations. Use relative/Dynamic-Type-aware fonts (e.g. .body, .monospaced) instead of fixed point sizes for log text, and add a native toolbar/menu-bar-extra for sprint controls following macOS HIG.",
+  "status": "rejected",
+  "created_at": "2026-06-10T07:44:00.538021+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No files were actually modified (false success)"
+}

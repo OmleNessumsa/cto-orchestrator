@@ -1,0 +1,18 @@
+{
+  "proposal_id": "PROM-111",
+  "created_at": "2026-06-10T08:30:06.686787+00:00",
+  "files": {
+    "scripts/mcp_server.py": {
+      "snapshot_name": "scripts__mcp_server.py",
+      "original_size": 28513
+    },
+    "scripts/ticket.py": {
+      "snapshot_name": "scripts__ticket.py",
+      "original_size": 22947
+    },
+    "scripts/schemas.py": {
+      "snapshot_name": "scripts__schemas.py",
+      "original_size": 8609
+    }
+  }
+}

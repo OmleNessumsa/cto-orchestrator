@@ -1,0 +1,42 @@
+{
+  "name": "cto-orchestrator",
+  "version": "1.0.0",
+  "description": "Rick Sanchez CTO Orchestrator — ticket-based development workflow with Morty sub-agents, team collaboration, and Prometheus self-evolution.",
+  "author": "OmleNessumsa",
+  "skills": [
+    {
+      "name": "cto-orchestrator",
+      "path": "../SKILL.md"
+    }
+  ],
+  "mcpServers": {
+    "cto-orchestrator": {
+      "command": "python3",
+      "args": ["scripts/mcp_server.py"],
+      "cwd": "${pluginRoot}"
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/hooks.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/hooks.py"
+          }
+        ]
+      }
+    ]
+  },
+  "changelog": []
+}

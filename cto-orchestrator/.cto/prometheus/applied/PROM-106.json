@@ -1,0 +1,23 @@
+{
+  "id": "PROM-106",
+  "title": "Wire verify_module_integrity() into orchestrator startup for self-tamper detection",
+  "category": "security",
+  "source": "OWASP LLM Top 10 2025 \u2014 LLM03/LLM10 supply-chain & model/script integrity; SLSA provenance principles. verify_module_integrity() exists in security_utils.py but has zero callers.",
+  "description": "security_utils.py:1021 defines a complete SHA-256 module-integrity verifier, but grep shows it is never called anywhere. The self-evolving Prometheus loop rewrites its own scripts, so an injected or corrupted delegate.py/security_utils.py would execute silently. Calling the integrity check at startup turns an existing-but-dormant control into an active tamper tripwire (defense for a system that edits its own code).",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/orchestrate.py",
+    "scripts/mcp_server.py"
+  ],
+  "proposed_changes": "Call `verify_module_integrity()` once at orchestrate.py main() entry and at mcp_server.py startup. On status 'degraded' (mismatches/missing), emit a roro event + audit_log_security_event(severity='critical') and require an explicit CTO_INTEGRITY_OVERRIDE=true env var to continue (otherwise abort). After legitimate Prometheus self-edits, run `python3 security_utils.py security-check --update-manifest` to re-baseline so the manifest stays current. Add the resulting .cto/security/module-hashes.json to .gitignore-awareness so it is treated as local state.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:46:15.027426+00:00",
+  "applied_at": "2026-06-10T09:06:13.530253+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-106-20260610T090440",
+  "files_actually_changed": [
+    "scripts/orchestrate.py",
+    "scripts/mcp_server.py"
+  ]
+}

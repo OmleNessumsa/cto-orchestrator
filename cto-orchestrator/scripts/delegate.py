@@ -23,12 +23,18 @@ from rich.console import Console
 console = Console()
 err_console = Console(stderr=True)
 
+# Import agent profiles for least-privilege tool scoping
+try:
+    from persona import AGENT_PROFILES
+except ImportError:
+    AGENT_PROFILES: dict = {}
+
 # Flag set to True when security_utils is unavailable (set in except ImportError block below)
 SECURITY_DEGRADED = False
 
 # Import roro event emitter
 try:
-    from roro_events import emit, emit_progress, emit_stream_progress, get_agent_id
+    from roro_events import emit, emit_progress, emit_stream_progress, emit_morty_done, get_agent_id
 except ImportError:
     # Fallback if module not found
     def emit(*args, **kwargs):
@@ -36,6 +42,8 @@ except ImportError:
     def emit_progress(*args, **kwargs):
         pass
     def emit_stream_progress(*args, **kwargs):
+        pass
+    def emit_morty_done(*args, **kwargs):
         pass
     def get_agent_id(role, team_id=None):
         return f"cto:{role}"
@@ -159,13 +167,18 @@ except ImportError:
 # ── Cost Tracking ────────────────────────────────────────────────────────────
 
 # Rough model pricing per 1M tokens (USD) — estimates only, not billed amounts
+# cache_read: prompt-cache hit rate; cache_write_5m: cache-write premium (5-min TTL)
 _MODEL_PRICING_USD_PER_1M: dict[str, dict[str, float]] = {
-    "opus": {"input": 15.0, "output": 75.0},
-    "opus-4-7": {"input": 15.0, "output": 75.0},
-    "sonnet": {"input": 3.0, "output": 15.0},
-    "sonnet-4-6": {"input": 3.0, "output": 15.0},
-    "haiku": {"input": 0.8, "output": 4.0},
-    "claude-haiku-4-5-20251001": {"input": 0.8, "output": 4.0},
+    "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
+    "opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
+    "claude-opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
+    "claude-opus-4-8": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
+    "sonnet": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75},
+    "sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75},
+    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75},
+    "haiku": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00},
+    "claude-haiku-4-5": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00},
+    "claude-haiku-4-5-20251001": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00},
 }
 _CHARS_PER_TOKEN = 4  # rough approximation: 4 chars ≈ 1 token
 
@@ -185,28 +198,73 @@ class CostTracker:
         self.total_output_tokens: int = 0
         self.delegations: list[dict] = []
 
-    def estimate(self, prompt: str, output: str, model: str) -> dict:
+    def estimate(
+        self,
+        prompt: str,
+        output: str,
+        model: str,
+        cache_read_tokens: int = 0,
+        cache_creation_tokens: int = 0,
+    ) -> dict:
         """Return a cost breakdown dict for a single prompt/output pair."""
         input_tokens = max(1, len(prompt) // _CHARS_PER_TOKEN)
         output_tokens = max(1, len(output) // _CHARS_PER_TOKEN)
+        if model not in _MODEL_PRICING_USD_PER_1M:
+            err_console.print(f"[yellow][CostTracker] Unknown model '{model}' — falling back to sonnet pricing; ledger may be inaccurate.[/yellow]")
         pricing = _MODEL_PRICING_USD_PER_1M.get(model, _MODEL_PRICING_USD_PER_1M["sonnet"])
         input_cost = input_tokens * pricing["input"] / 1_000_000
         output_cost = output_tokens * pricing["output"] / 1_000_000
+        cache_read_cost = cache_read_tokens * pricing.get("cache_read", pricing["input"] * 0.1) / 1_000_000
+        cache_write_cost = cache_creation_tokens * pricing.get("cache_write_5m", pricing["input"] * 1.25) / 1_000_000
         return {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
+            "cache_read_input_tokens": cache_read_tokens,
+            "cache_creation_input_tokens": cache_creation_tokens,
             "input_cost_usd": round(input_cost, 6),
             "output_cost_usd": round(output_cost, 6),
-            "total_cost_usd": round(input_cost + output_cost, 6),
+            "cache_read_cost_usd": round(cache_read_cost, 6),
+            "cache_write_cost_usd": round(cache_write_cost, 6),
+            "total_cost_usd": round(input_cost + output_cost + cache_read_cost + cache_write_cost, 6),
             "model": model,
         }
 
-    def record(self, ticket_id: str, agent: str, prompt: str, output: str, model: str) -> dict:
+    def record(
+        self,
+        ticket_id: str,
+        agent: str,
+        prompt: str,
+        output: str,
+        model: str,
+        cache_read_tokens: int = 0,
+        cache_creation_tokens: int = 0,
+    ) -> dict:
         """Estimate and accumulate cost; return the breakdown."""
-        breakdown = self.estimate(prompt, output, model)
+        breakdown = self.estimate(prompt, output, model, cache_read_tokens, cache_creation_tokens)
         self.total_cost_usd += breakdown["total_cost_usd"]
         self.total_input_tokens += breakdown["input_tokens"]
         self.total_output_tokens += breakdown["output_tokens"]
+        self.delegations.append({"ticket_id": ticket_id, "agent": agent, **breakdown})
+        return breakdown
+
+    def record_actual(self, ticket_id: str, agent: str, usage: dict, total_cost_usd: float, model: str) -> dict:
+        """Record real token usage from the CLI 'result' event; accumulate cost."""
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        cache_read = usage.get("cache_read_input_tokens", 0)
+        cache_creation = usage.get("cache_creation_input_tokens", 0)
+        breakdown = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cache_read_input_tokens": cache_read,
+            "cache_creation_input_tokens": cache_creation,
+            "total_cost_usd": round(total_cost_usd, 6),
+            "model": model,
+            "source": "actual",
+        }
+        self.total_cost_usd += breakdown["total_cost_usd"]
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
         self.delegations.append({"ticket_id": ticket_id, "agent": agent, **breakdown})
         return breakdown
 
@@ -461,11 +519,29 @@ Team lead: {team['coordination']['lead']}
                 conflict_lines.append(f"  - @{role}: {', '.join(files)}")
             sections.append("**Files Reserved by Others** (DO NOT MODIFY):\n" + "\n".join(conflict_lines))
 
-    # Communication instructions — structured handoff envelope
+    # Communication instructions — MCP tool preferred, <handoff_json> as fallback
     sections.append("""
 ### Team Communication
 
-At the END of your output, emit a structured handoff block so Rick can parse it reliably:
+**Preferred**: call the `emit_handoff` MCP tool at the end of your work. It is validated and
+never lost to streaming or prose wrapping:
+
+```python
+emit_handoff(
+  messages=[
+    {"to": "@backend-morty", "content": "API schema ready at schemas/api.json", "type": "artifact"},
+    {"to": "@*", "content": "Using REST not GraphQL — see ADR-003", "type": "decision"}
+  ],
+  artifacts=[
+    {"type": "api-schema", "content": {"endpoint": "/users", "method": "GET"}},
+    {"type": "test-result", "content": {"passed": 12, "failed": 0}}
+  ],
+  status="completed"
+)
+```
+
+**Fallback** (only if the MCP tool is unavailable): emit a `<handoff_json>` block at the END
+of your output:
 
 ```
 <handoff_json>
@@ -596,10 +672,34 @@ def parse_team_agent_output(output: str) -> dict:
 def process_team_output(root: Path, team_id: str, agent_role: str, output: str):
     """Process and save team-related output.
 
+    Prefers a tool-recorded handoff written by the emit_handoff MCP tool;
+    falls back to parsing stdout for a <handoff_json> block.
     Saves messages to the team message queue, decisions and typed artifacts
     to shared context so downstream agents can consume them.
     """
-    parsed = parse_team_agent_output(output)
+    # Prefer structured data from emit_handoff MCP tool over stdout scraping
+    handoff_fp = root / ".cto" / "teams" / "handoffs" / f"{team_id}-{agent_role}.json"
+    if handoff_fp.exists():
+        try:
+            recorded = load_json(handoff_fp)
+            parsed: dict = {
+                "messages": [],
+                "decisions": [],
+                "blocked_on": recorded.get("blocked_on", []),
+                "artifacts": recorded.get("artifacts", []),
+            }
+            for msg in recorded.get("messages", []):
+                to = msg.get("to", "").lstrip("@")
+                content = msg.get("content", "")
+                msg_type = msg.get("type", "info")
+                if to and content:
+                    parsed["messages"].append({"to": to, "message": content, "type": msg_type})
+                    if msg_type == "decision":
+                        parsed["decisions"].append(content)
+        except Exception:
+            parsed = parse_team_agent_output(output)
+    else:
+        parsed = parse_team_agent_output(output)
 
     # Send messages
     if parsed["messages"]:
@@ -712,28 +812,17 @@ def smart_select_agent(ticket: dict, root: Optional[Path] = None) -> tuple:
         f'Respond with ONLY: {{"agent": "<agent-id>", "complexity": "<XS|S|M|L|XL>"}}'
     )
 
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", routing_prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        raw = result.stdout.strip()
-        match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
-        if match:
-            data = json.loads(match.group())
-            agent = data.get("agent", "").strip()
-            complexity = data.get("complexity", "").upper().strip()
-            valid_agents = {
-                "architect-morty", "frontend-morty", "backend-morty",
-                "fullstack-morty", "tester-morty", "security-morty", "devops-morty",
-            }
-            valid_complexities = {"XS", "S", "M", "L", "XL"}
-            if agent in valid_agents and complexity in valid_complexities:
-                return agent, complexity
-    except Exception:
-        pass
+    data = _call_helper_json(routing_prompt)
+    if data:
+        agent = data.get("agent", "").strip()
+        complexity = data.get("complexity", "").upper().strip()
+        valid_agents = {
+            "architect-morty", "frontend-morty", "backend-morty",
+            "fullstack-morty", "tester-morty", "security-morty", "devops-morty",
+        }
+        valid_complexities = {"XS", "S", "M", "L", "XL"}
+        if agent in valid_agents and complexity in valid_complexities:
+            return agent, complexity
 
     return fallback_agent, fallback_complexity
 
@@ -787,25 +876,15 @@ def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
         f'{{"{list(agent_caps.keys())[0]}": 7, ...}}. No other text.'
     )
 
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", scoring_prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        raw = result.stdout.strip()
-        # Extract JSON object from output
-        match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
-        if match:
-            scores = json.loads(match.group())
-            # Filter to known agents and pick highest
-            valid = {k: float(v) for k, v in scores.items() if k in agent_caps}
+    data = _call_helper_json(scoring_prompt)
+    if data:
+        try:
+            valid = {k: float(v) for k, v in data.items() if k in agent_caps}
             if valid:
                 best = max(valid, key=lambda k: valid[k])
                 return best
-    except Exception:
-        pass
+        except (TypeError, ValueError):
+            pass
 
     return _keyword_select_agent(ticket)
 
@@ -946,28 +1025,16 @@ def _extract_memory_entry(ticket_id: str, agent_role: str, output: str) -> Optio
         f'{{"ticket_id": "{ticket_id}", "patterns": ["bullet 1", "bullet 2"]}}\n\n'
         f"Agent output:\n{safe_output}"
     )
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env={k: v for k, v in os.environ.items() if k != "CLAUDECODE"},
-        )
-        raw = result.stdout.strip()
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
-            data = json.loads(match.group())
-            patterns = [p for p in data.get("patterns", []) if isinstance(p, str)]
-            if patterns:
-                return {
-                    "ticket_id": ticket_id,
-                    "agent_role": agent_role,
-                    "timestamp": now_iso(),
-                    "patterns": patterns[:3],
-                }
-    except Exception:
-        pass
+    data = _call_helper_json(prompt)
+    if data:
+        patterns = [p for p in data.get("patterns", []) if isinstance(p, str)]
+        if patterns:
+            return {
+                "ticket_id": ticket_id,
+                "agent_role": agent_role,
+                "timestamp": now_iso(),
+                "patterns": patterns[:3],
+            }
     return None
 
 
@@ -1185,7 +1252,9 @@ _EXTENDED_THINKING_ROLES = frozenset({"architect-morty", "security-morty"})
 
 _claude_effort_supported: Optional[bool] = None
 _claude_thinking_supported: Optional[bool] = None
+_claude_output_format_json_supported: Optional[bool] = None
 _last_session_id: Optional[str] = None
+_last_stream_usage: dict = {}  # populated from stream-json 'result' event
 
 # Maps versioned model aliases to the short names accepted by claude CLI 2.1.x.
 # CLI ≤2.1.x rejects aliases like "opus-4-7"; only "opus/sonnet/haiku" work.
@@ -1270,6 +1339,198 @@ def _check_claude_thinking_support() -> bool:
     except Exception:
         _claude_thinking_supported = False
     return _claude_thinking_supported
+
+
+def _check_claude_output_format_json_support() -> bool:
+    """Return True if the installed claude CLI supports --output-format json."""
+    global _claude_output_format_json_supported
+    if _claude_output_format_json_supported is not None:
+        return _claude_output_format_json_supported
+    try:
+        result = subprocess.run(
+            ["claude", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        _claude_output_format_json_supported = "--output-format" in (result.stdout + result.stderr)
+    except Exception:
+        _claude_output_format_json_supported = False
+    return _claude_output_format_json_supported
+
+
+def _call_helper_json(prompt: str, model: str = "claude-haiku-4-5-20251001", timeout: int = 30) -> Optional[dict]:
+    """Call a Haiku helper subprocess and return the parsed JSON response.
+
+    Appends a strict JSON-only instruction to the prompt. When --output-format
+    json is supported by the installed CLI, uses it and reads the 'result' field.
+    Falls back to regex extraction. Retries once on JSONDecodeError.
+    Returns the parsed dict or None on any failure.
+    """
+    json_suffix = "\n\nIMPORTANT: Respond with ONLY valid JSON — no prose, no markdown, no code fences."
+    full_prompt = prompt + json_suffix
+    resolved_model = _resolve_model_for_cli(model)
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+
+    def _run() -> str:
+        if _check_claude_output_format_json_support():
+            r = subprocess.run(
+                ["claude", "-p", "--model", resolved_model, "--output-format", "json", full_prompt],
+                capture_output=True, text=True, timeout=timeout, env=env,
+            )
+            try:
+                outer = json.loads(r.stdout.strip())
+                return outer.get("result", r.stdout.strip())
+            except json.JSONDecodeError:
+                return r.stdout.strip()
+        else:
+            r = subprocess.run(
+                ["claude", "-p", "--model", resolved_model, full_prompt],
+                capture_output=True, text=True, timeout=timeout, env=env,
+            )
+            return r.stdout.strip()
+
+    def _parse(raw: str) -> Optional[dict]:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            pass
+        m = re.search(r'\{.*\}', raw, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group())
+                if isinstance(data, dict):
+                    return data
+            except json.JSONDecodeError:
+                pass
+        return None
+
+    try:
+        raw = _run()
+        data = _parse(raw)
+        if data is not None:
+            return data
+        raw = _run()
+        return _parse(raw)
+    except Exception:
+        return None
+
+
+_FEWSHOT_SCORE_THRESHOLD = 0.15
+
+
+def _select_fewshot_examples(root: Path, agent_role: str, ticket: dict) -> list[dict]:
+    """Return up to 2 completed tickets most similar to *ticket* for few-shot use.
+
+    Scoring: Jaccard overlap of target_files (weight 0.7) + same complexity
+    bucket match (weight 0.3).  Only entries whose score exceeds
+    _FEWSHOT_SCORE_THRESHOLD are returned so cold starts stay on the static pair.
+    """
+    ticket_files = set(ticket.get("target_files") or [])
+    ticket_complexity = (ticket.get("estimated_complexity") or "M").upper()
+
+    # Collect candidate entries from sprint-state agent_outputs
+    candidates: list[tuple[float, dict]] = []
+
+    sprint_fp = root / ".cto" / "sprint-state.json"
+    if sprint_fp.exists():
+        try:
+            state = load_json(sprint_fp)
+        except Exception:
+            state = {}
+        for tid, info in state.get("agent_outputs", {}).items():
+            if info.get("status") not in ("completed", "needs_review"):
+                continue
+            prior_files = set(info.get("files") or [])
+            if ticket_files and prior_files:
+                union = ticket_files | prior_files
+                jaccard = len(ticket_files & prior_files) / len(union) if union else 0.0
+            else:
+                jaccard = 0.0
+            score = jaccard * 0.7
+            candidates.append((score, {
+                "ticket_id": tid,
+                "description": info.get("description", ""),
+                "files_changed": list(prior_files),
+                "complexity": "",
+            }))
+
+    # Also scan agent memory JSONL for richer per-role examples
+    mem_fp = _memory_file(root, agent_role)
+    if mem_fp.exists():
+        try:
+            with open(mem_fp) as f:
+                mem_lines = [json.loads(l) for l in f if l.strip()]
+        except Exception:
+            mem_lines = []
+        for entry in mem_lines:
+            tid = entry.get("ticket_id", "")
+            prior_files = set(entry.get("files_changed") or [])
+            complexity = (entry.get("complexity") or "M").upper()
+            if ticket_files and prior_files:
+                union = ticket_files | prior_files
+                jaccard = len(ticket_files & prior_files) / len(union) if union else 0.0
+            else:
+                jaccard = 0.0
+            complexity_bonus = 0.3 if complexity == ticket_complexity else 0.0
+            score = jaccard * 0.7 + complexity_bonus
+            if score > _FEWSHOT_SCORE_THRESHOLD:
+                candidates.append((score, {
+                    "ticket_id": tid,
+                    "description": entry.get("description", ""),
+                    "files_changed": list(prior_files),
+                    "complexity": complexity,
+                    "patterns": entry.get("patterns") or [],
+                }))
+
+    # Deduplicate by ticket_id, keep highest score
+    seen: dict[str, tuple[float, dict]] = {}
+    for score, info in candidates:
+        tid = info["ticket_id"]
+        if tid not in seen or score > seen[tid][0]:
+            seen[tid] = (score, info)
+
+    ranked = sorted(seen.values(), key=lambda x: x[0], reverse=True)
+    return [info for score, info in ranked[:2] if score > _FEWSHOT_SCORE_THRESHOLD]
+
+
+def _render_fewshot_examples(examples: list[dict]) -> str:
+    """Render a list of completed-ticket dicts as <example> XML blocks."""
+    blocks = []
+    for ex in examples:
+        tid = ex.get("ticket_id", "?")
+        desc = ex.get("description") or "(no description)"
+        files = ex.get("files_changed") or []
+        patterns = ex.get("patterns") or []
+        files_str = ", ".join(f'"{f}"' for f in files) if files else '[]'
+        pattern_note = ""
+        if patterns:
+            pattern_note = "\n  Note: " + "; ".join(patterns[:3])
+        block = (
+            f"<example>\n"
+            f"ANALYZE: Ticket {tid} — {desc[:120]}{pattern_note}\n"
+            f"PLAN:\n"
+            f"- Identify affected files and their current state\n"
+            f"- Apply targeted changes within scope\n"
+            f"VERIFY: Acceptance criteria matched against implementation.\n"
+            f"EXECUTE: Applied changes to affected files.\n"
+            f"\n"
+            f"<result_json>\n"
+            f"{{\n"
+            f'  "status": "completed",\n'
+            f'  "files_changed": [{files_str}],\n'
+            f'  "description": "{desc[:150].replace(chr(34), chr(39))}",\n'
+            f'  "open_questions": null,\n'
+            f'  "confidence": "high",\n'
+            f'  "next_steps": []\n'
+            f"}}\n"
+            f"</result_json>\n"
+            f"</example>"
+        )
+        blocks.append(block)
+    return "\n".join(blocks)
 
 
 def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None, task_budget: Optional[int] = None) -> str:
@@ -1399,10 +1660,12 @@ You have MCP tools to pull context on-demand — use them instead of guessing:
 - **update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.
 {team_delegation_note}{contract_note}"""
 
-    # Inject sprint context for downstream agents (PROM-008)
+    # Inject sprint context for downstream agents (PROM-008).
+    # Sprint context embeds previous agent output descriptions that may have processed
+    # repo files — route through wrap_untrusted_content to spotlight indirect injection.
     sprint_ctx = _load_sprint_context(root)
     if sprint_ctx:
-        prompt += f"\n{sprint_ctx}\n"
+        prompt += f"\n{wrap_untrusted_content(sprint_ctx, label='REPO_CONTENT')}\n"
 
     # Inject per-role agent memory (accumulated lessons from past tickets)
     memory_entries = _load_agent_memory(root, agent_role)
@@ -1442,11 +1705,30 @@ If extended thinking is not available, follow this fallback sequence:
 2. **PLAN** — Outline your approach in 3-5 bullet points. List the files you'll create or modify and the interfaces you'll use.
 3. **VERIFY** — Check your plan against the acceptance criteria. Does it cover every requirement? Are there edge cases?
 4. **EXECUTE** — Implement the plan. Test as you go. If something doesn't work, loop back to ANALYZE with new information.
+5. **SELF_CRITIQUE** — Before reporting status, enumerate each acceptance criterion with a pass/fail/unknown verdict and one line of evidence (file:line or test name). Set status='needs_review' if any criterion is fail or unknown.
 
 Show a brief summary of your approach before diving into implementation — Rick respects agents who think before they code.
 </reasoning_protocol>
 
-<examples>
+<self_critique>
+After EXECUTE and before emitting the JSON report, perform a structured self-check:
+- For each acceptance criterion listed in the ticket, produce one entry with:
+  - "criterion": the criterion text (verbatim or paraphrased)
+  - "verdict": "pass", "fail", or "unknown"
+  - "evidence": a single pointer (file:line number, test name, or "no evidence found")
+- If ANY verdict is "fail" or "unknown", you MUST set status="needs_review" in the JSON report.
+- Include the full list as "criteria_check" in the JSON output.
+- Do NOT mark status="completed" unless every criterion has verdict="pass" with concrete evidence.
+</self_critique>
+
+"""
+
+    # Select few-shot examples: prefer similar completed tickets, fall back to static pair
+    dynamic_examples = _select_fewshot_examples(root, agent_role, ticket)
+    if dynamic_examples:
+        prompt += "<examples>\n" + _render_fewshot_examples(dynamic_examples) + "\n</examples>\n"
+    else:
+        prompt += """<examples>
 <example>
 ANALYZE: Ticket asks to add a `created_at` timestamp field to the User model. The model lives in `models/user.py` and the DB migration folder is `migrations/`.
 PLAN:
@@ -1456,7 +1738,7 @@ PLAN:
 VERIFY: Acceptance criteria require the field to be non-nullable with a server default — covered.
 EXECUTE: Applied changes to model and generated migration file.
 
-```json
+<result_json>
 {
   "status": "completed",
   "files_changed": ["models/user.py", "migrations/versions/0042_add_user_created_at.py"],
@@ -1465,7 +1747,7 @@ EXECUTE: Applied changes to model and generated migration file.
   "confidence": "high",
   "next_steps": []
 }
-```
+</result_json>
 </example>
 <example>
 ANALYZE: Ticket asks to extract a `format_currency` helper from three duplicated call sites in `utils/billing.py`, `utils/invoice.py`, and `api/checkout.py`.
@@ -1475,7 +1757,7 @@ PLAN:
 VERIFY: All three sites use the same rounding logic — safe to unify.
 EXECUTE: Created helper module and updated all three call sites.
 
-```json
+<result_json>
 {
   "status": "completed",
   "files_changed": ["utils/formatting.py", "utils/billing.py", "utils/invoice.py", "api/checkout.py"],
@@ -1484,10 +1766,12 @@ EXECUTE: Created helper module and updated all three call sites.
   "confidence": "high",
   "next_steps": []
 }
-```
+</result_json>
 </example>
 </examples>
+"""
 
+    prompt += """
 <execution_rules>
 - Execute ALL tasks directly. Do NOT ask for permission or confirmation — Rick hates that.
 - Create and modify files as needed. Do NOT just describe what should be done — that's Jerry behavior.
@@ -1509,20 +1793,24 @@ EXECUTE: Created helper module and updated all three call sites.
 </common_mistakes>
 
 <output_format>
-End your work with a JSON report block in EXACTLY this format — no other summary format needed:
+End your work with a JSON report inside EXACTLY these XML tags — no other summary format needed:
 
-```json
+<result_json>
 {
   "status": "completed|needs_review|blocked",
   "files_changed": ["path/to/file1.py", "path/to/file2.py"],
   "description": "What you did in 1-3 sentences",
   "open_questions": "Any questions for Rick, or null",
   "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
+  "next_steps": ["optional follow-up actions, or empty array"],
+  "criteria_check": [
+    {"criterion": "acceptance criterion text", "verdict": "pass|fail|unknown", "evidence": "file:line or test name"}
+  ]
 }
-```
+</result_json>
 
 IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
+The `criteria_check` array is REQUIRED when acceptance criteria are present — include one entry per criterion.
 As a backup, also emit a `## Files changed` markdown block listing every file you touched:
 
 ## Files changed
@@ -1538,6 +1826,51 @@ Begin:
     return prompt
 
 
+def _reformat_retry_haiku(output: str) -> Optional[dict]:
+    """Ask Haiku to reformat malformed agent output into valid <result_json>.
+
+    Single retry only. Returns the parsed dict on success, None on any failure.
+    """
+    safe_tail = (output or "")[-3000:]
+    prompt = (
+        "The following is the output from a coding agent that failed to produce "
+        "valid structured JSON. Extract the key information and re-emit it as valid "
+        "JSON inside <result_json>...</result_json> tags.\n\n"
+        "Required fields: status (completed|needs_review|blocked), files_changed (array of strings), "
+        "description (string), open_questions (string or null), confidence (high|medium|low), "
+        "next_steps (array).\n\n"
+        "If you cannot determine the status, use needs_review. "
+        "Emit ONLY the <result_json> block — no other text.\n\n"
+        f"Agent output:\n{safe_tail}"
+    )
+    try:
+        result = subprocess.run(
+            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", prompt],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={k: v for k, v in os.environ.items() if k != "CLAUDECODE"},
+        )
+        raw = result.stdout.strip()
+        match = re.search(r"<result_json>\s*(.*?)\s*</result_json>", raw, re.DOTALL)
+        if match:
+            data = json.loads(match.group(1))
+            if isinstance(data, dict) and "status" in data:
+                audit_log_security_event(
+                    "reformat_retry_success",
+                    "Reformat-retry Haiku call recovered malformed agent output",
+                    severity="info",
+                )
+                return data
+    except Exception as exc:
+        audit_log_security_event(
+            "reformat_retry_error",
+            f"Reformat-retry Haiku call failed: {exc}",
+            severity="info",
+        )
+    return None
+
+
 def _parse_handoff_from_output(output: str):
     """Try to extract a Handoff from agent output. Returns Handoff or None."""
     try:
@@ -1548,7 +1881,15 @@ def _parse_handoff_from_output(output: str):
 
 
 def _extract_json_from_output(output: str) -> Optional[dict]:
-    """Extract the last JSON object from a ```json fenced code block."""
+    """Extract JSON from <result_json> XML tags or ```json fenced code blocks."""
+    # Try XML-tagged form first (unambiguous delimiter)
+    xml_matches = list(re.finditer(r'<result_json>\s*(.*?)\s*</result_json>', output, re.DOTALL))
+    for m in reversed(xml_matches):
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            continue
+    # Fall back to fenced JSON blocks
     matches = list(re.finditer(r'```json\s*\n(.*?)\n```', output, re.DOTALL))
     for m in reversed(matches):
         try:
@@ -1591,7 +1932,24 @@ def parse_agent_output(output: str) -> dict:
             "confidence": json_data.get("confidence", "high"),
             "next_steps": json_data.get("next_steps", []),
         }
-        return sanitize_agent_output(result)
+        # ── Self-critique gate: downgrade over-confident 'completed' ──
+        criteria_check = [
+            c for c in json_data.get("criteria_check", [])
+            if isinstance(c, dict)
+        ]
+        if result["status"] == "completed" and criteria_check:
+            failed = [c for c in criteria_check if str(c.get("verdict", "unknown")).lower() != "pass"]
+            if failed:
+                result["status"] = "needs_review"
+                audit_log_security_event(
+                    "criteria_check_downgrade",
+                    f"Status downgraded completed→needs_review: {len(failed)} criterion(s) not passing — "
+                    + str([c.get("criterion", "?")[:60] for c in failed]),
+                    severity="warning",
+                )
+        sanitized = sanitize_agent_output(result)
+        sanitized["criteria_check"] = criteria_check
+        return sanitized
 
     # ── Try schemas module (PROM-009) ──
     try:
@@ -1616,9 +1974,35 @@ def parse_agent_output(output: str) -> dict:
                 }
             parsed.setdefault("confidence", "high")
             parsed.setdefault("next_steps", [])
-            return sanitize_agent_output(parsed)
+            # ── Self-critique gate (schemas path) ──
+            criteria_check = [c for c in parsed.get("criteria_check", []) if isinstance(c, dict)]
+            if parsed.get("status") == "completed" and criteria_check:
+                failed = [c for c in criteria_check if str(c.get("verdict", "unknown")).lower() != "pass"]
+                if failed:
+                    parsed["status"] = "needs_review"
+                    audit_log_security_event(
+                        "criteria_check_downgrade",
+                        f"Status downgraded completed→needs_review: {len(failed)} criterion(s) not passing — "
+                        + str([c.get("criterion", "?")[:60] for c in failed]),
+                        severity="warning",
+                    )
+            sanitized = sanitize_agent_output(parsed)
+            sanitized["criteria_check"] = criteria_check
+            return sanitized
     except ImportError:
         pass
+
+    # ── Reformat-retry: ask Haiku to re-emit valid <result_json> ──
+    reformat_result = _reformat_retry_haiku(output)
+    if reformat_result is not None:
+        is_valid, schema_errors = validate_agent_output_schema(reformat_result, "delegate")
+        if is_valid:
+            reformat_result.setdefault("confidence", "low")
+            reformat_result.setdefault("next_steps", [])
+            criteria_check = [c for c in reformat_result.get("criteria_check", []) if isinstance(c, dict)]
+            sanitized = sanitize_agent_output(reformat_result)
+            sanitized["criteria_check"] = criteria_check
+            return sanitized
 
     # ── No structured JSON found — return safe default ──
     # Regex fallback parsing removed (OWASP LLM09): unstructured content must not
@@ -1660,29 +2044,18 @@ def reflect_on_output(output: str, criteria: list, ticket_id: str = "") -> dict:
         f"Agent output (last 4000 chars):\n{safe_output}"
     )
 
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", prompt],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            env={k: v for k, v in os.environ.items() if k != "CLAUDECODE"},
-        )
-        raw = result.stdout.strip()
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
-            data = json.loads(match.group())
-            return {
-                "criteria_met": data.get("criteria_met", []),
-                "criteria_missed": data.get("criteria_missed", []),
-                "pass": bool(data.get("pass", True)),
-            }
-    except Exception as exc:
-        audit_log_security_event(
-            "reflection_error",
-            f"Reflection pass failed for {ticket_id}: {exc}",
-            severity="info",
-        )
+    data = _call_helper_json(prompt, timeout=60)
+    if data:
+        return {
+            "criteria_met": data.get("criteria_met", []),
+            "criteria_missed": data.get("criteria_missed", []),
+            "pass": bool(data.get("pass", True)),
+        }
+    audit_log_security_event(
+        "reflection_error",
+        f"Reflection pass failed for {ticket_id}: helper returned no JSON",
+        severity="info",
+    )
 
     # Default to pass to avoid blocking the pipeline when reflection itself fails
     return {"criteria_met": criteria, "criteria_missed": [], "pass": True}
@@ -1769,8 +2142,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     Raises:
         RuntimeError: If agent fails or times out
     """
-    global _last_session_id
+    global _last_session_id, _last_stream_usage
     _last_session_id = None
+    _last_stream_usage = {}
 
     # Sanitize the prompt to prevent prompt injection
     safe_prompt = sanitize_prompt_content(prompt)
@@ -1800,7 +2174,10 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.append("--dangerously-skip-permissions")
     else:
         cmd.extend(["--permission-mode", "acceptEdits"])
-        allowed = ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
+        # Prefer AGENT_PROFILES (persona.py) as the authoritative tool scope;
+        # fall back to ROLE_TOOL_ALLOWLISTS (security_utils) then the global default.
+        _profile = AGENT_PROFILES.get(agent_role, {})
+        allowed = _profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
         cmd.extend(["--allowedTools", ",".join(allowed)])
 
     # Attach MCP server so agents can query/update CTO state during execution
@@ -1819,10 +2196,10 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
 
     if model:
         cmd.extend(["--model", _resolve_model_for_cli(model)])
-    # Enable extended thinking for reasoning-heavy Opus agents (architect-morty, security-morty).
-    # Uses --thinking flag if supported by the installed CLI; silently skips if not.
+    # Enable extended thinking when the caller has allocated a budget for it.
+    # Budget is set for: architect/security roles (M+) or any role on L/XL tickets.
+    # Requires Opus model and CLI --thinking support.
     if (thinking_budget is not None
-            and agent_role in _EXTENDED_THINKING_ROLES
             and model and "opus" in model.lower()
             and _check_claude_thinking_support()):
         cmd.append("--thinking")
@@ -1832,8 +2209,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         else:
             safe_prompt = f"## EFFORT LEVEL: {effort} — reason accordingly.\n\n{safe_prompt}"
     if stream:
-        # Recent Claude CLI requires --verbose alongside stream-json under --print.
-        cmd.extend(["--output-format", "stream-json", "--verbose"])
+        cmd.extend(["--output-format", "stream-json", "--verbose", "--include-partial-messages"])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
@@ -1910,15 +2286,51 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                                                 )
                                             except Exception:
                                                 pass
+                        elif etype == "content_block_delta":
+                            delta = event.get("delta", {})
+                            if delta.get("type") == "text_delta":
+                                text = delta.get("text", "")
+                                if text:
+                                    output_chunks.append(text)
+                                    phase = _detect_phase(text)
+                                    if phase:
+                                        current_step = phase
+                                        detected = phase
+                                    try:
+                                        emit_stream_progress(
+                                            "morty.token",
+                                            {"text": text[:100]},
+                                            role=agent_role,
+                                            team_id=team_id,
+                                        )
+                                    except Exception:
+                                        pass
                         elif etype == "result":
                             result_text = event.get("result", "")
                             if result_text:
                                 stream_result = result_text
                             if event.get("is_error") and result_text:
                                 stream_errors.append(result_text)
+                            _usage = event.get("usage", {})
+                            _cli_cost = event.get("total_cost_usd")
+                            if _usage or _cli_cost is not None:
+                                _last_stream_usage = {
+                                    "usage": _usage,
+                                    "total_cost_usd": _cli_cost or 0.0,
+                                }
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
+                            try:
+                                emit_morty_done(
+                                    total_cost_usd=event.get("total_cost_usd"),
+                                    duration_ms=event.get("duration_ms"),
+                                    num_turns=event.get("num_turns"),
+                                    role=agent_role,
+                                    team_id=team_id,
+                                )
+                            except Exception:
+                                pass
                         elif etype == "error":
                             err_obj = event.get("error", {})
                             if isinstance(err_obj, dict):
@@ -1977,8 +2389,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                 )
             raise RuntimeError(f"Agent process exited with code {proc.returncode}: {stderr}")
         full_output = stream_result if (stream and stream_result is not None) else "".join(output_chunks)
-        # Extract and audit-log thinking blocks from extended thinking agents
-        if agent_role in _EXTENDED_THINKING_ROLES:
+        # Extract and audit-log thinking blocks from any agent that ran with thinking enabled
+        if thinking_budget is not None:
             thinking_blocks = re.findall(r'<thinking>(.*?)</thinking>', full_output, re.DOTALL)
             if thinking_blocks:
                 total_chars = sum(len(b) for b in thinking_blocks)
@@ -2113,13 +2525,20 @@ def cmd_delegate(args):
         "files_changed": [],
     })
 
-    # Emit cto.morty.delegation.started event
+    # Emit cto.morty.delegation.started event (includes effective tool scope for audit)
+    _emit_profile = AGENT_PROFILES.get(agent, {})
+    _emit_allowed = _emit_profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent, _DEFAULT_TOOL_ALLOWLIST)
+    _emit_disallowed = _emit_profile.get("disallowedTools", [])
     emit("cto.morty.delegation.started", {
         "ticket_id": ticket["id"],
         "title": ticket.get("title"),
         "agent": agent,
         "model": model,
         "team_id": team_id,
+        "tool_scope": {
+            "allowed": _emit_allowed,
+            "disallowed": _emit_disallowed,
+        },
     }, role=agent, team_id=team_id)
 
     # Update team member status if in a team
@@ -2136,17 +2555,20 @@ def cmd_delegate(args):
                 team["started_at"] = now_iso()
             save_json(team_fp, team)
 
-    # Determine thinking budget based on ticket complexity and agent role
+    # Determine thinking budget based on ticket complexity and agent role.
+    # Architect/security roles think at M+; L/XL enable thinking for any role.
     thinking_budget = None
-    if agent in ("architect-morty", "security-morty") or complexity in ("XL", "L"):
+    if complexity == "XL":
         thinking_budget = 10000
-    elif complexity == "M":
-        thinking_budget = 5000
+    elif complexity == "L":
+        thinking_budget = 6000
+    elif complexity == "M" and agent in _EXTENDED_THINKING_ROLES:
+        thinking_budget = 3000
 
     # Execute
     run_hooks("pre_delegate", ticket, agent, root=root)
     try:
-        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, session_id=resume_session_id)
+        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id)
     except RuntimeError as e:
         error_msg = str(e)
         run_hooks("on_failure", ticket, agent, root=root)
@@ -2270,18 +2692,31 @@ def cmd_delegate(args):
             parsed["files_changed"] = git_files
             console.print(f"[dim]files_changed auto-collected from git ({len(git_files)} file(s))[/dim]")
 
-    # Estimate and emit cost for this delegation
+    # Record and emit cost for this delegation
     _cost_tracker = CostTracker()
-    cost_breakdown = _cost_tracker.record(ticket["id"], agent, prompt, output, model)
+    if _last_stream_usage:
+        cost_breakdown = _cost_tracker.record_actual(
+            ticket["id"], agent,
+            _last_stream_usage.get("usage", {}),
+            _last_stream_usage.get("total_cost_usd", 0.0),
+            model,
+        )
+    else:
+        cost_breakdown = _cost_tracker.record(ticket["id"], agent, prompt, output, model)
     emit("cto.cost.delegation", {
         "ticket_id": ticket["id"],
         "agent": agent,
         "model": model,
         **cost_breakdown,
     }, role=agent, team_id=team_id)
+    cache_read = cost_breakdown.get("cache_read_input_tokens", 0)
+    cached_marker = " [dim cyan](cached)[/dim cyan]" if cache_read > 0 else ""
+    cost_label = "Actual cost" if cost_breakdown.get("source") == "actual" else "Estimated cost"
+    cache_info = f" / {cache_read:,} cache_read" if cache_read > 0 else ""
     console.print(
-        f"[dim]Estimated cost: ${cost_breakdown['total_cost_usd']:.4f} "
-        f"({cost_breakdown['input_tokens']:,} in / {cost_breakdown['output_tokens']:,} out tokens)[/dim]"
+        f"[dim]{cost_label}: ${cost_breakdown['total_cost_usd']:.4f} "
+        f"({cost_breakdown['input_tokens']:,} in / {cost_breakdown['output_tokens']:,} out{cache_info} tokens)[/dim]"
+        f"{cached_marker}"
     )
 
     # Reflection pass — check output against acceptance criteria (optional, skip with --no-reflect)
@@ -2490,6 +2925,8 @@ def build_parser():
                         "Use after a timeout; the agent continues from where it left off.")
     p.add_argument("--smart-routing", action="store_true",
                    help="Use Haiku-powered smart routing for agent selection instead of keyword matching.")
+    p.add_argument("--no-stream", action="store_true",
+                   help="Disable stream-json mode (blocking buffered output). Use for sleepy/batch runs.")
     return p
 
 

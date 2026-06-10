@@ -27,6 +27,12 @@ except ImportError:
     def emit(*args, **kwargs):
         pass
 
+# Import agent profiles for least-privilege tool scoping
+try:
+    from persona import AGENT_PROFILES
+except ImportError:
+    AGENT_PROFILES: dict = {}
+
 # Import security utilities
 try:
     from security_utils import sanitize_team_id, sanitize_ticket_id, sanitize_text_input
@@ -178,19 +184,25 @@ def create_team_session(
     roles = custom_roles if custom_roles else template["roles"]
     coordination = template["coordination"] if template else {"mode": "parallel", "lead": roles[0]["role"]}
 
-    # Create member entries with pending status
+    # Create member entries with pending status and least-privilege tool scope
     members = []
     for i, role_def in enumerate(roles):
         # Generate sub-assignment ID
         assignment_suffix = chr(65 + i)  # A, B, C, ...
+        role_name = role_def["role"]
+        profile = AGENT_PROFILES.get(role_name, {})
         members.append({
-            "role": role_def["role"],
+            "role": role_name,
             "focus": role_def.get("focus", ""),
             "assignment": f"{parent_ticket}-{assignment_suffix}",
             "status": "pending",
             "started_at": None,
             "completed_at": None,
             "output_summary": None,
+            "tool_scope": {
+                "allowedTools": profile.get("allowedTools", []),
+                "disallowedTools": profile.get("disallowedTools", []),
+            },
         })
 
     team = {
@@ -577,6 +589,40 @@ def get_reserved_files(root: Path, team_id: str) -> dict[str, list[str]]:
     """Get all file reservations for a team."""
     team = load_team(root, team_id)
     return team.get("files_reserved", {})
+
+
+def aggregate_results(results: list[dict]) -> dict:
+    """Aggregate parallel fan-out results into a structured team rollup.
+
+    Args:
+        results: List of per-worker result dicts with keys:
+                 worker/ticket, status, files_changed, conflict, error.
+
+    Returns:
+        Structured summary with per_ticket status, files_changed, conflicts,
+        and aggregate counts for the team report.
+    """
+    per_ticket = []
+    all_files: list[str] = []
+    conflicts: list[str] = []
+
+    for r in results:
+        ticket = r.get("ticket") or r.get("worker", "unknown")
+        status = r.get("status", "unknown")
+        per_ticket.append({"ticket": ticket, "status": status, "error": r.get("error")})
+        all_files.extend(r.get("files_changed", []))
+        if r.get("conflict"):
+            conflicts.append(r["conflict"])
+
+    return {
+        "per_ticket": per_ticket,
+        "files_changed": sorted(set(all_files)),
+        "conflicts": conflicts,
+        "total": len(results),
+        "completed": sum(1 for r in results if r.get("status") == "completed"),
+        "failed": sum(1 for r in results if r.get("status") == "failed"),
+        "queued": sum(1 for r in results if r.get("status") == "queued"),
+    }
 
 
 # ── CLI Commands ─────────────────────────────────────────────────────────────

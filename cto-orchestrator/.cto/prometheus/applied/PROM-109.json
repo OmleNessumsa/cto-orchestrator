@@ -1,0 +1,23 @@
+{
+  "id": "PROM-109",
+  "title": "Add a pinned, hash-locked dependency manifest plus pip-audit supply-chain gate",
+  "category": "security",
+  "source": "OWASP LLM Top 10 2025 \u2014 LLM03 Supply Chain Vulnerabilities; PyPA pip-audit / OSV; SLSA hashed-requirements guidance.",
+  "description": "The project has no requirements file, lockfile, or pyproject.toml, yet imports third-party packages (mcp SDK, jsonschema). Dependencies are resolved implicitly from the ambient environment with no version pinning, hash verification, or vulnerability scanning \u2014 leaving the orchestrator open to dependency-confusion and known-CVE pulls, the core LLM03 risk for a system that shells out to `claude` and an MCP server.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 4,
+  "target_files": [
+    "requirements.lock",
+    "scripts/security_utils.py"
+  ],
+  "proposed_changes": "Generate a pinned `requirements.lock` via `pip-compile --generate-hashes` (or `uv pip compile`) capturing mcp, jsonschema, and transitive deps with SHA-256 hashes; document `pip install --require-hashes -r requirements.lock` as the install path. Add a `supply-chain-check` subcommand to security_utils.py that runs `pip-audit -r requirements.lock` and surfaces CVEs via audit_log_security_event(). Optionally invoke it from the Prometheus scan cycle so a known-vulnerable dependency is flagged as a finding rather than silently shipped.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:46:15.034132+00:00",
+  "applied_at": "2026-06-10T09:16:11.881101+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-109-20260610T091259",
+  "files_actually_changed": [
+    "requirements.lock",
+    "scripts/security_utils.py"
+  ]
+}

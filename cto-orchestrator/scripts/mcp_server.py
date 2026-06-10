@@ -14,6 +14,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -21,6 +22,38 @@ except ImportError:
     print("Error: mcp package not installed. Run: pip install mcp", file=sys.stderr)
     sys.exit(1)
 
+try:
+    from security_utils import (
+        sanitize_ticket_id,
+        sanitize_path_component,
+        audit_log_security_event,
+        verify_module_integrity,
+        ROLE_TOOL_ALLOWLISTS,
+        SAFE_ID_PATTERN,
+    )
+    _AGENT_ROLES: set = set(ROLE_TOOL_ALLOWLISTS.keys())
+    _SECURITY_AVAILABLE = True
+except ImportError:
+    print("[SECURITY-WARNING] security_utils not found — MCP input validation degraded", file=sys.stderr)
+    _SECURITY_AVAILABLE = False
+    _AGENT_ROLES: set = set()
+    def sanitize_ticket_id(tid): return tid  # type: ignore[misc]
+    def sanitize_path_component(c): return c  # type: ignore[misc]
+    def audit_log_security_event(*a, **kw): pass  # type: ignore[misc]
+    def verify_module_integrity(**kwargs):  # type: ignore[misc]
+        return {"status": "degraded", "mismatches": [], "missing": [], "hashes": {}}
+
+
+def _plugin_version() -> str:
+    """Read semver from .claude-plugin/plugin.json, falling back to 'unknown'."""
+    plugin_json = Path(__file__).parent.parent / ".claude-plugin" / "plugin.json"
+    try:
+        return json.loads(plugin_json.read_text())["version"]
+    except Exception:
+        return "unknown"
+
+
+PLUGIN_VERSION = _plugin_version()
 
 mcp = FastMCP("cto-orchestrator")
 
@@ -425,21 +458,31 @@ def _load_config() -> dict:
 # -------------------- Ticket management --------------------
 
 @mcp.tool()
-def list_tickets(status: str = "", agent: str = "", limit: int = 50) -> str:
+def list_tickets(
+    status: str = "",
+    agent: str = "",
+    limit: int = 50,
+    offset: int = 0,
+    response_format: Literal["concise", "detailed"] = "concise",
+) -> str:
     """List tickets in the current project, optionally filtered.
 
     Args:
         status: Filter by status (todo, in_progress, needs_review, blocked, completed). Empty = all.
         agent: Filter by assigned agent (e.g. backend-morty). Empty = all.
-        limit: Max tickets to return (default 50).
+        limit: Max tickets to return per page (default 50).
+        offset: Number of matching tickets to skip for pagination (default 0).
+        response_format: 'concise' returns id/title/status/assignee only (default);
+                         'detailed' returns all fields including priority, type, complexity, dependencies.
 
     Returns:
-        JSON array of ticket summaries (id, title, status, agent, priority, type).
+        JSON object with count, total, offset, and tickets array.
     """
     td = _tickets_dir()
     if not td.exists():
-        return json.dumps({"tickets": [], "note": "No tickets directory yet. Run init_project.sh."})
-    rows = []
+        return json.dumps({"tickets": [], "total": 0, "count": 0, "offset": offset,
+                           "note": "No tickets directory yet. Run init_project.sh."})
+    all_rows = []
     for fp in sorted(td.glob("*.json")):
         try:
             t = _load_json(fp)
@@ -449,31 +492,50 @@ def list_tickets(status: str = "", agent: str = "", limit: int = 50) -> str:
             continue
         if agent and t.get("agent") != agent:
             continue
-        rows.append({
-            "id": t.get("id"),
-            "title": t.get("title"),
-            "status": t.get("status"),
-            "agent": t.get("agent"),
-            "priority": t.get("priority"),
-            "type": t.get("type"),
-            "complexity": t.get("complexity"),
-            "dependencies": t.get("dependencies") or [],
-        })
-        if len(rows) >= limit:
-            break
-    return json.dumps({"count": len(rows), "tickets": rows}, indent=2)
+        all_rows.append(t)
+
+    total = len(all_rows)
+    page = all_rows[offset:offset + limit]
+
+    detailed = response_format == "detailed"
+    rows = []
+    for t in page:
+        if detailed:
+            rows.append({
+                "id": t.get("id"),
+                "title": t.get("title"),
+                "status": t.get("status"),
+                "assignee": t.get("agent"),
+                "priority": t.get("priority"),
+                "type": t.get("type"),
+                "complexity": t.get("complexity"),
+                "dependencies": t.get("dependencies") or [],
+            })
+        else:
+            rows.append({
+                "id": t.get("id"),
+                "title": t.get("title"),
+                "status": t.get("status"),
+                "assignee": t.get("agent"),
+            })
+    return json.dumps({"count": len(rows), "total": total, "offset": offset, "tickets": rows}, indent=2)
 
 
 @mcp.tool()
-def board() -> str:
+def board(response_format: Literal["concise", "detailed"] = "concise") -> str:
     """Kanban board view — tickets grouped by status.
 
+    Args:
+        response_format: 'concise' returns totals + ticket IDs per column only (default);
+                         'detailed' returns totals + full card objects {id, title, agent, priority}.
+
     Returns:
-        JSON with columns {todo, in_progress, needs_review, blocked, completed},
-        each holding an array of {id, title, agent, priority}.
+        JSON with totals and either ids (concise) or columns with card objects (detailed).
     """
     td = _tickets_dir()
-    columns = {"todo": [], "in_progress": [], "needs_review": [], "blocked": [], "completed": []}
+    col_names = ("todo", "in_progress", "needs_review", "blocked", "completed")
+    columns: dict = {c: [] for c in col_names}
+    ids: dict = {c: [] for c in col_names}
     if td.exists():
         for fp in sorted(td.glob("*.json")):
             try:
@@ -482,6 +544,7 @@ def board() -> str:
                 continue
             col = t.get("status", "todo")
             if col in columns:
+                ids[col].append(t.get("id"))
                 columns[col].append({
                     "id": t.get("id"),
                     "title": t.get("title"),
@@ -489,7 +552,9 @@ def board() -> str:
                     "priority": t.get("priority"),
                 })
     totals = {k: len(v) for k, v in columns.items()}
-    return json.dumps({"totals": totals, "columns": columns}, indent=2)
+    if response_format == "detailed":
+        return json.dumps({"totals": totals, "columns": columns}, indent=2)
+    return json.dumps({"totals": totals, "ids": ids}, indent=2)
 
 
 @mcp.tool()
@@ -580,12 +645,15 @@ def close_ticket(ticket_id: str, output: str = "") -> str:
 
 
 @mcp.tool()
-def project_status() -> str:
+def project_status(response_format: Literal["concise", "detailed"] = "concise") -> str:
     """Overall project dashboard — config, ticket counts by status, sprint.
 
+    Args:
+        response_format: 'concise' returns project_name, ticket_prefix, and ticket_counts only (default);
+                         'detailed' adds current_sprint, default_model, next_ticket_number, last_activity.
+
     Returns:
-        JSON snapshot of project_name, prefix, current_sprint, default_model,
-        ticket counts per column, and last activity timestamp.
+        JSON snapshot of project state at the requested detail level.
     """
     cfg = _load_config()
     td = _tickets_dir()
@@ -603,14 +671,20 @@ def project_status() -> str:
             upd = t.get("updated_at")
             if upd and (last_updated is None or upd > last_updated):
                 last_updated = upd
+    if response_format == "detailed":
+        return json.dumps({
+            "project_name": cfg.get("project_name"),
+            "ticket_prefix": cfg.get("ticket_prefix"),
+            "current_sprint": cfg.get("current_sprint"),
+            "default_model": cfg.get("default_model"),
+            "next_ticket_number": cfg.get("next_ticket_number"),
+            "ticket_counts": counts,
+            "last_activity": last_updated,
+        }, indent=2)
     return json.dumps({
         "project_name": cfg.get("project_name"),
         "ticket_prefix": cfg.get("ticket_prefix"),
-        "current_sprint": cfg.get("current_sprint"),
-        "default_model": cfg.get("default_model"),
-        "next_ticket_number": cfg.get("next_ticket_number"),
         "ticket_counts": counts,
-        "last_activity": last_updated,
     }, indent=2)
 
 
@@ -762,11 +836,28 @@ def delegate(ticket_id: str, agent: str, model: str = "", detached: bool = True)
     """
     if not ticket_id or not agent:
         return json.dumps({"error": "ticket_id and agent required"})
+    try:
+        ticket_id = sanitize_ticket_id(ticket_id)
+    except ValueError as exc:
+        audit_log_security_event(
+            "invalid_ticket_id",
+            f"delegate() rejected ticket_id={ticket_id!r}: {exc}",
+            severity="warning",
+        )
+        return json.dumps({"error": f"invalid ticket_id: {exc}"})
+    if _AGENT_ROLES and agent not in _AGENT_ROLES:
+        audit_log_security_event(
+            "invalid_agent_role",
+            f"delegate() rejected agent={agent!r}: not in allowlist {sorted(_AGENT_ROLES)}",
+            severity="warning",
+        )
+        return json.dumps({"error": f"invalid agent: {agent!r} — must be one of {sorted(_AGENT_ROLES)}"})
+    safe_ticket = sanitize_path_component(ticket_id)
     args = [ticket_id, "--agent", agent]
     if model:
         args.extend(["--model", model])
     if detached:
-        return json.dumps(_spawn_detached("delegate.py", args, f"delegate-{ticket_id}-{_now_iso().replace(':', '-')}.log"))
+        return json.dumps(_spawn_detached("delegate.py", args, f"delegate-{safe_ticket}-{_now_iso().replace(':', '-')}.log"))
     return json.dumps(_run_script("delegate.py", args, timeout=600))
 
 
@@ -875,5 +966,131 @@ def explain_concept(topic: str, level: int = 3, lang: str = "nl") -> str:
     ))
 
 
+@mcp.tool()
+def emit_handoff(
+    messages: list[dict] | None = None,
+    artifacts: list[dict] | None = None,
+    status: str = "completed",
+    blocked_on: list[str] | None = None,
+    team_id: str = "",
+) -> str:
+    """Record a structured handoff from this agent to the team.
+
+    Call this at the end of your work instead of printing a <handoff_json> block.
+    Writes validated, typed data directly to the team shared-context — no regex parsing.
+
+    Args:
+        messages: List of {to, content, type} objects. to is a role like "@backend-morty"
+                  or "@*". type is one of: decision, question, artifact, info.
+        artifacts: List of {type, content} objects.
+                   type is one of: api-schema, test-result, adr.
+        status: Overall handoff status — completed | blocked.
+        blocked_on: List of blocking reasons when status is blocked.
+        team_id: Team session ID (auto-detected from CTO_TEAM_ID env var if omitted).
+
+    Returns:
+        JSON confirming the handoff was recorded, or an error description.
+    """
+    root = _find_cto_root()
+    agent_role = os.environ.get("CTO_AGENT_ROLE", "unknown")
+
+    resolved_team_id = team_id or os.environ.get("CTO_TEAM_ID", "")
+    if not resolved_team_id:
+        return json.dumps({"error": "team_id required — pass it explicitly or set CTO_TEAM_ID env var"})
+    if len(resolved_team_id) > 20:
+        return json.dumps({"error": f"invalid team_id: {resolved_team_id!r}"})
+
+    valid_msg_types = {"decision", "question", "artifact", "info"}
+    validated_messages = []
+    for msg in (messages or []):
+        if not isinstance(msg, dict):
+            continue
+        to = str(msg.get("to", "")).strip()
+        content = str(msg.get("content", "")).strip()
+        msg_type = str(msg.get("type", "info"))
+        if msg_type not in valid_msg_types:
+            msg_type = "info"
+        if to and content:
+            validated_messages.append({"to": to, "content": content[:2000], "type": msg_type})
+
+    valid_artifact_types = {"api-schema", "test-result", "adr"}
+    validated_artifacts = []
+    for art in (artifacts or []):
+        if not isinstance(art, dict):
+            continue
+        art_type = str(art.get("type", ""))
+        art_content = art.get("content")
+        if art_type in valid_artifact_types and art_content is not None:
+            validated_artifacts.append({"type": art_type, "content": art_content})
+
+    if status not in {"completed", "blocked"}:
+        status = "completed"
+
+    handoff_data = {
+        "team_id": resolved_team_id,
+        "agent_role": agent_role,
+        "messages": validated_messages,
+        "artifacts": validated_artifacts,
+        "status": status,
+        "blocked_on": [str(b) for b in (blocked_on or []) if b],
+        "recorded_at": _now_iso(),
+    }
+
+    handoffs_dir = root / ".cto" / "teams" / "handoffs"
+    handoffs_dir.mkdir(parents=True, exist_ok=True)
+    handoff_fp = handoffs_dir / f"{resolved_team_id}-{agent_role}.json"
+    _save_json(handoff_fp, handoff_data)
+
+    return json.dumps({
+        "ok": True,
+        "recorded": {
+            "messages": len(validated_messages),
+            "artifacts": len(validated_artifacts),
+            "status": status,
+        },
+    })
+
+
+def _run_integrity_check():
+    """Run module integrity check at MCP server startup; abort on tampering unless overridden."""
+    result = verify_module_integrity()
+    status = result.get("status")
+    if status == "initialized":
+        return
+    if status == "degraded":
+        details = (
+            f"mismatches={result.get('mismatches', [])}, "
+            f"missing={result.get('missing', [])}"
+        )
+        audit_log_security_event(
+            "module_integrity_check_failed",
+            details,
+            severity="critical",
+        )
+        print(
+            f"[SECURITY-CRITICAL] cto-orchestrator MCP: module integrity DEGRADED — {details}",
+            file=sys.stderr,
+        )
+        if os.environ.get("CTO_INTEGRITY_OVERRIDE", "").lower() != "true":
+            print(
+                "[SECURITY-CRITICAL] Aborting MCP server startup. "
+                "Set CTO_INTEGRITY_OVERRIDE=true to bypass (after running: "
+                "python3 security_utils.py security-check --update-manifest).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(
+            "[SECURITY-WARNING] CTO_INTEGRITY_OVERRIDE=true — starting MCP server despite mismatch.",
+            file=sys.stderr,
+        )
+
+
+@mcp.tool()
+def plugin_info() -> dict:
+    """Return plugin name and semver version from .claude-plugin/plugin.json."""
+    return {"name": "cto-orchestrator", "version": PLUGIN_VERSION}
+
+
 if __name__ == "__main__":
+    _run_integrity_check()
     mcp.run()

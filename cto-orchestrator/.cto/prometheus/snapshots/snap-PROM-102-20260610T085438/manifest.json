@@ -1,0 +1,14 @@
+{
+  "proposal_id": "PROM-102",
+  "created_at": "2026-06-10T08:54:38.449582+00:00",
+  "files": {
+    "scripts/roro_events.py": {
+      "snapshot_name": "scripts__roro_events.py",
+      "original_size": 27067
+    },
+    "scripts/schemas.py": {
+      "snapshot_name": "scripts__schemas.py",
+      "original_size": 12957
+    }
+  }
+}

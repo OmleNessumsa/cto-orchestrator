@@ -1,0 +1,18 @@
+{
+  "proposal_id": "PROM-094",
+  "created_at": "2026-06-10T08:42:11.439113+00:00",
+  "files": {
+    "scripts/session.py": {
+      "snapshot_name": "scripts__session.py",
+      "original_size": 16513
+    },
+    "scripts/orchestrate.py": {
+      "snapshot_name": "scripts__orchestrate.py",
+      "original_size": 70123
+    },
+    "scripts/sleepy.py": {
+      "snapshot_name": "scripts__sleepy.py",
+      "original_size": 28622
+    }
+  }
+}

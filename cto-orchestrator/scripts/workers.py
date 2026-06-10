@@ -17,11 +17,34 @@ import json
 import os
 import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+
+try:
+    from roro_events import emit
+except ImportError:
+    def emit(*args, **kwargs):
+        pass
+
+try:
+    from team import reserve_files, release_files, aggregate_results
+except ImportError:
+    def reserve_files(root, team_id, role, file_paths):  # type: ignore[misc]
+        return True
+    def release_files(root, team_id, role):  # type: ignore[misc]
+        pass
+    def aggregate_results(results):  # type: ignore[misc]
+        completed = sum(1 for r in results if r.get("status") == "completed")
+        failed = sum(1 for r in results if r.get("status") == "failed")
+        queued = sum(1 for r in results if r.get("status") == "queued")
+        return {"per_ticket": [], "files_changed": [], "conflicts": [],
+                "total": len(results), "completed": completed,
+                "failed": failed, "queued": queued}
 
 try:
     from orchestrate import find_cto_root
@@ -36,6 +59,109 @@ except ImportError:
                 print("Error: No .cto/ directory found.", file=sys.stderr)
                 sys.exit(1)
             current = parent
+
+
+# ── Parallel Fan-out ─────────────────────────────────────────────────────────
+
+def _get_fanout_cap(root: Path) -> int:
+    """Return the max parallel workers from config, defaulting to cpu_count - 2 (min 1)."""
+    try:
+        cfg_path = root / ".cto" / "config.json"
+        if cfg_path.exists():
+            with open(cfg_path) as f:
+                cfg = json.load(f)
+            cap = cfg.get("max_parallel_workers")
+            if isinstance(cap, int) and cap > 0:
+                return cap
+    except Exception:
+        pass
+    return max(1, (os.cpu_count() or 4) - 2)
+
+
+def run_workers_parallel(
+    root: Path,
+    dispatch_list: list[dict],
+) -> dict:
+    """Run dispatch_list in parallel with a bounded semaphore and conflict-aware queuing.
+
+    Each entry in dispatch_list is a dict with:
+        name     — worker/ticket identifier
+        fn       — callable(root: Path) -> dict
+        files    — list[str] of file paths this worker will touch (optional)
+        team_id  — team session ID for file reservation (optional)
+
+    Workers whose target files are already reserved by another running worker
+    are queued (not run concurrently) and reported as status="queued".
+
+    Returns:
+        Aggregated rollup from aggregate_results(), also emitted as
+        the roro 'cto.fanout.complete' event.
+    """
+    cap = _get_fanout_cap(root)
+    results: list[dict] = []
+    _lock = threading.Lock()
+
+    def _run_one(entry: dict) -> dict:
+        name = entry["name"]
+        fn = entry["fn"]
+        team_id = entry.get("team_id")
+        file_paths = entry.get("files", [])
+
+        if team_id and file_paths:
+            reserved = reserve_files(root, team_id, name, file_paths)
+            if not reserved:
+                return {
+                    "worker": name,
+                    "status": "queued",
+                    "conflict": f"{name}: file conflict — queued for serial execution",
+                    "files_changed": [],
+                }
+
+        try:
+            result = fn(root)
+            return {
+                "worker": name,
+                "status": "completed",
+                "result": result,
+                "files_changed": file_paths,
+            }
+        except Exception as exc:
+            return {
+                "worker": name,
+                "status": "failed",
+                "error": str(exc)[:200],
+                "files_changed": [],
+            }
+        finally:
+            if team_id and file_paths:
+                release_files(root, team_id, name)
+
+    with ThreadPoolExecutor(max_workers=cap) as pool:
+        futures = {pool.submit(_run_one, entry): entry for entry in dispatch_list}
+        for future in as_completed(futures):
+            entry = futures[future]
+            try:
+                results.append(future.result())
+            except Exception as exc:
+                results.append({
+                    "worker": entry["name"],
+                    "status": "failed",
+                    "error": str(exc)[:200],
+                    "files_changed": [],
+                })
+
+    rollup = aggregate_results(results)
+
+    emit("cto.fanout.complete", {
+        "total": rollup["total"],
+        "completed": rollup["completed"],
+        "failed": rollup["failed"],
+        "queued": rollup["queued"],
+        "conflicts": rollup["conflicts"],
+        "files_changed": rollup["files_changed"],
+    }, role="rick")
+
+    return rollup
 
 
 # ── Workers ──────────────────────────────────────────────────────────────────

@@ -1,0 +1,11 @@
+{
+  "name": "cto-orchestrator",
+  "displayName": "CTO Orchestrator (Rick Sanchez)",
+  "description": "End-to-end software project management via a ticket-based system with Morty sub-agents, team collaboration, Prometheus self-evolution, and Unity security scanning.",
+  "version": "1.0.0",
+  "author": "OmleNessumsa",
+  "repository": "github:OmleNessumsa/cto-orchestrator",
+  "pluginPath": ".claude-plugin/plugin.json",
+  "tags": ["orchestration", "tickets", "agents", "cto", "dev-workflow"],
+  "minClaudeCodeVersion": "1.0.0"
+}

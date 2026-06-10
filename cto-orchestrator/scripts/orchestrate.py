@@ -86,6 +86,7 @@ try:
         quarantine_prompt,
         audit_log_security_event,
         should_skip_permissions,
+        verify_module_integrity,
         SecurityViolationError,
         SANDWICH_REINFORCEMENT,
     )
@@ -141,6 +142,8 @@ except ImportError:
             audit_log_security_event("skip_permissions_authorized", "Using --dangerously-skip-permissions", severity="warning")
             return True
         return False
+    def verify_module_integrity(**kwargs):
+        return {"status": "degraded", "mismatches": [], "missing": [], "hashes": {}}
 
 
 # ── Shared helpers (same as other scripts) ──────────────────────────────────
@@ -1576,13 +1579,18 @@ def cmd_status(args):
     ld = root / ".cto" / "logs"
     last_activity = "No activity yet"
     if ld.exists():
-        log_files = sorted(ld.glob("*.jsonl"), reverse=True)
+        # Only daily logs (YYYY-MM-DD.jsonl); prefixed logs like sleepy-*.jsonl
+        # sort lexicographically after digits and use a different schema.
+        log_files = sorted(
+            (p for p in ld.glob("*.jsonl") if p.stem[:1].isdigit()), reverse=True
+        )
         if log_files:
             with open(log_files[0]) as f:
                 lines = f.readlines()
                 if lines:
                     last = json.loads(lines[-1].strip())
-                    last_activity = f"{last['timestamp'][:19]} — {last['message'][:40]}"
+                    msg = last.get("message") or last.get("note") or last.get("action", "")
+                    last_activity = f"{last['timestamp'][:19]} — {msg[:40]}"
 
     backlog = status_counts.get("backlog", 0)
     todo = status_counts.get("todo", 0)
@@ -1686,7 +1694,41 @@ def build_parser():
     return p
 
 
+def _run_integrity_check():
+    """Run module integrity check; abort on tampering unless CTO_INTEGRITY_OVERRIDE=true."""
+    result = verify_module_integrity()
+    status = result.get("status")
+    if status == "initialized":
+        emit("cto.security.integrity.initialized", {"hashes": result.get("hashes", {})})
+        return
+    if status == "degraded":
+        details = (
+            f"mismatches={result.get('mismatches', [])}, "
+            f"missing={result.get('missing', [])}"
+        )
+        audit_log_security_event(
+            "module_integrity_check_failed",
+            details,
+            severity="critical",
+        )
+        emit("cto.security.integrity.degraded", {
+            "mismatches": result.get("mismatches", []),
+            "missing": result.get("missing", []),
+        })
+        if os.environ.get("CTO_INTEGRITY_OVERRIDE", "").lower() != "true":
+            err_console.print(
+                "[bold red][SECURITY-CRITICAL] Module integrity check FAILED. "
+                "Set CTO_INTEGRITY_OVERRIDE=true to bypass (e.g. after a Prometheus self-edit "
+                "followed by: python3 security_utils.py security-check --update-manifest).[/bold red]"
+            )
+            sys.exit(1)
+        err_console.print(
+            "[yellow][SECURITY-WARNING] Integrity override active — proceeding despite mismatch.[/yellow]"
+        )
+
+
 def main():
+    _run_integrity_check()
     parser = build_parser()
     args = parser.parse_args()
 

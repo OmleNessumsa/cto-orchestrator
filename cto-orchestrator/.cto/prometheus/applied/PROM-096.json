@@ -1,0 +1,21 @@
+{
+  "id": "PROM-096",
+  "title": "Dynamic few-shot retrieval from similar completed tickets",
+  "category": "prompt-engineering",
+  "source": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting \u2014 relevant in-context examples beat generic ones",
+  "description": "The <examples> block (delegate.py:1444-1484) is two hardcoded, generic examples used for every task regardless of relevance. Multishot guidance shows that examples resembling the actual task improve output format adherence and quality far more than generic ones. The system already stores per-role learnings in .cto/memory/<role>.jsonl and completed ticket outputs in sprint-state.json, so it can select the 1-2 most similar prior tickets (by target_files overlap and complexity match) and render them as worked examples instead of the static pair.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add _select_fewshot_examples(role, ticket) that scores completed tickets from sprint-state.json / agent memory by Jaccard overlap of target_files plus same complexity bucket, returning the top 1-2. Render each as an ANALYZE/PLAN/VERIFY/EXECUTE + JSON example mirroring the current format. In build_prompt(), substitute these into the <examples> block when at least one good match (score above threshold) exists; otherwise fall back to the existing two static examples so behavior is unchanged for cold starts.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:42:53.679750+00:00",
+  "applied_at": "2026-06-10T08:30:06.682691+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-096-20260610T082731",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

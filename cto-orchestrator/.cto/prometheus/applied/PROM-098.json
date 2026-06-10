@@ -1,0 +1,21 @@
+{
+  "id": "PROM-098",
+  "title": "Complexity-scaled extended thinking beyond architect/security roles",
+  "category": "prompt-engineering",
+  "source": "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking \u2014 budget thinking to task difficulty",
+  "description": "Extended thinking (--thinking) is gated to architect-morty and security-morty on Opus only (delegate.py:1179, 1809-1815). Reviewer and tester work on L/XL tickets involves exactly the kind of multi-step reasoning that benefits from a thinking budget, and reasoning quality scales with allocated thinking tokens. Enabling thinking for any role on L/XL complexity (where Opus is already selected) and scaling the budget by complexity would improve hard-ticket outcomes without affecting the XS/S/M fast path.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Generalize the thinking-enable predicate (around delegate.py:1179/1809-1815) from a role allowlist to: role in {architect, security} OR ticket complexity in {L, XL}. Keep the Opus + CLI-feature-detection guards. Extend the existing budget mapping (1120-1135, 2128-2131) so XL=10k, L=6k, M=3k (only when thinking is on), and keep XS/S with thinking disabled. Continue extracting and audit-logging <thinking> blocks (1968-1977).",
+  "status": "applied",
+  "created_at": "2026-06-10T07:42:53.683207+00:00",
+  "applied_at": "2026-06-10T09:12:12.196154+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-098-20260610T090944",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

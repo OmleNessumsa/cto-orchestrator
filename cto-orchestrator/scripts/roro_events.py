@@ -35,6 +35,11 @@ try:
 except ImportError:
     _validate_webhook_endpoint = None  # graceful degradation if module unavailable
 
+try:
+    from schemas import RoroEvent as _RoroEvent
+except ImportError:
+    _RoroEvent = None  # graceful degradation; falls back to legacy payload shape
+
 
 # ── Thread Tracking (prevents SIGSEGV on exit) ────────────────────────────────
 
@@ -404,7 +409,7 @@ def _send_event(endpoint: str, payload: dict, timeout: float, verbose: bool):
             if response.status == 200:
                 _circuit_breaker.record_success()
                 if verbose:
-                    print(f"[roro] Event sent: {payload.get('eventType')}")
+                    print(f"[roro] Event sent: {payload.get('type')}")
             else:
                 _circuit_breaker.record_failure()
                 if verbose:
@@ -469,13 +474,25 @@ def emit(
     if not agent_id:
         agent_id = get_agent_id(role, team_id)
 
-    # Build event payload
-    payload = {
-        "agentId": agent_id,
-        "eventType": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "data": data,
-    }
+    # Build versioned event envelope
+    ts = datetime.now(timezone.utc).isoformat()
+    if _RoroEvent is not None:
+        event = _RoroEvent(
+            type=event_type,
+            ts=ts,
+            payload=data,
+            ticket_id=data.get("ticket_id") if isinstance(data, dict) else None,
+            agent_id=agent_id,
+        )
+        payload = event.to_dict()
+    else:
+        # Legacy fallback when schemas module is unavailable
+        payload = {
+            "agentId": agent_id,
+            "eventType": event_type,
+            "timestamp": ts,
+            "data": data,
+        }
 
     # Push to SSE stream if enabled (opt-in)
     if config.get("sse_enabled"):
@@ -585,26 +602,66 @@ def emit_progress(
     )
 
 
+_STREAM_KIND_TO_EVENT: dict = {
+    "tool_use": "cto.morty.tool",
+    "morty.token": "cto.morty.token",
+}
+
+
 def emit_stream_progress(
     event_kind: str,
     event_data: dict,
     role: str = "rick",
     team_id: Optional[str] = None,
 ):
-    """Emit a cto.morty.progress event from a streaming claude agent event.
+    """Emit a typed roro event from a streaming claude agent event.
 
-    Called for tool_use and text_delta events in the stream-json output,
-    giving the Rick Terminal real-time visibility into agent activity.
+    Maps stream-json event kinds to specific roro event types:
+    - tool_use       → cto.morty.tool
+    - morty.token    → cto.morty.token  (content_block_delta text)
+    - anything else  → cto.morty.progress
 
     Args:
-        event_kind: "tool_use" or "text_delta"
+        event_kind: Stream event kind ("tool_use", "morty.token", "text_delta", …)
         event_data: Event-specific data (e.g. {"tool": "Read"} or {"phase": "Reading files"})
         role: Agent role for ID generation
         team_id: Optional team session ID
     """
+    event_type = _STREAM_KIND_TO_EVENT.get(event_kind, "cto.morty.progress")
     emit(
-        "cto.morty.progress",
+        event_type,
         {"kind": event_kind, **event_data},
+        role=role,
+        team_id=team_id,
+    )
+
+
+def emit_morty_done(
+    total_cost_usd: Optional[float] = None,
+    duration_ms: Optional[int] = None,
+    num_turns: Optional[int] = None,
+    role: str = "rick",
+    team_id: Optional[str] = None,
+):
+    """Emit a cto.morty.done event from the final result event in stream-json output.
+
+    Called when the 'result' event arrives at end of stream, surfacing accurate
+    cost and turn metadata reported by the Claude CLI.
+
+    Args:
+        total_cost_usd: Actual USD cost reported by the result event (or None)
+        duration_ms: Wall-clock duration in milliseconds reported by the result event
+        num_turns: Number of agentic turns in the session
+        role: Agent role for ID generation
+        team_id: Optional team session ID
+    """
+    emit(
+        "cto.morty.done",
+        {
+            "total_cost_usd": total_cost_usd,
+            "duration_ms": duration_ms,
+            "num_turns": num_turns,
+        },
         role=role,
         team_id=team_id,
     )

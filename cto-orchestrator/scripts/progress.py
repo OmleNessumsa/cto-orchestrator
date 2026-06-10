@@ -9,8 +9,127 @@ import argparse
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+# ── Progress display ─────────────────────────────────────────────────────────
+
+_REDRAW_INTERVAL = 0.1  # seconds — minimum gap between terminal repaints
+
+
+def _animated_output() -> bool:
+    """Return True only when the terminal supports in-place animation."""
+    if os.environ.get("RICK_REDUCE_MOTION"):
+        return False
+    return sys.stdout.isatty()
+
+
+class ProgressDisplay:
+    """Throttled multi-Morty progress bar with ETA and accessibility fallback.
+
+    Animated mode: repaint a single line at most every 100 ms.
+    Non-TTY / RICK_REDUCE_MOTION: emit discrete one-line status updates at
+    meaningful thresholds (every ~10 percentage points) instead.
+    """
+
+    _SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    _BAR_WIDTH = 20
+
+    def __init__(self, total: int = 0, label: str = "Working"):
+        self._total = total
+        self._completed = 0
+        self._label = label
+        self._animated = _animated_output()
+        self._start = time.monotonic()
+        self._last_draw = 0.0
+        self._spinner_idx = 0
+        self._last_static_pct = -1  # tracks discrete update threshold
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def update(self, completed: int, total: int | None = None, label: str | None = None) -> None:
+        """Record progress; redraws are throttled to _REDRAW_INTERVAL."""
+        if total is not None:
+            self._total = total
+        self._completed = completed
+        if label is not None:
+            self._label = label
+
+        if self._animated:
+            now = time.monotonic()
+            if now - self._last_draw < _REDRAW_INTERVAL:
+                return
+            self._last_draw = now
+            self._render_animated()
+        else:
+            self._maybe_emit_static()
+
+    def finish(self) -> None:
+        """Always emit a clean completed line, even when animation is suppressed."""
+        elapsed = time.monotonic() - self._start
+        pct = (self._completed / self._total * 100) if self._total else 100
+        line = (
+            f"  ✓ {self._label}: {self._completed}/{self._total} done "
+            f"({pct:.0f}%) in {elapsed:.1f}s"
+        )
+        if self._animated:
+            sys.stdout.write("\r\033[K" + line + "\n")
+            sys.stdout.flush()
+        else:
+            print(line)
+
+    # ── Internals ─────────────────────────────────────────────────────────────
+
+    def _elapsed(self) -> float:
+        return time.monotonic() - self._start
+
+    def _rate(self) -> float:
+        """Tickets completed per second."""
+        e = self._elapsed()
+        return self._completed / e if e > 0.5 and self._completed else 0.0
+
+    def _eta_str(self) -> str:
+        rate = self._rate()
+        remaining = self._total - self._completed
+        if rate <= 0 or remaining <= 0:
+            return "ETA: --"
+        secs = remaining / rate
+        if secs < 60:
+            return f"ETA: {secs:.0f}s"
+        return f"ETA: {secs / 60:.1f}m"
+
+    def _rate_str(self) -> str:
+        rate = self._rate()
+        return f"{rate:.2f} tix/s" if rate > 0 else ""
+
+    def _render_animated(self) -> None:
+        frame = self._SPINNER[self._spinner_idx % len(self._SPINNER)]
+        self._spinner_idx += 1
+        pct = (self._completed / self._total * 100) if self._total else 0
+        filled = int(self._BAR_WIDTH * pct / 100)
+        bar = "█" * filled + "░" * (self._BAR_WIDTH - filled)
+        eta = self._eta_str()
+        rate = self._rate_str()
+        suffix = f"  {rate}" if rate else ""
+        line = (
+            f"  {frame} {self._label}: [{bar}] "
+            f"{self._completed}/{self._total} ({pct:.0f}%)  {eta}{suffix}"
+        )
+        sys.stdout.write("\r\033[K" + line)
+        sys.stdout.flush()
+
+    def _maybe_emit_static(self) -> None:
+        """Emit a plain status line only at each 10-percentage-point step."""
+        pct = int(self._completed / self._total * 100) if self._total else 0
+        bucket = pct // 10
+        if bucket == self._last_static_pct // 10 and self._last_static_pct != -1:
+            return
+        self._last_static_pct = pct
+        eta = self._eta_str()
+        rate = self._rate_str()
+        suffix = f"  {rate}" if rate else ""
+        print(f"  {self._label}: {self._completed}/{self._total} ({pct}%)  {eta}{suffix}")
 
 
 def find_cto_root(start=None) -> Path:

@@ -1,0 +1,21 @@
+{
+  "id": "PROM-119",
+  "title": "Force JSON output for routing and scoring helper calls",
+  "category": "claude-features",
+  "source": "Anthropic docs: Structured outputs / increasing output consistency \u2014 https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+  "description": "The haiku-backed routing and scoring helpers (delegate.py:712, 787, 946, 1651) prompt the model and then parse its free-text reply for a decision. Free-text parsing of routing/scoring output is brittle and a single malformed reply can misroute a ticket or skew a score. Constraining these helper calls to emit strict JSON (prefilled assistant turn or stream-json with a schema-style instruction) makes downstream parsing deterministic.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "For the routing_prompt and scoring_prompt subprocess calls, append an explicit JSON-only contract (e.g. 'Respond with ONLY this JSON: {\"choice\": ..., \"confidence\": ...}, no prose') and parse with a strict json.loads guarded by a single retry on JSONDecodeError. Where the installed CLI supports it, run these helpers with --output-format json and read the structured result field rather than raw stdout. Centralize this into a _call_helper_json(prompt, model) utility so all four call sites share the same validated path.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:49:51.007754+00:00",
+  "applied_at": "2026-06-10T09:21:10.577714+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-119-20260610T091724",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

@@ -19,7 +19,7 @@ import time
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from rich.console import Console
 from rich.live import Live
@@ -49,38 +49,156 @@ def pad_to_width(s: str, width: int) -> str:
     return s + " " * (width - current)
 
 
-# ── ANSI Color Module ─────────────────────────────────────────────────────────
+# ── Terminal Color Capabilities ───────────────────────────────────────────────
+
+_COLOR_NONE      = 0  # no color (piped, CI, NO_COLOR)
+_COLOR_16        = 1  # basic 16 ANSI colors
+_COLOR_256       = 2  # 256-color (xterm-256color)
+_COLOR_TRUECOLOR = 3  # 24-bit RGB (COLORTERM=truecolor)
 
 _ANSI_RESET = "\033[0m"
 
-STATUS_COLORS = {
-    "completed":   "\033[32m",   # green
-    "done":        "\033[32m",   # green
-    "working":     "\033[33m",   # yellow
-    "in_progress": "\033[33m",   # yellow
-    "active":      "\033[33m",   # yellow
-    "blocked":     "\033[31m",   # red
-    "failed":      "\033[31m",   # red
-    "in_review":   "\033[36m",   # cyan
-    "testing":     "\033[35m",   # magenta
-    "pending":     "\033[2m",    # dim
+_ANSI_FG_16: dict = {
+    "black":   "\033[30m",
+    "red":     "\033[31m",
+    "green":   "\033[32m",
+    "yellow":  "\033[33m",
+    "blue":    "\033[34m",
+    "magenta": "\033[35m",
+    "cyan":    "\033[36m",
+    "white":   "\033[37m",
 }
 
-# Resolved once at startup; can be overridden by --no-color flag.
-_USE_COLOR: bool = (
-    "NO_COLOR" not in os.environ
-    and sys.stdout.isatty()
-)
+_ANSI_STYLES: dict = {
+    "bold":      "\033[1m",
+    "dim":       "\033[2m",
+    "italic":    "\033[3m",
+    "underline": "\033[4m",
+}
+
+# Approximate RGB values for named colors (truecolor / 256-color paths)
+_COLOR_RGB: dict = {
+    "black":   (0,   0,   0),
+    "red":     (204, 0,   0),
+    "green":   (0,   170, 0),
+    "yellow":  (204, 170, 0),
+    "blue":    (0,   0,   204),
+    "magenta": (170, 0,   170),
+    "cyan":    (0,   170, 170),
+    "white":   (204, 204, 204),
+}
+
+# Maps status key → (fg color name | None, style name | None)
+STATUS_COLORS: dict = {
+    "completed":   ("green",   None),
+    "done":        ("green",   None),
+    "working":     ("yellow",  None),
+    "in_progress": ("yellow",  None),
+    "active":      ("yellow",  None),
+    "blocked":     ("red",     None),
+    "failed":      ("red",     None),
+    "in_review":   ("cyan",    None),
+    "testing":     ("magenta", None),
+    "pending":     (None,      "dim"),
+}
 
 
-def colorize(text: str, status: str) -> str:
-    """Wrap *text* in ANSI color for *status*.  No-ops when colors disabled."""
-    if not _USE_COLOR:
+def _rgb_to_256(r: int, g: int, b: int) -> int:
+    """Map an RGB triple to the nearest xterm-256 color cube index."""
+    def _step(v: int) -> int:
+        if v < 48:
+            return 0
+        if v < 115:
+            return 1
+        return (v - 35) // 40
+    return 16 + 36 * _step(r) + 6 * _step(g) + _step(b)
+
+
+def _detect_color_level() -> int:
+    """Detect terminal color capability once at import time.
+
+    Priority: NO_COLOR > FORCE_COLOR > TTY check > COLORTERM > TERM > default.
+    """
+    if "NO_COLOR" in os.environ:
+        return _COLOR_NONE
+
+    force = os.environ.get("FORCE_COLOR", "")
+    if force:
+        try:
+            return min(max(int(force), _COLOR_NONE), _COLOR_TRUECOLOR)
+        except ValueError:
+            return _COLOR_16
+
+    if not sys.stdout.isatty():
+        return _COLOR_NONE
+
+    colorterm = os.environ.get("COLORTERM", "").lower()
+    if colorterm in ("truecolor", "24bit"):
+        return _COLOR_TRUECOLOR
+
+    if "256color" in os.environ.get("TERM", ""):
+        return _COLOR_256
+
+    return _COLOR_16
+
+
+_COLOR_LEVEL: int = _detect_color_level()
+_USE_COLOR: bool = _COLOR_LEVEL > _COLOR_NONE  # backward-compat alias
+
+
+def colorize(
+    text: str,
+    fg: Optional[Union[str, tuple]] = None,
+    style: Optional[str] = None,
+) -> str:
+    """Wrap *text* with ANSI codes for the detected terminal color level.
+
+    Picks 24-bit truecolor, falls back to 256- or 16-color codes, and
+    returns plain text when color is disabled or output is not a TTY.
+
+    Args:
+        text:  The string to colorize.
+        fg:    Foreground color — a named color string (e.g. ``"green"``) or
+               an ``(r, g, b)`` tuple.  ``None`` leaves the foreground unchanged.
+        style: Optional style modifier: ``"bold"``, ``"dim"``, ``"italic"``,
+               or ``"underline"``.
+    """
+    if _COLOR_LEVEL == _COLOR_NONE:
         return text
-    code = STATUS_COLORS.get(status, "")
-    if not code:
+
+    codes: list = []
+
+    if style and style in _ANSI_STYLES:
+        codes.append(_ANSI_STYLES[style])
+
+    if fg is not None:
+        if isinstance(fg, tuple):
+            r, g, b = fg
+            if _COLOR_LEVEL >= _COLOR_TRUECOLOR:
+                codes.append(f"\033[38;2;{r};{g};{b}m")
+            elif _COLOR_LEVEL >= _COLOR_256:
+                codes.append(f"\033[38;5;{_rgb_to_256(r, g, b)}m")
+            else:
+                codes.append(_ANSI_FG_16.get("white", ""))
+        else:
+            if _COLOR_LEVEL >= _COLOR_TRUECOLOR and fg in _COLOR_RGB:
+                r, g, b = _COLOR_RGB[fg]
+                codes.append(f"\033[38;2;{r};{g};{b}m")
+            elif _COLOR_LEVEL >= _COLOR_256 and fg in _COLOR_RGB:
+                r, g, b = _COLOR_RGB[fg]
+                codes.append(f"\033[38;5;{_rgb_to_256(r, g, b)}m")
+            elif fg in _ANSI_FG_16:
+                codes.append(_ANSI_FG_16[fg])
+
+    if not codes:
         return text
-    return f"{code}{text}{_ANSI_RESET}"
+    return "".join(codes) + text + _ANSI_RESET
+
+
+def colorize_status(text: str, status: str) -> str:
+    """Wrap *text* in color for the given *status* key. No-ops when colors disabled."""
+    fg, style = STATUS_COLORS.get(status, (None, None))
+    return colorize(text, fg, style)
 
 
 def _progress_color(pct: int) -> str:
@@ -694,12 +812,13 @@ def build_parser():
 
 
 def main():
-    global _USE_COLOR, console
+    global _COLOR_LEVEL, _USE_COLOR, console
 
     parser = build_parser()
     args = parser.parse_args()
 
     if args.no_color:
+        _COLOR_LEVEL = _COLOR_NONE
         _USE_COLOR = False
         console = _make_console_live()
 

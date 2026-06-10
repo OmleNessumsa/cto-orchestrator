@@ -11,11 +11,13 @@ This module provides:
 - OWASP Top 10 mitigations
 """
 
+import base64
 import ipaddress
 import os
 import re
 import html
 import shlex
+import unicodedata
 import urllib.parse
 from pathlib import Path
 from typing import Optional, Union
@@ -46,6 +48,27 @@ SAFE_ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
 
 # Forbidden path components
 FORBIDDEN_PATH_COMPONENTS = {'..', '~', '$', '`', '|', ';', '&', '>', '<', '\x00'}
+
+# Zero-width and Unicode bidirectional control characters used to obfuscate injection payloads
+_ZERO_WIDTH_CHARS = frozenset([
+    '­',  # SOFT HYPHEN
+    '​',  # ZERO WIDTH SPACE
+    '‌',  # ZERO WIDTH NON-JOINER
+    '‍',  # ZERO WIDTH JOINER
+    '‎',  # LEFT-TO-RIGHT MARK
+    '‏',  # RIGHT-TO-LEFT MARK
+    '‪',  # LEFT-TO-RIGHT EMBEDDING
+    '‫',  # RIGHT-TO-LEFT EMBEDDING
+    '‬',  # POP DIRECTIONAL FORMATTING
+    '‭',  # LEFT-TO-RIGHT OVERRIDE
+    '‮',  # RIGHT-TO-LEFT OVERRIDE (Trojan Source attacks)
+    '⁠',  # WORD JOINER
+    '⁡',  # FUNCTION APPLICATION
+    '⁢',  # INVISIBLE TIMES
+    '⁣',  # INVISIBLE SEPARATOR
+    '⁤',  # INVISIBLE PLUS
+    '﻿',  # ZERO WIDTH NO-BREAK SPACE (BOM)
+])
 
 
 # ── Path Traversal Prevention ─────────────────────────────────────────────────
@@ -581,6 +604,11 @@ INJECTION_PATTERNS = [
     {"pattern": r"pretend\s+(you\s+are|to\s+be)", "severity": "medium"},
     {"pattern": r"</?(system|user|assistant)>", "severity": "medium"},
     {"pattern": r"act\s+as\s+(if|a\s+)", "severity": "low"},
+    # Tool/data exfiltration cues — common indirect-injection goals
+    {"pattern": r"print\s+(your\s+)?(system\s+)?prompt", "severity": "high"},
+    {"pattern": r"(exfiltrate|leak|steal)\s+(your\s+|the\s+)?(system\s+)?prompt", "severity": "high"},
+    {"pattern": r"send\s+(it\s+)?to\s+https?://", "severity": "high"},
+    {"pattern": r"read\s+\.env\b", "severity": "high"},
 ]
 
 # Pre-compiled: list of (compiled_regex, severity) tuples
@@ -588,6 +616,60 @@ _compiled_injection_patterns = [
     (re.compile(p["pattern"], re.IGNORECASE), p["severity"])
     for p in INJECTION_PATTERNS
 ]
+
+
+def _normalize_for_scan(text: str) -> str:
+    """Normalize text before injection scanning.
+
+    Applies NFKC to collapse homoglyphs (e.g. fullwidth letters → ASCII),
+    then strips zero-width and bidirectional control characters that attackers
+    insert to defeat regex matching without changing rendered appearance.
+    """
+    normalized = unicodedata.normalize('NFKC', text)
+    return ''.join(c for c in normalized if c not in _ZERO_WIDTH_CHARS)
+
+
+def _decode_and_rescan(text: str) -> list[str]:
+    """Try base64/hex decoding on long token runs and re-run injection patterns.
+
+    Returns pattern strings matched in decoded content so callers can surface
+    encoded payloads that evade raw-text scanning.
+    """
+    detections: list[str] = []
+
+    # base64: runs of ≥20 base64 chars (reduces false positives on short tokens)
+    for candidate in re.findall(r'[A-Za-z0-9+/]{20,}={0,2}', text):
+        padded = candidate + '=' * (-len(candidate) % 4)
+        try:
+            decoded = base64.b64decode(padded).decode('utf-8', errors='ignore')
+            if decoded:
+                normed = _normalize_for_scan(decoded)
+                for compiled, _sev in _compiled_injection_patterns:
+                    if compiled.search(normed):
+                        tag = f"base64:{compiled.pattern}"
+                        if tag not in detections:
+                            detections.append(tag)
+        except Exception:
+            pass
+
+    # hex: runs of ≥20 hex chars (even length required for byte decoding)
+    for candidate in re.findall(r'(?:0x)?[0-9a-fA-F]{20,}', text):
+        clean = candidate[2:] if candidate.startswith('0x') else candidate
+        if len(clean) % 2 != 0:
+            clean = clean[:-1]
+        try:
+            decoded = bytes.fromhex(clean).decode('utf-8', errors='ignore')
+            if decoded:
+                normed = _normalize_for_scan(decoded)
+                for compiled, _sev in _compiled_injection_patterns:
+                    if compiled.search(normed):
+                        tag = f"hex:{compiled.pattern}"
+                        if tag not in detections:
+                            detections.append(tag)
+        except Exception:
+            pass
+
+    return detections
 
 
 def detect_injection_patterns(text: str) -> list[str]:
@@ -612,14 +694,23 @@ def detect_injection_patterns(text: str) -> list[str]:
 
     enforce_mode = os.environ.get("CTO_BLOCK_INJECTIONS", "warn").lower().strip()
 
+    # Normalize before matching to defeat homoglyph and zero-width obfuscation
+    normalized_text = _normalize_for_scan(text)
+
     detections: list[str] = []
     high_detections: list[str] = []
 
     for compiled, severity in _compiled_injection_patterns:
-        if compiled.search(text):
+        if compiled.search(normalized_text):
             detections.append(compiled.pattern)
             if severity == "high":
                 high_detections.append(compiled.pattern)
+
+    # Decode-and-rescan: catch base64/hex-encoded injection payloads
+    for encoded_match in _decode_and_rescan(normalized_text):
+        if encoded_match not in detections:
+            detections.append(encoded_match)
+            high_detections.append(encoded_match)  # encoded payloads always treated as high severity
 
     if detections:
         warn_dangerous_pattern(
@@ -1035,6 +1126,83 @@ def quarantine_prompt(
         f.write(json.dumps(entry) + "\n")
 
 
+# ── Guardrail Path Denylist ───────────────────────────────────────────────────
+
+_DENYLIST_BASENAME_PATTERNS = [
+    re.compile(r'^\.env(\..+)?$', re.IGNORECASE),
+    re.compile(r'.*\.(pem|key|p12|pfx|crt|cer|jks)$', re.IGNORECASE),
+    re.compile(r'^(secrets?|credentials?|passwords?)(\..+)?$', re.IGNORECASE),
+    re.compile(r'^.*secret.*\.(json|yaml|yml|toml)$', re.IGNORECASE),
+    re.compile(r'^\.netrc$', re.IGNORECASE),
+    re.compile(r'^id_(rsa|ecdsa|ed25519)(\.pub)?$', re.IGNORECASE),
+]
+
+
+def is_path_in_denylist(
+    path: str,
+    repo_root: Optional[Union[str, Path]] = None,
+) -> tuple[bool, str]:
+    """Check whether a file path is in the guardrail denylist.
+
+    Blocks .env/secret/credential files by name pattern and paths that
+    escape the repo root.
+
+    Returns:
+        Tuple of (is_blocked, reason)
+    """
+    if not path:
+        return False, ""
+
+    p = Path(path)
+    basename = p.name
+
+    for pattern in _DENYLIST_BASENAME_PATTERNS:
+        if pattern.match(basename):
+            return True, f"File '{basename}' matches sensitive file denylist"
+
+    if repo_root is not None:
+        try:
+            resolved = p.resolve()
+            Path(repo_root).resolve().relative_to  # noqa — just validate it resolves
+            resolved.relative_to(Path(repo_root).resolve())
+        except ValueError:
+            return True, f"Path '{path}' escapes the repository root"
+        except OSError:
+            pass  # path doesn't exist yet; skip containment check
+
+    return False, ""
+
+
+# ── Bash Command Safety Scanner ───────────────────────────────────────────────
+
+_DANGEROUS_BASH_PATTERNS = [
+    (re.compile(r'\brm\s+(-[rfRF]+\s+)*(~|/(\s|$)|/[^/\s]+/[^/\s]+)'), "destructive rm targeting root or home"),
+    (re.compile(r'(curl|wget)\s+[^\|]*\|\s*(ba)?sh'), "download-and-execute pattern"),
+    (re.compile(r'\|\s*(ba)?sh\b'), "pipe to shell (RCE risk)"),
+    (re.compile(r'>\s*/etc/(passwd|shadow|sudoers|hosts)'), "write to sensitive system file"),
+    (re.compile(r'chmod\s+(-R\s+)?[0-7]*7[0-7][0-7]\s+/'), "world-writable on root path"),
+    (re.compile(r':\(\)\s*\{.*\|.*:.*&.*\}.*:'), "fork bomb"),
+    (re.compile(r'sudo\s+.*\brm\s+-[rfRF]+'), "sudo destructive delete"),
+    (re.compile(r'git\s+push\s+(--force|-f)\b.*\b(main|master)\b'), "force push to protected branch"),
+]
+
+
+def scan_bash_command(command: str) -> tuple[bool, str]:
+    """Scan a shell command string for dangerous patterns.
+
+    Returns:
+        Tuple of (is_dangerous, reason)
+    """
+    if not command:
+        return False, ""
+
+    for compiled, description in _DANGEROUS_BASH_PATTERNS:
+        if compiled.search(command):
+            return True, f"Dangerous shell pattern: {description}"
+
+    return False, ""
+
+
 # ── Module Integrity Verification ────────────────────────────────────────────
 
 def verify_module_integrity(
@@ -1155,6 +1323,106 @@ def verify_module_integrity(
     }
 
 
+def supply_chain_check(
+    lockfile: Optional[Union[str, Path]] = None,
+    log_dir: Optional[Union[str, Path]] = None,
+) -> dict:
+    """Run pip-audit against the pinned requirements.lock and surface CVEs.
+
+    Requires pip-audit to be installed (`pip install pip-audit`).
+    The lockfile defaults to requirements.lock at the project root.
+
+    Args:
+        lockfile: Path to the requirements lock file (hash-pinned).
+        log_dir:  Directory for the security audit log.
+
+    Returns:
+        Dict with keys:
+            "status"        — "ok" | "vulnerable" | "error"
+            "vulnerabilities" — list of dicts with 'package', 'version', 'id', 'description'
+            "error"         — error message if pip-audit could not run
+    """
+    import json as _json
+    import subprocess as _subprocess
+
+    # Locate lockfile relative to project root
+    if lockfile is None:
+        scripts_dir = Path(__file__).parent
+        # Walk up to find project root (directory containing requirements.lock)
+        cwd = scripts_dir
+        while True:
+            candidate = cwd / "requirements.lock"
+            if candidate.exists():
+                lockfile = candidate
+                break
+            parent = cwd.parent
+            if parent == cwd:
+                lockfile = scripts_dir.parent / "requirements.lock"
+                break
+            cwd = parent
+
+    lockfile = Path(lockfile)
+    if not lockfile.exists():
+        msg = f"requirements.lock not found at {lockfile}"
+        audit_log_security_event("supply_chain_check_error", msg, severity="warning", log_dir=log_dir)
+        return {"status": "error", "vulnerabilities": [], "error": msg}
+
+    # pip-audit must be on PATH; guide users to install it if missing
+    import shutil as _shutil
+    if not _shutil.which("pip-audit"):
+        msg = "pip-audit not found — install with: pip install pip-audit"
+        audit_log_security_event("supply_chain_check_error", msg, severity="warning", log_dir=log_dir)
+        return {"status": "error", "vulnerabilities": [], "error": msg}
+
+    try:
+        result = _subprocess.run(
+            ["pip-audit", "--require-hashes", "-r", str(lockfile), "--format", "json"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except _subprocess.TimeoutExpired:
+        msg = "pip-audit timed out after 120 seconds"
+        audit_log_security_event("supply_chain_check_error", msg, severity="warning", log_dir=log_dir)
+        return {"status": "error", "vulnerabilities": [], "error": msg}
+    except Exception as exc:
+        msg = f"pip-audit execution failed: {exc}"
+        audit_log_security_event("supply_chain_check_error", msg, severity="warning", log_dir=log_dir)
+        return {"status": "error", "vulnerabilities": [], "error": msg}
+
+    vulns: list[dict] = []
+    try:
+        audit_data = _json.loads(result.stdout)
+        for dep in audit_data.get("dependencies", []):
+            for vuln in dep.get("vulns", []):
+                vulns.append({
+                    "package": dep.get("name", "unknown"),
+                    "version": dep.get("version", "unknown"),
+                    "id": vuln.get("id", "unknown"),
+                    "description": vuln.get("description", "")[:300],
+                })
+    except (_json.JSONDecodeError, AttributeError):
+        pass  # pip-audit may print non-JSON warnings to stdout; ignore parse failures
+
+    if vulns:
+        audit_log_security_event(
+            "supply_chain_vulnerability",
+            f"pip-audit found {len(vulns)} CVE(s): "
+            + ", ".join(f"{v['package']}@{v['version']} [{v['id']}]" for v in vulns[:5]),
+            severity="critical",
+            log_dir=log_dir,
+        )
+        return {"status": "vulnerable", "vulnerabilities": vulns, "error": None}
+
+    audit_log_security_event(
+        "supply_chain_ok",
+        f"pip-audit found no vulnerabilities in {lockfile.name}",
+        severity="info",
+        log_dir=log_dir,
+    )
+    return {"status": "ok", "vulnerabilities": [], "error": None}
+
+
 if __name__ == "__main__":
     import argparse as _argparse
 
@@ -1174,9 +1442,35 @@ if __name__ == "__main__":
         help="Rewrite the hash manifest with current file hashes (use after intentional changes)",
     )
 
+    _audit_parser = _sub.add_parser(
+        "supply-chain-check",
+        help="Run pip-audit against requirements.lock and report CVEs",
+    )
+    _audit_parser.add_argument(
+        "--lockfile",
+        default=None,
+        metavar="PATH",
+        help="Path to requirements.lock (default: auto-detected project root)",
+    )
+
     _args = _parser.parse_args()
 
-    if _args.command == "security-check":
+    if _args.command == "supply-chain-check":
+        print("=== CTO Orchestrator — Supply-Chain Check ===\n")
+        _lockfile = getattr(_args, "lockfile", None)
+        _sc = supply_chain_check(lockfile=_lockfile)
+        if _sc["status"] == "error":
+            print(f"ERROR: {_sc['error']}")
+            raise SystemExit(2)
+        elif _sc["status"] == "ok":
+            print("Supply chain: OK — no known CVEs in requirements.lock")
+        else:
+            print(f"VULNERABLE — {len(_sc['vulnerabilities'])} CVE(s) found:")
+            for v in _sc["vulnerabilities"]:
+                print(f"  [{v['id']}] {v['package']}=={v['version']}: {v['description'][:120]}")
+            raise SystemExit(1)
+
+    elif _args.command == "security-check":
         print("=== CTO Orchestrator — Security Check ===\n")
 
         # Module integrity

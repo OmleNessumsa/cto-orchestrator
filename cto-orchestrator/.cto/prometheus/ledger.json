@@ -1692,5 +1692,247 @@
       "scripts/delegate.py",
       "scripts/team.py"
     ]
+  },
+  {
+    "timestamp": "2026-06-10T08:06:38.749349+00:00",
+    "proposal_id": "PROM-110",
+    "action": "applied",
+    "title": "Stream claude -p output via stream-json for real-time delegation events",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/roro_events.py",
+      "scripts/workers.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:10:57.757743+00:00",
+    "proposal_id": "PROM-113",
+    "action": "applied",
+    "title": "Migrate hooks.py to the standardized Claude Code hook JSON protocol for guardrails",
+    "target_files": [
+      "scripts/hooks.py",
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:15:57.806731+00:00",
+    "proposal_id": "PROM-092",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-06-10T08:16:33.926873+00:00",
+    "proposal_id": "PROM-103",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-06-10T08:18:46.617339+00:00",
+    "proposal_id": "PROM-115",
+    "action": "applied",
+    "title": "Capture real token usage and cost from stream-json result event",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:22:31.465606+00:00",
+    "proposal_id": "PROM-100",
+    "action": "applied",
+    "title": "Capability-aware terminal color rendering with NO_COLOR support",
+    "target_files": [
+      "scripts/visual.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:27:31.506958+00:00",
+    "proposal_id": "PROM-116",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-06-10T08:30:06.684259+00:00",
+    "proposal_id": "PROM-096",
+    "action": "applied",
+    "title": "Dynamic few-shot retrieval from similar completed tickets",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:33:05.202522+00:00",
+    "proposal_id": "PROM-111",
+    "action": "applied",
+    "title": "Adopt concise-by-default MCP tool responses with a response_format toggle",
+    "target_files": [
+      "scripts/mcp_server.py",
+      "scripts/ticket.py",
+      "scripts/schemas.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:36:36.109330+00:00",
+    "proposal_id": "PROM-107",
+    "action": "applied",
+    "title": "Harden injection detection against obfuscated, encoded, and indirect prompt injection",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:39:00.614824+00:00",
+    "proposal_id": "PROM-108",
+    "action": "applied",
+    "title": "Validate MCP tool inputs against allowlists before spawning subprocesses",
+    "target_files": [
+      "scripts/mcp_server.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:42:11.436965+00:00",
+    "proposal_id": "PROM-112",
+    "action": "applied",
+    "title": "Define least-privilege agent types via Claude Code --agents config",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/persona.py",
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:47:11.472243+00:00",
+    "proposal_id": "PROM-094",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-06-10T08:52:11.503447+00:00",
+    "proposal_id": "PROM-095",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-06-10T08:54:38.447252+00:00",
+    "proposal_id": "PROM-099",
+    "action": "applied",
+    "title": "Structured self-critique step before returning agent output",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/schemas.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:56:48.931034+00:00",
+    "proposal_id": "PROM-102",
+    "action": "applied",
+    "title": "Versioned, schema-stable roro event envelope for the SwiftUI terminal",
+    "target_files": [
+      "scripts/roro_events.py",
+      "scripts/schemas.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T08:59:29.365993+00:00",
+    "proposal_id": "PROM-118",
+    "action": "applied",
+    "title": "Replace regex handoff scraping with a structured MCP tool call",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/mcp_server.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:01:49.953137+00:00",
+    "proposal_id": "PROM-093",
+    "action": "applied",
+    "title": "Concurrency-capped parallel fan-out with conflict-aware aggregation",
+    "target_files": [
+      "scripts/workers.py",
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:03:21.844071+00:00",
+    "proposal_id": "PROM-117",
+    "action": "applied",
+    "title": "Refresh model registry and add cache-tier pricing",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:04:40.606438+00:00",
+    "proposal_id": "PROM-101",
+    "action": "applied",
+    "title": "Accessible progress bars with ETA, throttling, and motion-reduction",
+    "target_files": [
+      "scripts/progress.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:06:13.532048+00:00",
+    "proposal_id": "PROM-106",
+    "action": "applied",
+    "title": "Wire verify_module_integrity() into orchestrator startup for self-tamper detection",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/mcp_server.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:09:44.789422+00:00",
+    "proposal_id": "PROM-097",
+    "action": "applied",
+    "title": "Enforce JSON output via XML delimiters plus a reformat-retry pass",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/schemas.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:12:12.197691+00:00",
+    "proposal_id": "PROM-098",
+    "action": "applied",
+    "title": "Complexity-scaled extended thinking beyond architect/security roles",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:12:59.450847+00:00",
+    "proposal_id": "PROM-104",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-06-10T09:16:11.882780+00:00",
+    "proposal_id": "PROM-109",
+    "action": "applied",
+    "title": "Add a pinned, hash-locked dependency manifest plus pip-audit supply-chain gate",
+    "target_files": [
+      "requirements.lock",
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:17:24.841822+00:00",
+    "proposal_id": "PROM-114",
+    "action": "applied",
+    "title": "Package the orchestrator skills/MCP as a versioned Claude Code plugin",
+    "target_files": [
+      ".claude-plugin/plugin.json",
+      ".claude-plugin/marketplace.json",
+      "scripts/mcp_server.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T09:21:10.579265+00:00",
+    "proposal_id": "PROM-119",
+    "action": "applied",
+    "title": "Force JSON output for routing and scoring helper calls",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
   }
 ]
