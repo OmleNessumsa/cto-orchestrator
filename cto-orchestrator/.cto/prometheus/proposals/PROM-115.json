@@ -1,0 +1,18 @@
+{
+  "id": "PROM-115",
+  "title": "Capture real token usage and cost from stream-json result event",
+  "category": "claude-features",
+  "source": "Anthropic docs: Claude Code CLI reference (stream-json output format) \u2014 https://docs.anthropic.com/en/docs/claude-code/cli-reference",
+  "description": "delegate.py estimates cost with a crude 4-chars-per-token heuristic (CostTracker.estimate, lines 156-204), ignoring the authoritative usage data the CLI already emits. In stream mode the 'result' event (parsed at delegate.py:1900) carries a 'usage' object (input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens) and a 'total_cost_usd' field. Using the real numbers makes budget gating and the Prometheus ledger accurate instead of guessed, and surfaces prompt-cache savings.",
+  "impact_score": 8,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "In the stream-json loop, when etype=='result', read event.get('usage', {}) and event.get('total_cost_usd'). Add a CostTracker.record_actual(ticket_id, agent, usage, total_cost_usd, model) that stores real input/output/cache_read/cache_creation tokens and the CLI-reported cost. Prefer actual usage when present and fall back to the char-based estimate() only for non-stream runs. Update the cost line at delegate.py:2216 to display cache_read tokens and a '(cached)' marker when cache_read_input_tokens > 0.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:49:50.998344+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

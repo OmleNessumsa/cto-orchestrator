@@ -1,0 +1,25 @@
+{
+  "id": "PROM-090",
+  "title": "Explicit handoff protocol for agent-to-agent control transfer",
+  "category": "agent-patterns",
+  "source": "Search description: OpenAI Swarm / Agents SDK 'handoff' pattern + Anthropic 'Building Effective Agents' orchestrator-worker section (web fetch blocked this run; pattern is established)",
+  "description": "Currently delegate.py spawns isolated `claude -p` subprocesses with no first-class way for one Morty to hand a task back to Rick or sideways to a specialist mid-run. Swarm-style handoffs make routing data-driven instead of hardcoded, so a worker that discovers it needs a different skill can transfer control with accumulated context rather than failing or guessing.",
+  "impact_score": 8,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/schemas.py",
+    "scripts/delegate.py",
+    "scripts/team.py"
+  ],
+  "proposed_changes": "Add a `Handoff` dataclass/schema in schemas.py (fields: target_role, reason, context_summary, ticket_id). In delegate.py, parse a structured `<handoff>` JSON block from a worker's final output; when present, re-delegate to the named role with context_summary injected into the new prompt instead of returning the raw result. In team.py, route handoffs through send_team_message so the transfer is visible on the roro event stream.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:40:33.595946+00:00",
+  "applied_at": "2026-06-10T07:57:43.036437+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-090-20260610T075506",
+  "files_actually_changed": [
+    "scripts/team.py",
+    "scripts/schemas.py",
+    "scripts/delegate.py"
+  ]
+}

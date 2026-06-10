@@ -527,25 +527,6 @@ def should_skip_permissions(explicit_flag: bool = False) -> bool:
     return False
 
 
-# Per-role tool allowlists for least-privilege subprocess scoping (OWASP LLM06).
-# Passed verbatim to --allowedTools on the claude CLI subprocess.
-# mcp__cto-orchestrator__* allows agents to query/update CTO state via MCP.
-ROLE_TOOL_ALLOWLISTS: dict = {
-    "architect-morty":  ["Read", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "backend-morty":    ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "frontend-morty":   ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "fullstack-morty":  ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "tester-morty":     ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "security-morty":   ["Read", "Grep", "Glob", "Bash", "mcp__cto-orchestrator__*"],
-    "devops-morty":     ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "reviewer-morty":   ["Read", "Grep", "Glob", "mcp__cto-orchestrator__*"],
-    "unity":            ["Read", "Grep", "Glob", "Bash", "mcp__cto-orchestrator__*"],
-}
-
-# Fallback for roles not in ROLE_TOOL_ALLOWLISTS
-_DEFAULT_TOOL_ALLOWLIST: list = ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"]
-
-
 # ── Deprecated Pattern Warning ────────────────────────────────────────────────
 
 def warn_dangerous_pattern(pattern: str, location: str):

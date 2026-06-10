@@ -1,0 +1,18 @@
+{
+  "id": "PROM-101",
+  "title": "Accessible progress bars with ETA, throttling, and motion-reduction",
+  "category": "ui-ux",
+  "source": "Terminal UX patterns from rich/tqdm conventions and prefers-reduced-motion accessibility principles (knowledge through Jan 2026)",
+  "description": "Live spinners and progress indicators that repaint on every event flood non-TTY logs and can be disorienting. Throttling redraws to a fixed interval, showing an ETA/rate, and switching to a single static line (or plain status updates) when not attached to a TTY or when a RICK_REDUCE_MOTION flag is set improves both readability and accessibility while keeping the multi-Morty progress legible.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/progress.py"
+  ],
+  "proposed_changes": "Refactor progress.py to coalesce redraws behind a min-interval timer (e.g. 100ms) so rapid roro events don't thrash the terminal. Add ETA/throughput computation based on completed-vs-total ticket counts. Detect non-TTY and a RICK_REDUCE_MOTION env var to disable animated spinners, emitting discrete one-line status updates instead. Ensure the final state always prints a clean completed line even when animation is suppressed.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:44:00.531846+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

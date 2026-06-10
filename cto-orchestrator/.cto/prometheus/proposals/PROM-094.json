@@ -1,0 +1,20 @@
+{
+  "id": "PROM-094",
+  "title": "Durable checkpointing for resumable agent runs",
+  "category": "agent-patterns",
+  "source": "Search description: LangGraph persistence/checkpointer pattern for resumable graph state (live fetch blocked)",
+  "description": "If a long delegate or sprint crashes (token limit, killed subprocess, machine sleep), all progress is lost and the ticket restarts from zero. Checkpointing agent state to disk after each completed step lets Rick resume from the last good point, which is essential for the multi-hour sleepy/overnight runs this system already does.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/session.py",
+    "scripts/orchestrate.py",
+    "scripts/sleepy.py"
+  ],
+  "proposed_changes": "In session.py add `save_checkpoint(ticket_id, step, state)` and `load_checkpoint(ticket_id)` writing JSON to .cto/scratchpad/checkpoints/<ticket>.json (step index, compacted history, completed subtasks, reserved files). In orchestrate.py and sleepy.py, persist a checkpoint after each completed ticket/step and, on startup, offer to resume any ticket with an open checkpoint instead of restarting. Emit roro 'checkpoint_saved'/'resumed' events.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:40:33.606318+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

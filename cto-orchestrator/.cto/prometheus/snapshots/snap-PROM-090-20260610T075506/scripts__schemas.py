@@ -86,30 +86,6 @@ class MeeseeksOutput:
         }
 
 
-VALID_HANDOFF_ROLES = frozenset({
-    "architect-morty", "backend-morty", "frontend-morty",
-    "fullstack-morty", "tester-morty", "security-morty",
-    "devops-morty", "reviewer-morty",
-})
-
-
-@dataclass
-class Handoff:
-    """Agent-to-agent control transfer request."""
-    target_role: str
-    reason: str
-    context_summary: str
-    ticket_id: str = ""
-
-    def to_dict(self) -> dict:
-        return {
-            "target_role": self.target_role,
-            "reason": self.reason,
-            "context_summary": self.context_summary,
-            "ticket_id": self.ticket_id,
-        }
-
-
 # ── JSON extraction ─────────────────────────────────────────────────────────
 
 # Pattern to match ```json ... ``` fenced blocks
@@ -172,35 +148,6 @@ def parse_agent_json(output: str) -> Optional[AgentOutput]:
         )
     except (TypeError, ValueError):
         return None
-
-
-_HANDOFF_RE = re.compile(r"<handoff>\s*(\{.*?\})\s*</handoff>", re.DOTALL)
-
-
-def parse_handoff_block(output: str) -> Optional[Handoff]:
-    """Extract and parse a <handoff> JSON block from agent output.
-
-    Returns a Handoff if a valid block is found with a recognized target_role,
-    None otherwise.
-    """
-    if not output:
-        return None
-    match = _HANDOFF_RE.search(output)
-    if not match:
-        return None
-    try:
-        data = json.loads(match.group(1))
-    except json.JSONDecodeError:
-        return None
-    target_role = str(data.get("target_role", "")).strip()
-    if target_role not in VALID_HANDOFF_ROLES:
-        return None
-    return Handoff(
-        target_role=target_role,
-        reason=str(data.get("reason", ""))[:500],
-        context_summary=str(data.get("context_summary", ""))[:2000],
-        ticket_id=str(data.get("ticket_id", ""))[:20],
-    )
 
 
 def parse_meeseeks_json(output: str) -> Optional[MeeseeksOutput]:

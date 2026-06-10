@@ -1,0 +1,20 @@
+{
+  "id": "PROM-114",
+  "title": "Package the orchestrator skills/MCP as a versioned Claude Code plugin",
+  "category": "tooling",
+  "source": "Claude Code plugins & marketplaces: .claude-plugin/plugin.json + marketplace.json bundling skills, MCP servers, hooks (knowledge cutoff Jan 2026; live web search unavailable this run)",
+  "description": "The system ships as loose scripts + a skill. Claude Code plugins bundle skills, MCP server config, hooks, and commands into one versioned, installable unit via a .claude-plugin/plugin.json and a marketplace manifest. Packaging the orchestrator as a plugin gives versioning, one-command install on other machines, declarative MCP/hook wiring, and a clean upgrade path for Prometheus self-evolution to bump versions.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 4,
+  "target_files": [
+    ".claude-plugin/plugin.json",
+    ".claude-plugin/marketplace.json",
+    "scripts/mcp_server.py"
+  ],
+  "proposed_changes": "Create .claude-plugin/plugin.json declaring name 'cto-orchestrator', semver version, the cto-orchestrator skill path, the MCP server entry (command to launch mcp_server.py), and hook registrations. Add a marketplace.json so it can be added via /plugin marketplace add <repo>. Have prometheus.py bump the plugin.json version and append a CHANGELOG entry on each applied evolve cycle so installs are reproducible and traceable.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:47:25.440541+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

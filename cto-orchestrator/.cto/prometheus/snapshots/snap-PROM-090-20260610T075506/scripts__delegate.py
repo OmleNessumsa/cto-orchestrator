@@ -1538,15 +1538,6 @@ Begin:
     return prompt
 
 
-def _parse_handoff_from_output(output: str):
-    """Try to extract a Handoff from agent output. Returns Handoff or None."""
-    try:
-        from schemas import parse_handoff_block
-        return parse_handoff_block(output)
-    except ImportError:
-        return None
-
-
 def _extract_json_from_output(output: str) -> Optional[dict]:
     """Extract the last JSON object from a ```json fenced code block."""
     matches = list(re.finditer(r'```json\s*\n(.*?)\n```', output, re.DOTALL))
@@ -2206,61 +2197,6 @@ def cmd_delegate(args):
 
     # Parse output
     parsed = parse_agent_output(output)
-
-    # ── Agent-to-agent handoff detection ────────────────────────────────────
-    handoff = _parse_handoff_from_output(output)
-    if handoff:
-        console.print(
-            f"[cyan]*Burrrp* Handoff: @{agent} → @{handoff.target_role}[/cyan]\n"
-            f"[dim]Reason: {handoff.reason[:120]}[/dim]"
-        )
-        append_log(root, {
-            "timestamp": now_iso(),
-            "ticket_id": ticket["id"],
-            "agent": agent,
-            "action": "handoff",
-            "message": f"Handoff to @{handoff.target_role}: {handoff.reason[:100]}",
-            "files_changed": [],
-        })
-        if team_id:
-            try:
-                from team import send_handoff_message
-                send_handoff_message(root, team_id, from_role=agent, handoff=handoff)
-            except Exception:
-                pass
-        emit("cto.morty.handoff", {
-            "ticket_id": ticket["id"],
-            "from_agent": agent,
-            "to_agent": handoff.target_role,
-            "reason": handoff.reason,
-            "team_id": team_id,
-        }, role=agent, team_id=team_id)
-        new_model = load_agent_card(handoff.target_role, root=root).get("model", "sonnet")
-        handoff_prompt = build_prompt(root, ticket, handoff.target_role, team_id=team_id, task_budget=task_budget)
-        handoff_prompt += (
-            f"\n\n<handoff_context>\n"
-            f"You are receiving a task handoff from @{agent}.\n"
-            f"Reason: {handoff.reason}\n"
-            f"Context summary:\n{handoff.context_summary}\n"
-            f"</handoff_context>\n"
-        )
-        console.print(f"[green]Re-delegating to @{handoff.target_role} (model: {new_model})...[/green]")
-        try:
-            handoff_output = delegate_to_agent(
-                handoff_prompt,
-                model=new_model,
-                timeout=args.timeout,
-                skip_permissions=True,
-                agent_role=handoff.target_role,
-                team_id=team_id,
-                task_budget=task_budget,
-                effort=effort,
-            )
-            output = handoff_output
-            agent = handoff.target_role
-            parsed = parse_agent_output(output)
-        except RuntimeError as handoff_err:
-            console.print(f"[yellow]Handoff re-delegation to @{handoff.target_role} failed: {handoff_err}[/yellow]")
 
     # Backfill files_changed from git when agent didn't self-report — derive from
     # filesystem reality so reviewer-morty quality-gate never rejects on missing metadata.

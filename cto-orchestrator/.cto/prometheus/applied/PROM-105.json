@@ -1,0 +1,23 @@
+{
+  "id": "PROM-105",
+  "title": "Remove unconditional --dangerously-skip-permissions and replace blanket skip with a scoped --allowedTools allowlist",
+  "category": "security",
+  "source": "OWASP LLM Top 10 2025 \u2014 LLM06: Excessive Agency; Anthropic Claude CLI --allowedTools/--permission-mode docs. Found PROM-071 workaround in code.",
+  "description": "delegate.py:1789-1791 unconditionally appends `--dangerously-skip-permissions` to every Morty subprocess, and the centralized env-gated guard `should_skip_permissions()` is dead-coded behind `if False`. This means every delegated agent runs with unrestricted tool access regardless of CTO_ALLOW_SKIP_PERMISSIONS, the exact Excessive Agency anti-pattern (OWASP LLM06). The workaround was added because Morty's stall on interactive permission prompts \u2014 the correct fix is least-privilege tool scoping, not blanket bypass.",
+  "impact_score": 9,
+  "risk_score": 5,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/security_utils.py"
+  ],
+  "proposed_changes": "Delete the unconditional `cmd.append('--dangerously-skip-permissions')` at delegate.py:1789 and the dead `if False and should_skip_permissions(...)` branch. Replace with `--permission-mode acceptEdits` (non-interactive, no blanket bypass) plus a per-role `--allowedTools` allowlist defined in a new `ROLE_TOOL_ALLOWLISTS` dict in security_utils.py (e.g. backend-morty: Read,Write,Edit,Bash(git*),mcp__cto-orchestrator__*; architect-morty: Read,Grep,Glob only). Add `cmd.extend(['--allowedTools', ','.join(allowed)])`. Keep `should_skip_permissions()` as the only path to full skip, gated on CTO_ALLOW_SKIP_PERMISSIONS, and audit-log every invocation. This unblocks non-interactive Morty's without granting universal agency.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:46:15.022786+00:00",
+  "applied_at": "2026-06-10T07:55:06.291636+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-105-20260610T075246",
+  "files_actually_changed": [
+    "scripts/security_utils.py",
+    "scripts/delegate.py"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "PROM-113",
+  "title": "Migrate hooks.py to the standardized Claude Code hook JSON protocol for guardrails",
+  "category": "tooling",
+  "source": "Claude Code hooks: PreToolUse/PostToolUse JSON stdin, exit code 2 / decision:block, permissionDecision (knowledge cutoff Jan 2026; live web search unavailable this run)",
+  "description": "File reservation and security enforcement are stronger when done as deterministic hooks rather than relying on the model to behave. Claude Code's hook protocol passes tool input as JSON on stdin and lets a hook block a call (exit 2 or {\"decision\":\"block\"}) with feedback fed back to the agent. Routing PreToolUse(Edit/Write/Bash) through hooks.py lets the orchestrator hard-enforce file reservations and security_utils rules across every Morty without trusting the prompt.",
+  "impact_score": 8,
+  "risk_score": 5,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/hooks.py",
+    "scripts/security_utils.py"
+  ],
+  "proposed_changes": "Make hooks.py read the hook JSON from stdin (tool_name, tool_input, cwd, session_id). For PreToolUse on Edit/Write, parse the target path and block (exit 2 with a stderr reason) if the file isn't reserved by the calling Morty or matches a security_utils denylist (secrets, .env, outside repo root). For Bash, scan the command via security_utils for dangerous patterns. Register hooks in the project .claude/settings.json matcher config and emit each block to roro as 'guardrail.block'.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:47:25.438877+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

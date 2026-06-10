@@ -1,0 +1,19 @@
+{
+  "id": "PROM-102",
+  "title": "Versioned, schema-stable roro event envelope for the SwiftUI terminal",
+  "category": "ui-ux",
+  "source": "Observability/event-contract best practices and SwiftUI Codable decoding resilience patterns (knowledge through Jan 2026)",
+  "description": "The SwiftUI Rick Terminal decodes roro events; any unversioned or loosely-typed event shape forces brittle decoding and silent UI breakage when the Python side evolves. Adding an explicit schema_version and a stable, documented envelope (type, ts, ticket_id, payload) lets the macOS app decode defensively, render unknown event types gracefully, and stay forward-compatible as new event kinds are added.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/roro_events.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "Define a single RoroEvent envelope in schemas.py with fields schema_version (int), type (str enum), ts (ISO-8601), ticket_id (optional), and payload (typed per event type). Update roro_events.py to emit every event through this envelope. Document the enum of event types so the SwiftUI side can implement an 'unknown event' fallback rather than failing the whole decode when new types appear.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:44:00.533955+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

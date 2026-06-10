@@ -1,0 +1,23 @@
+{
+  "id": "PROM-091",
+  "title": "Context compaction for long-running subagents",
+  "category": "agent-patterns",
+  "source": "Search description: Anthropic 'Effective context engineering for AI agents' \u2014 compaction/summarization to stay under window limits (live fetch blocked)",
+  "description": "Long delegate runs accumulate tool output and file dumps until they hit context limits, degrading reasoning quality near the end of a ticket. Progressive summarization (compact older turns into a running summary, keep recent turns verbatim) keeps the working window dense and on-task, which is the single biggest quality lever for multi-step agents.",
+  "impact_score": 9,
+  "risk_score": 5,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/session.py",
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "In session.py add a `compact_history(messages, keep_last_n)` helper that, when estimated tokens exceed a threshold, replaces older messages with a single summary message produced by a cheap `claude -p` summarization call. Call it from delegate.py's turn loop before each new model invocation. Persist the summary so it survives resume, and emit a roro 'context_compacted' event with before/after token counts.",
+  "status": "applied",
+  "created_at": "2026-06-10T07:40:33.600582+00:00",
+  "applied_at": "2026-06-10T07:52:46.600499+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-091-20260610T075006",
+  "files_actually_changed": [
+    "scripts/session.py",
+    "scripts/delegate.py"
+  ]
+}

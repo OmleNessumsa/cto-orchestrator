@@ -1,0 +1,20 @@
+{
+  "id": "PROM-112",
+  "title": "Define least-privilege agent types via Claude Code --agents config",
+  "category": "tooling",
+  "source": "Claude Code subagents / --agents JSON (allowedTools, disallowedTools per agent) (knowledge cutoff Jan 2026; live web search unavailable this run)",
+  "description": "Specialized Morty roles (reviewer, planner, implementer) appear to all run with the same broad tool access. Claude Code lets you declare named agent types with scoped allowedTools/disallowedTools and a custom system prompt. Scoping tools per role enforces least privilege (e.g. a reviewer Morty cannot Write/Bash, a planner cannot edit files), reducing blast radius and accidental cross-ticket edits, and improves output quality by focusing each agent.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/persona.py",
+    "scripts/team.py"
+  ],
+  "proposed_changes": "In persona.py, define an AGENT_PROFILES map (role -> {systemPrompt, allowedTools, disallowedTools}). In delegate.py pass these via `--agents '<json>'` (or per-call --allowedTools/--disallowedTools) when spawning a Morty so reviewers get read-only tools (Read/Grep/Glob), implementers get Edit/Write/Bash scoped to reserved files, planners get no file-mutating tools. Wire team.py to select the profile by assigned role. Log the effective tool scope to roro for auditability.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:47:25.437245+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

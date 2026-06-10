@@ -501,30 +501,6 @@ def mark_messages_read(root: Path, team_id: str, role: str, message_ids: Optiona
             save_json(fp, msg)
 
 
-def send_handoff_message(
-    root: Path,
-    team_id: str,
-    from_role: str,
-    handoff,  # schemas.Handoff — target_role, reason, context_summary
-) -> dict:
-    """Route an agent handoff through the team message stream.
-
-    Makes the control transfer visible on the roro event stream so Rick
-    can track which agent is taking over and why.
-    """
-    message = f"HANDOFF → @{handoff.target_role}: {handoff.reason}"
-    if handoff.context_summary:
-        message += f"\nContext: {handoff.context_summary[:200]}"
-    return send_message(
-        root,
-        team_id=team_id,
-        from_role=from_role,
-        to_role=handoff.target_role,
-        message=message,
-        message_type="handoff",
-    )
-
-
 # ── File Reservation (Conflict Prevention) ───────────────────────────────────
 
 def reserve_files(root: Path, team_id: str, role: str, file_paths: list[str]) -> bool:

@@ -1,0 +1,18 @@
+{
+  "id": "PROM-103",
+  "title": "Migrate Rick Terminal SwiftUI views to @Observable + Lazy stacks",
+  "category": "ui-ux",
+  "source": "Apple SwiftUI guidance: Observation framework (@Observable replacing ObservableObject), LazyVStack/Table virtualization, ScrollViewReader auto-scroll (knowledge through Jan 2026)",
+  "description": "If the SwiftUI Rick Terminal still uses ObservableObject/@Published it re-renders broadly on every roro event, which degrades as the event log grows during long sprints. Migrating to the @Observable macro narrows invalidation to the properties actually read by each view, and rendering the event/ticket stream in a LazyVStack or Table with stable Identifiable ids plus ScrollViewReader auto-scroll keeps the UI smooth with thousands of events.",
+  "impact_score": 8,
+  "risk_score": 5,
+  "effort_score": 6,
+  "target_files": [
+    "RickTerminal/"
+  ],
+  "proposed_changes": "In the SwiftUI app (path TBD \u2014 locate the .xcodeproj/Sources dir; placeholder shown), replace ObservableObject view models with the @Observable macro and swap @ObservedObject/@StateObject for @State/@Bindable. Render the roro event feed in a LazyVStack or Table backed by an array of Identifiable events with stable ids. Add a ScrollViewReader that pins to the latest event unless the user has scrolled up. Verify minimum deployment target supports the Observation framework before migrating.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:44:00.535994+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

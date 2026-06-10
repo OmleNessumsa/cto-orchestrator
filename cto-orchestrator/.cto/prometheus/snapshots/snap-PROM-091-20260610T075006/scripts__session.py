@@ -13,7 +13,6 @@ Features:
 
 import json
 import os
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -242,76 +241,6 @@ def get_recent_log_entries(root: Path, count: int = 3) -> str:
     recent = [e.strip() for e in entries[-count:] if e.strip() and e.strip().startswith("##")]
 
     return "\n\n".join(recent)
-
-
-# ── Context Compaction ───────────────────────────────────────────────────────
-
-_COMPACT_CHARS_PER_TOKEN = 4
-_COMPACT_TOKEN_THRESHOLD = 50_000  # compact when estimated tokens exceed this
-
-
-def compact_history(messages: list[dict], keep_last_n: int = 6) -> list[dict]:
-    """Compact older conversation turns when estimated tokens exceed threshold.
-
-    When total estimated token count exceeds _COMPACT_TOKEN_THRESHOLD, replaces
-    turns older than keep_last_n with a single summary produced by a cheap
-    Haiku call. Returns messages unchanged when under the threshold or when
-    there are too few turns to compact.
-
-    Args:
-        messages: List of dicts with at least "role" and "content" keys.
-        keep_last_n: Number of most-recent turns to keep verbatim.
-
-    Returns:
-        Compacted message list (may be identical to input if no compaction needed).
-    """
-    if not messages or len(messages) <= keep_last_n:
-        return messages
-
-    total_chars = sum(len(str(m.get("content", ""))) for m in messages)
-    estimated_tokens = total_chars // _COMPACT_CHARS_PER_TOKEN
-
-    if estimated_tokens < _COMPACT_TOKEN_THRESHOLD:
-        return messages
-
-    older = messages[:-keep_last_n]
-    recent = messages[-keep_last_n:]
-
-    older_text = "\n\n".join(
-        f"[{str(m.get('role', 'unknown')).upper()}]:\n{str(m.get('content', ''))[:3000]}"
-        for m in older
-    )
-
-    summary_prompt = (
-        "Summarize the following conversation turns into a compact context block "
-        "(3-6 bullet points, key decisions, findings, and file paths only). "
-        "Be terse — this replaces prior turns in an agent context window.\n\n"
-        f"{older_text}"
-    )
-
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", "claude-haiku-4-5-20251001", summary_prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        summary_text = result.stdout.strip() or "(prior turns omitted)"
-    except Exception:
-        summary_text = "(prior turns omitted — summarization unavailable)"
-
-    summary_message = {
-        "role": "user",
-        "content": (
-            f"[COMPACTED CONTEXT — {len(older)} prior turn(s) summarized]\n"
-            f"{summary_text}"
-        ),
-        "_compacted": True,
-        "_original_turns": len(older),
-        "_tokens_before": estimated_tokens,
-    }
-
-    return [summary_message] + recent
 
 
 # ── Persona Intensity ─────────────────────────────────────────────────────────

@@ -1,0 +1,19 @@
+{
+  "id": "PROM-097",
+  "title": "Enforce JSON output via XML delimiters plus a reformat-retry pass",
+  "category": "prompt-engineering",
+  "source": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/increase-output-consistency \u2014 delimited output + self-correction",
+  "description": "Structured output relies on a ```json markdown fence (delegate.py:1506-1526) parsed by regex with a silent 'needs_review' fallback (1609-1624). Markdown fences are the least reliable delimiter \u2014 agents often emit prose around them or omit the language tag. Switching to explicit, unique XML tags (<result_json>...</result_json>) is far easier to extract unambiguously, and adding a single lightweight reformat-retry (send only the unparseable tail back to Haiku asking it to re-emit valid JSON in the tags) recovers most malformed responses instead of discarding them to needs_review.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "Change the output-format spec in build_prompt() to require the result inside <result_json>...</result_json> tags. In schemas.py extend extract_json_block() to try the XML-tagged form first, then fall back to the existing fenced/bare-JSON regexes for backward compatibility. In parse_agent_output() (delegate.py:1554), before returning the safe default, add one reformat-retry: invoke a cheap Haiku call with just the raw tail and the target schema, asking only for valid <result_json>. Cap at a single retry and audit-log when it fires.",
+  "status": "pending",
+  "created_at": "2026-06-10T07:42:53.681545+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

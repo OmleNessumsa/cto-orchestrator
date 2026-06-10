@@ -1451,5 +1451,246 @@
     "target_files": [
       "scripts/delegate.py"
     ]
+  },
+  {
+    "timestamp": "2026-06-10T07:40:33.597603+00:00",
+    "proposal_id": "PROM-090",
+    "action": "created",
+    "title": "Explicit handoff protocol for agent-to-agent control transfer",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-06-10T07:40:33.601035+00:00",
+    "proposal_id": "PROM-091",
+    "action": "created",
+    "title": "Context compaction for long-running subagents",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-06-10T07:40:33.603079+00:00",
+    "proposal_id": "PROM-092",
+    "action": "created",
+    "title": "Evaluator-optimizer review gate before ticket close",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-06-10T07:40:33.604832+00:00",
+    "proposal_id": "PROM-093",
+    "action": "created",
+    "title": "Concurrency-capped parallel fan-out with conflict-aware aggregation",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-06-10T07:40:33.606514+00:00",
+    "proposal_id": "PROM-094",
+    "action": "created",
+    "title": "Durable checkpointing for resumable agent runs",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-06-10T07:42:53.677777+00:00",
+    "proposal_id": "PROM-095",
+    "action": "created",
+    "title": "Cache-aware prompt ordering for claude -p delegations",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-06-10T07:42:53.680029+00:00",
+    "proposal_id": "PROM-096",
+    "action": "created",
+    "title": "Dynamic few-shot retrieval from similar completed tickets",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-06-10T07:42:53.681784+00:00",
+    "proposal_id": "PROM-097",
+    "action": "created",
+    "title": "Enforce JSON output via XML delimiters plus a reformat-retry pass",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-06-10T07:42:53.683403+00:00",
+    "proposal_id": "PROM-098",
+    "action": "created",
+    "title": "Complexity-scaled extended thinking beyond architect/security roles",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-06-10T07:42:53.685180+00:00",
+    "proposal_id": "PROM-099",
+    "action": "created",
+    "title": "Structured self-critique step before returning agent output",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-06-10T07:44:00.528856+00:00",
+    "proposal_id": "PROM-100",
+    "action": "created",
+    "title": "Capability-aware terminal color rendering with NO_COLOR support",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-06-10T07:44:00.532156+00:00",
+    "proposal_id": "PROM-101",
+    "action": "created",
+    "title": "Accessible progress bars with ETA, throttling, and motion-reduction",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-06-10T07:44:00.534183+00:00",
+    "proposal_id": "PROM-102",
+    "action": "created",
+    "title": "Versioned, schema-stable roro event envelope for the SwiftUI terminal",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-06-10T07:44:00.536227+00:00",
+    "proposal_id": "PROM-103",
+    "action": "created",
+    "title": "Migrate Rick Terminal SwiftUI views to @Observable + Lazy stacks",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-06-10T07:44:00.538220+00:00",
+    "proposal_id": "PROM-104",
+    "action": "created",
+    "title": "macOS HIG compliance: semantic colors, reduce-motion, Dynamic Type",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-06-10T07:46:15.024306+00:00",
+    "proposal_id": "PROM-105",
+    "action": "created",
+    "title": "Remove unconditional --dangerously-skip-permissions and replace blanket skip with a scoped --allowedTools allowlist",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-06-10T07:46:15.027879+00:00",
+    "proposal_id": "PROM-106",
+    "action": "created",
+    "title": "Wire verify_module_integrity() into orchestrator startup for self-tamper detection",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-06-10T07:46:15.030097+00:00",
+    "proposal_id": "PROM-107",
+    "action": "created",
+    "title": "Harden injection detection against obfuscated, encoded, and indirect prompt injection",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-06-10T07:46:15.032368+00:00",
+    "proposal_id": "PROM-108",
+    "action": "created",
+    "title": "Validate MCP tool inputs against allowlists before spawning subprocesses",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-06-10T07:46:15.034353+00:00",
+    "proposal_id": "PROM-109",
+    "action": "created",
+    "title": "Add a pinned, hash-locked dependency manifest plus pip-audit supply-chain gate",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-06-10T07:47:25.432982+00:00",
+    "proposal_id": "PROM-110",
+    "action": "created",
+    "title": "Stream claude -p output via stream-json for real-time delegation events",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-06-10T07:47:25.435605+00:00",
+    "proposal_id": "PROM-111",
+    "action": "created",
+    "title": "Adopt concise-by-default MCP tool responses with a response_format toggle",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-06-10T07:47:25.437459+00:00",
+    "proposal_id": "PROM-112",
+    "action": "created",
+    "title": "Define least-privilege agent types via Claude Code --agents config",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-06-10T07:47:25.439053+00:00",
+    "proposal_id": "PROM-113",
+    "action": "created",
+    "title": "Migrate hooks.py to the standardized Claude Code hook JSON protocol for guardrails",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-06-10T07:47:25.440711+00:00",
+    "proposal_id": "PROM-114",
+    "action": "created",
+    "title": "Package the orchestrator skills/MCP as a versioned Claude Code plugin",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-06-10T07:49:50.999308+00:00",
+    "proposal_id": "PROM-115",
+    "action": "created",
+    "title": "Capture real token usage and cost from stream-json result event",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-06-10T07:49:51.001583+00:00",
+    "proposal_id": "PROM-116",
+    "action": "created",
+    "title": "Move stable Morty persona/role into --append-system-prompt to maximize prompt-cache hits",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-06-10T07:49:51.003168+00:00",
+    "proposal_id": "PROM-117",
+    "action": "created",
+    "title": "Refresh model registry and add cache-tier pricing",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-06-10T07:49:51.005092+00:00",
+    "proposal_id": "PROM-118",
+    "action": "created",
+    "title": "Replace regex handoff scraping with a structured MCP tool call",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-06-10T07:49:51.008046+00:00",
+    "proposal_id": "PROM-119",
+    "action": "created",
+    "title": "Force JSON output for routing and scoring helper calls",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-06-10T07:52:46.602067+00:00",
+    "proposal_id": "PROM-091",
+    "action": "applied",
+    "title": "Context compaction for long-running subagents",
+    "target_files": [
+      "scripts/session.py",
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T07:55:06.292813+00:00",
+    "proposal_id": "PROM-105",
+    "action": "applied",
+    "title": "Remove unconditional --dangerously-skip-permissions and replace blanket skip with a scoped --allowedTools allowlist",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-06-10T07:57:43.037883+00:00",
+    "proposal_id": "PROM-090",
+    "action": "applied",
+    "title": "Explicit handoff protocol for agent-to-agent control transfer",
+    "target_files": [
+      "scripts/schemas.py",
+      "scripts/delegate.py",
+      "scripts/team.py"
+    ]
   }
 ]
