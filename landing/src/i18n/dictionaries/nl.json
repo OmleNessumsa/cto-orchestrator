@@ -1,7 +1,11 @@
 {
   "meta": {
     "title": "CTO Orchestrator — Rick Sanchez als je CTO",
-    "description": "De genialste CTO in het multiversum stuurt je softwareprojecten aan via een leger van Morty sub-agents. Wubba Lubba Dub Dub!"
+    "description": "De genialste CTO in het multiversum stuurt je softwareprojecten aan via een leger van Morty sub-agents. Nu met Rick IDE — het desktop command center. Wubba Lubba Dub Dub!"
+  },
+  "nav": {
+    "rick_ide": "Rick IDE",
+    "install": "Installeren"
   },
   "hero": {
     "title1": "Rick Sanchez",
@@ -11,6 +15,40 @@
     "cta_primary": "Get Schwifty → Installeer Nu",
     "cta_secondary": "Hoe Het Werkt ↓",
     "tagline": "Wubba Lubba Dub Dub! 🛸"
+  },
+  "rickIde": {
+    "badge": "🆕 NIEUW — Desktop App",
+    "title1": "Rick IDE",
+    "title2": "Mission Control voor het Morty-leger",
+    "version_badge": "v0.2.35 · macOS · Linux · Windows",
+    "subtitle": "*Burrrp* — een terminal is prima, Morty. Maar een COMMAND CENTER? Dát is science.",
+    "description": "Rick IDE is een native desktop app die je AI coding agents in parallelle sessies draait — met een live Kanban board, real-time cost tracking, en de volledige CTO Orchestrator ingebouwd. Kijk hoe de Morty's werken. Beoordeel ze. Het is prachtig.",
+    "feature1_title": "Multi-Session Swarm",
+    "feature1_desc": "Draai Claude Code-, Codex- en Gemini-sessies naast elkaar — grid view inbegrepen",
+    "feature2_title": "Live Kanban Board",
+    "feature2_desc": "Drag-and-drop tickets, sessie spawnen met één klik, automatisch done bij afronding",
+    "feature3_title": "Morty Activity Feed",
+    "feature3_desc": "Elke Read, Write en Bash van elke agent — live gestreamd",
+    "feature4_title": "Cost & Context Tracking",
+    "feature4_desc": "Token burn, cache hits en context-gebruik per sessie, in real time",
+    "feature5_title": "Counsel of Ricks",
+    "feature5_desc": "Twee AI-agents debatteren over jouw probleem — een moderator velt het oordeel",
+    "feature6_title": "P2P Session Sharing",
+    "feature6_desc": "Deel live terminals via versleutelde WebRTC met PIN-auth",
+    "feature7_title": "Embedded Browser",
+    "feature7_desc": "Inspecteer je app, klik op een element, stuur de selector direct naar de agent",
+    "feature8_title": "Dashboard Widgets",
+    "feature8_desc": "AI Readiness score, GitHub PRs & issues, team persona's — drag-and-drop layout",
+    "platforms_title": "Gebouwd voor elke dimensie",
+    "platform_mac": "macOS — gesigneerd & genotariseerd (.dmg)",
+    "platform_linux": "Linux — AppImage + .deb",
+    "platform_windows": "Windows — installer + portable",
+    "buy_title": "Krijg Rick IDE",
+    "buy_subtitle": "Eén betaling — alle platforms. Rick's command center is niet gratis.",
+    "buy_locked_label": "🔒 Betaal om de download te ontgrendelen",
+    "buy_button": "Betaal 0.002 ETH om te Downloaden",
+    "buy_price": "0.002 ETH",
+    "cta": "Krijg Rick IDE ↓"
   },
   "howItWorks": {
     "title": "Hoe Het Werkt",
@@ -137,10 +175,33 @@
     "feature3_desc": "Pre-upgrade snapshots voor elke wijziging",
     "feature4_title": "Audit Ledger",
     "feature4_desc": "Volledige historie van voorstellen, toepassingen en rollbacks",
-    "stats_applied": "33+ voorstellen toegepast in 14 evolution-cycles",
+    "stats_applied": "95+ voorstellen toegepast in 7 evolution-cycles",
     "stats_categories": "Claude Opus 4.7-migratie, task budgets, scratchpad-geheugen, gestructureerde output, agent-handoff, reflection loops, dual permission checks",
+    "latest_title": "🔥 Vers uit de evolution ledger",
+    "latest1_title": "Agent Handoff Protocol",
+    "latest1_desc": "Morty's dragen mid-task de controle over aan de juiste specialist — Swarm-style routing in plaats van hardcoded chains",
+    "latest2_title": "Context Compaction",
+    "latest2_desc": "Long-running agents vatten oudere turns samen en blijven scherp tegen de context-limiet aan",
+    "latest3_title": "Scoped Tool Allowlists",
+    "latest3_desc": "Per-rol permissies vervingen de blanket bypass — elke Morty krijgt exact de tools die hij nodig heeft",
+    "latest4_title": "Native MCP Server",
+    "latest4_desc": "De hele orchestrator beschikbaar als MCP tools — tickets, teams, sleepy mode, alles erop en eraan",
     "example_scan": "python scripts/prometheus.py scan",
     "example_evolve": "python scripts/prometheus.py evolve"
+  },
+  "explain": {
+    "title": "Explain Like I'm Morty",
+    "tagline": "Professor-Morty — Rick's vertaler voor simpele geesten",
+    "description": "Rick's genialiteit, vertaald naar mensentaal. Professor-Morty legt je code, concepten, architectuur en diffs uit op vijf begripsniveaus — van Total Morty tot Almost-Rick.",
+    "feature1_title": "6 Explain Modes",
+    "feature1_desc": "Code, concepten, architectuur, guided tours, diffs, en 'waarom bestaat dit überhaupt?'",
+    "feature2_title": "5 Morty Levels",
+    "feature2_desc": "De uitleg past zich aan jou aan — zonder oordeel. Oké, een béétje oordeel.",
+    "feature3_title": "Tweetalig",
+    "feature3_desc": "Engels en Nederlands, met elke sessie gelogd",
+    "level_low": "Total Morty",
+    "level_high": "Almost-Rick",
+    "example_command": "python scripts/explain.py tour"
   },
   "sleepy": {
     "title": "Sleepy Mode",
@@ -187,7 +248,14 @@
     "tip_rick": "Hey Rick, plan een REST API met user auth",
     "tip_meeseeks": "Meeseeks, fix de typo in README.md regel 42",
     "tip_description": "Rick activeert wanneer je zijn naam noemt. Mr. Meeseeks activeert voor snelle one-shot taken. Geen commando's nodig.",
-    "quote": "\"Je hebt betaald? Slimme zet. Slimmer dan de meeste dingen die Jerry doet.\" — Rick"
+    "quote": "\"Je hebt betaald? Slimme zet. Slimmer dan de meeste dingen die Jerry doet.\" — Rick",
+    "ide_subtitle": "Welkom bij mission control. Download Rick IDE hieronder — jouw OS, jouw keuze.",
+    "ide_download_title": "Download Rick IDE v0.2.35",
+    "ide_mac": "Download voor macOS",
+    "ide_linux": "Download voor Linux",
+    "ide_windows": "Download voor Windows",
+    "ide_tip": "💡 Open een projectmap, druk op Cmd+\\ voor een nieuwe sessie, en laat de Morty's los.",
+    "ide_quote": "\"Een IDE zo goed in JOUW dimensie? Graag gedaan.\" — Rick"
   },
   "commands": {
     "title": "Rick's Command Center",
@@ -213,6 +281,7 @@
   "footer": {
     "how_it_works": "Hoe Het Werkt",
     "install": "Installeren",
+    "rick_ide": "Rick IDE",
     "support": "Support",
     "disclaimer": "Disclaimer: Geen Morty's zijn mishandeld tijdens de ontwikkeling van deze skill. Nou ja, misschien een paar."
   }

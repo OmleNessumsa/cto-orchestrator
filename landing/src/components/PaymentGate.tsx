@@ -16,9 +16,15 @@ interface PaymentGateProps {
     buy_powered_by: string;
   };
   installCommand: string;
+  /** Which product this gate sells (drives charge creation + success page) */
+  product?: "cto-orchestrator" | "rick-ide";
 }
 
-export default function PaymentGate({ t, installCommand }: PaymentGateProps) {
+export default function PaymentGate({
+  t,
+  installCommand,
+  product = "cto-orchestrator",
+}: PaymentGateProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +39,7 @@ export default function PaymentGate({ t, installCommand }: PaymentGateProps) {
       const res = await fetch("/api/create-charge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product }),
       });
 
       if (!res.ok) {

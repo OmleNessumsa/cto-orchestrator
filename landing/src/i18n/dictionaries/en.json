@@ -1,7 +1,11 @@
 {
   "meta": {
     "title": "CTO Orchestrator — Rick Sanchez as your CTO",
-    "description": "The smartest CTO in the multiverse manages your software projects with an army of Morty sub-agents. Wubba Lubba Dub Dub!"
+    "description": "The smartest CTO in the multiverse manages your software projects with an army of Morty sub-agents. Now with Rick IDE — the desktop command center. Wubba Lubba Dub Dub!"
+  },
+  "nav": {
+    "rick_ide": "Rick IDE",
+    "install": "Install"
   },
   "hero": {
     "title1": "Rick Sanchez",
@@ -11,6 +15,40 @@
     "cta_primary": "Get Schwifty → Install Now",
     "cta_secondary": "How It Works ↓",
     "tagline": "Wubba Lubba Dub Dub! 🛸"
+  },
+  "rickIde": {
+    "badge": "🆕 NEW — Desktop App",
+    "title1": "Rick IDE",
+    "title2": "Mission Control for the Morty Army",
+    "version_badge": "v0.2.35 · macOS · Linux · Windows",
+    "subtitle": "*Burrrp* — a terminal is fine, Morty. But a COMMAND CENTER? That's science.",
+    "description": "Rick IDE is a native desktop app that runs your AI coding agents in parallel sessions — with a live Kanban board, real-time cost tracking, and the full CTO Orchestrator wired in. Watch the Morty's work. Judge them. It's beautiful.",
+    "feature1_title": "Multi-Session Swarm",
+    "feature1_desc": "Run Claude Code, Codex, and Gemini sessions side by side — grid view included",
+    "feature2_title": "Live Kanban Board",
+    "feature2_desc": "Drag-and-drop tickets, one-click session spawn, auto-done on completion",
+    "feature3_title": "Morty Activity Feed",
+    "feature3_desc": "Every Read, Write, and Bash from every agent — streamed live",
+    "feature4_title": "Cost & Context Tracking",
+    "feature4_desc": "Token burn, cache hits, and context usage per session, in real time",
+    "feature5_title": "Counsel of Ricks",
+    "feature5_desc": "Two AI agents debate your problem — a moderator declares the verdict",
+    "feature6_title": "P2P Session Sharing",
+    "feature6_desc": "Share live terminals over encrypted WebRTC with PIN auth",
+    "feature7_title": "Embedded Browser",
+    "feature7_desc": "Inspect your app, click an element, send the selector straight to the agent",
+    "feature8_title": "Dashboard Widgets",
+    "feature8_desc": "AI Readiness score, GitHub PRs & issues, team personas — drag-and-drop layout",
+    "platforms_title": "Built for every dimension",
+    "platform_mac": "macOS — signed & notarized (.dmg)",
+    "platform_linux": "Linux — AppImage + .deb",
+    "platform_windows": "Windows — installer + portable",
+    "buy_title": "Get Rick IDE",
+    "buy_subtitle": "One payment — all platforms. Rick's command center doesn't come free.",
+    "buy_locked_label": "🔒 Pay to unlock the download",
+    "buy_button": "Pay 0.002 ETH to Download",
+    "buy_price": "0.002 ETH",
+    "cta": "Get Rick IDE ↓"
   },
   "howItWorks": {
     "title": "How It Works",
@@ -137,10 +175,33 @@
     "feature3_desc": "Pre-upgrade snapshots for every change",
     "feature4_title": "Audit Ledger",
     "feature4_desc": "Full history of proposals, applies, and rollbacks",
-    "stats_applied": "33+ proposals applied across 14 evolution cycles",
+    "stats_applied": "95+ proposals applied across 7 evolution cycles",
     "stats_categories": "Claude Opus 4.7 migration, task budgets, scratchpad memory, structured output, agent handoff, reflection loops, dual permission checks",
+    "latest_title": "🔥 Fresh from the evolution ledger",
+    "latest1_title": "Agent Handoff Protocol",
+    "latest1_desc": "Morty's transfer control mid-task to the right specialist — Swarm-style routing instead of hardcoded chains",
+    "latest2_title": "Context Compaction",
+    "latest2_desc": "Long-running agents summarize older turns and stay sharp near the context limit",
+    "latest3_title": "Scoped Tool Allowlists",
+    "latest3_desc": "Per-role permissions replaced the blanket bypass — every Morty gets exactly the tools it needs",
+    "latest4_title": "Native MCP Server",
+    "latest4_desc": "The whole orchestrator exposed as MCP tools — tickets, teams, sleepy mode, the works",
     "example_scan": "python scripts/prometheus.py scan",
     "example_evolve": "python scripts/prometheus.py evolve"
+  },
+  "explain": {
+    "title": "Explain Like I'm Morty",
+    "tagline": "Professor-Morty — Rick's translator for simple minds",
+    "description": "Rick's genius, translated to human. Professor-Morty explains your code, concepts, architecture, and diffs at five comprehension levels — from Total Morty to Almost-Rick.",
+    "feature1_title": "6 Explain Modes",
+    "feature1_desc": "Code, concepts, architecture, guided tours, diffs, and 'why does this even exist?'",
+    "feature2_title": "5 Morty Levels",
+    "feature2_desc": "The explanation adapts to you — no judgment. Okay, some judgment.",
+    "feature3_title": "Bilingual",
+    "feature3_desc": "English and Dutch, with every session logged",
+    "level_low": "Total Morty",
+    "level_high": "Almost-Rick",
+    "example_command": "python scripts/explain.py tour"
   },
   "sleepy": {
     "title": "Sleepy Mode",
@@ -187,7 +248,14 @@
     "tip_rick": "Hey Rick, plan a REST API with user auth",
     "tip_meeseeks": "Meeseeks, fix the typo in README.md line 42",
     "tip_description": "Rick activates when you mention his name. Mr. Meeseeks activates for quick one-shot tasks. No commands needed.",
-    "quote": "\"You paid? Smart move. Smarter than most things Jerry does.\" — Rick"
+    "quote": "\"You paid? Smart move. Smarter than most things Jerry does.\" — Rick",
+    "ide_subtitle": "Welcome to mission control. Download Rick IDE below — your OS, your choice.",
+    "ide_download_title": "Download Rick IDE v0.2.35",
+    "ide_mac": "Download for macOS",
+    "ide_linux": "Download for Linux",
+    "ide_windows": "Download for Windows",
+    "ide_tip": "💡 Open a project folder, hit Cmd+\\ for a new session, and let the Morty's loose.",
+    "ide_quote": "\"An IDE this good in YOUR dimension? You're welcome.\" — Rick"
   },
   "commands": {
     "title": "Rick's Command Center",
@@ -213,6 +281,7 @@
   "footer": {
     "how_it_works": "How It Works",
     "install": "Install",
+    "rick_ide": "Rick IDE",
     "support": "Support",
     "disclaimer": "Disclaimer: No Morty's were harmed during the development of this skill. Well, maybe a few."
   }

@@ -1,7 +1,11 @@
 {
   "meta": {
     "title": "CTO Orchestrator — Rick Sanchez comme ton CTO",
-    "description": "Le CTO le plus génial du multivers dirige tes projets logiciels avec une armée de Morty sub-agents. Wubba Lubba Dub Dub !"
+    "description": "Le CTO le plus génial du multivers dirige tes projets logiciels avec une armée de Morty sub-agents. Maintenant avec Rick IDE — le centre de commande desktop. Wubba Lubba Dub Dub !"
+  },
+  "nav": {
+    "rick_ide": "Rick IDE",
+    "install": "Installer"
   },
   "hero": {
     "title1": "Rick Sanchez",
@@ -11,6 +15,40 @@
     "cta_primary": "Get Schwifty → Installer Maintenant",
     "cta_secondary": "Comment Ça Marche ↓",
     "tagline": "Wubba Lubba Dub Dub ! 🛸"
+  },
+  "rickIde": {
+    "badge": "🆕 NOUVEAU — App Desktop",
+    "title1": "Rick IDE",
+    "title2": "Mission Control pour l'Armée de Morty's",
+    "version_badge": "v0.2.35 · macOS · Linux · Windows",
+    "subtitle": "*Burrrp* — un terminal c'est mignon, Morty. Mais un CENTRE DE COMMANDE ? Ça, c'est de la science.",
+    "description": "Rick IDE est une app desktop native qui fait tourner tes agents de codage IA en sessions parallèles — avec un Kanban board en direct, suivi des coûts en temps réel, et le CTO Orchestrator complet intégré. Regarde les Morty's bosser. Juge-les. C'est magnifique.",
+    "feature1_title": "Swarm Multi-Sessions",
+    "feature1_desc": "Lance des sessions Claude Code, Codex et Gemini côte à côte — vue en grille incluse",
+    "feature2_title": "Kanban Board en Direct",
+    "feature2_desc": "Tickets en drag-and-drop, lancement de session en un clic, passage auto en done à la fin",
+    "feature3_title": "Flux d'Activité des Morty's",
+    "feature3_desc": "Chaque Read, Write et Bash de chaque agent — streamé en direct",
+    "feature4_title": "Suivi des Coûts & du Contexte",
+    "feature4_desc": "Consommation de tokens, cache hits et usage du contexte par session, en temps réel",
+    "feature5_title": "Counsel of Ricks",
+    "feature5_desc": "Deux agents IA débattent de ton problème — un modérateur rend le verdict",
+    "feature6_title": "Partage de Session P2P",
+    "feature6_desc": "Partage des terminaux en direct via WebRTC chiffré avec auth par PIN",
+    "feature7_title": "Navigateur Intégré",
+    "feature7_desc": "Inspecte ton app, clique sur un élément, envoie le sélecteur directement à l'agent",
+    "feature8_title": "Widgets de Dashboard",
+    "feature8_desc": "Score AI Readiness, PRs & issues GitHub, personas d'équipe — layout en drag-and-drop",
+    "platforms_title": "Conçu pour chaque dimension",
+    "platform_mac": "macOS — signé & notarisé (.dmg)",
+    "platform_linux": "Linux — AppImage + .deb",
+    "platform_windows": "Windows — installeur + portable",
+    "buy_title": "Obtiens Rick IDE",
+    "buy_subtitle": "Un seul paiement — toutes les plateformes. Le centre de commande de Rick n'est pas gratuit.",
+    "buy_locked_label": "🔒 Paye pour débloquer le téléchargement",
+    "buy_button": "Payer 0.002 ETH pour Télécharger",
+    "buy_price": "0.002 ETH",
+    "cta": "Obtiens Rick IDE ↓"
   },
   "howItWorks": {
     "title": "Comment Ça Marche",
@@ -137,10 +175,33 @@
     "feature3_desc": "Snapshots pré-upgrade pour chaque changement",
     "feature4_title": "Ledger d'Audit",
     "feature4_desc": "Historique complet des propositions, applications et rollbacks",
-    "stats_applied": "33+ proposals applied across 14 evolution cycles",
+    "stats_applied": "95+ propositions appliquées sur 7 cycles d'évolution",
     "stats_categories": "Claude Opus 4.7 migration, task budgets, scratchpad memory, structured output, agent handoff, reflection loops, dual permission checks",
+    "latest_title": "🔥 Tout frais sorti du ledger d'évolution",
+    "latest1_title": "Protocole de Handoff d'Agents",
+    "latest1_desc": "Les Morty's transfèrent le contrôle en pleine tâche au bon spécialiste — routage façon Swarm au lieu de chaînes codées en dur",
+    "latest2_title": "Compaction de Contexte",
+    "latest2_desc": "Les agents longue durée résument les anciens tours et restent affûtés près de la limite de contexte",
+    "latest3_title": "Allowlists d'Outils par Rôle",
+    "latest3_desc": "Des permissions par rôle ont remplacé le bypass global — chaque Morty reçoit exactement les outils dont il a besoin",
+    "latest4_title": "Serveur MCP Natif",
+    "latest4_desc": "Tout l'orchestrateur exposé en outils MCP — tickets, équipes, sleepy mode, tout le bazar",
     "example_scan": "python scripts/prometheus.py scan",
     "example_evolve": "python scripts/prometheus.py evolve"
+  },
+  "explain": {
+    "title": "Explique-Moi Comme à un Morty",
+    "tagline": "Professor-Morty — le traducteur de Rick pour les esprits simples",
+    "description": "Le génie de Rick, traduit en langage humain. Professor-Morty explique ton code, tes concepts, ton architecture et tes diffs sur cinq niveaux de compréhension — de Morty Total à Presque-Rick.",
+    "feature1_title": "6 Modes d'Explication",
+    "feature1_desc": "Code, concepts, architecture, visites guidées, diffs, et 'pourquoi ce truc existe, au juste ?'",
+    "feature2_title": "5 Niveaux de Morty",
+    "feature2_desc": "L'explication s'adapte à toi — sans jugement. Bon, un peu de jugement quand même.",
+    "feature3_title": "Bilingue",
+    "feature3_desc": "Anglais et néerlandais, avec chaque session loggée",
+    "level_low": "Morty Total",
+    "level_high": "Presque-Rick",
+    "example_command": "python scripts/explain.py tour"
   },
   "sleepy": {
     "title": "Sleepy Mode",
@@ -187,7 +248,14 @@
     "tip_rick": "Hey Rick, planifie une REST API avec auth utilisateur",
     "tip_meeseeks": "Meeseeks, corrige la faute dans README.md ligne 42",
     "tip_description": "Rick s'active quand tu mentionnes son nom. Mr. Meeseeks s'active pour les tâches rapides one-shot. Aucune commande nécessaire.",
-    "quote": "\"Tu as payé ? Bon choix. Plus intelligent que la plupart des trucs que Jerry fait.\" — Rick"
+    "quote": "\"Tu as payé ? Bon choix. Plus intelligent que la plupart des trucs que Jerry fait.\" — Rick",
+    "ide_subtitle": "Bienvenue au centre de contrôle. Télécharge Rick IDE ci-dessous — ton OS, ton choix.",
+    "ide_download_title": "Télécharger Rick IDE v0.2.35",
+    "ide_mac": "Télécharger pour macOS",
+    "ide_linux": "Télécharger pour Linux",
+    "ide_windows": "Télécharger pour Windows",
+    "ide_tip": "💡 Ouvre un dossier de projet, fais Cmd+\\ pour une nouvelle session, et lâche les Morty's.",
+    "ide_quote": "\"Un IDE aussi bon dans TA dimension ? De rien.\" — Rick"
   },
   "commands": {
     "title": "Centre de Commande de Rick",
@@ -213,6 +281,7 @@
   "footer": {
     "how_it_works": "Comment Ça Marche",
     "install": "Installer",
+    "rick_ide": "Rick IDE",
     "support": "Support",
     "disclaimer": "Avertissement : Aucun Morty n'a été maltraité lors du développement de cette skill. Enfin, peut-être quelques-uns."
   }

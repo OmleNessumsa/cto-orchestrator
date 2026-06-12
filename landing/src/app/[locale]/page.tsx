@@ -3,6 +3,7 @@ import { type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/getDictionary";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import PaymentGate from "@/components/PaymentGate";
+import RickIdeMockup from "@/components/RickIdeMockup";
 import StarField from "@/components/StarField";
 import TrackedLink from "@/components/TrackedLink";
 
@@ -159,7 +160,28 @@ export default async function Home({
               CTO Orchestrator
             </span>
           </div>
-          <LanguageSwitcher currentLocale={locale as Locale} />
+          <div className="flex items-center gap-4">
+            <TrackedLink
+              href="#rick-ide"
+              trackingName="nav_rick_ide"
+              trackingSection="nav"
+              className="hidden sm:flex items-center gap-1.5 text-sm text-gray-300 hover:text-[var(--portal-green)] transition-colors"
+            >
+              {t.nav.rick_ide}
+              <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-[var(--portal-green)]/15 text-[var(--portal-green)] border border-[var(--portal-green)]/30">
+                New
+              </span>
+            </TrackedLink>
+            <TrackedLink
+              href="#install"
+              trackingName="nav_install"
+              trackingSection="nav"
+              className="hidden sm:block text-sm text-gray-300 hover:text-[var(--portal-green)] transition-colors"
+            >
+              {t.nav.install}
+            </TrackedLink>
+            <LanguageSwitcher currentLocale={locale as Locale} />
+          </div>
         </div>
       </nav>
 
@@ -239,6 +261,98 @@ export default async function Home({
               d="M19 14l-7 7m0 0l-7-7m7 7V3"
             />
           </svg>
+        </div>
+      </section>
+
+      {/* Rick IDE Section */}
+      <section id="rick-ide" className="py-20 px-4 bg-[var(--space-blue)]/40 relative">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="inline-block text-[10px] sm:text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full bg-[var(--portal-green)]/15 text-[var(--portal-green)] border border-[var(--portal-green)]/30 mb-6">
+              {t.rickIde.badge}
+            </span>
+            <h2 className="text-4xl md:text-6xl font-bold mb-3">
+              <span className="text-[var(--portal-green)] portal-glow-text">
+                {t.rickIde.title1}
+              </span>
+              <span className="text-white"> — {t.rickIde.title2}</span>
+            </h2>
+            <p className="text-gray-500 font-mono text-sm mb-4">
+              {t.rickIde.version_badge}
+            </p>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-2 italic">
+              {t.rickIde.subtitle}
+            </p>
+            <p className="text-gray-400 max-w-3xl mx-auto mb-10">
+              {t.rickIde.description}
+            </p>
+          </div>
+
+          {/* CSS mockup of the app */}
+          <div className="mb-16">
+            <RickIdeMockup />
+          </div>
+
+          {/* IDE feature grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+            {[
+              { icon: "🌀", title: t.rickIde.feature1_title, desc: t.rickIde.feature1_desc },
+              { icon: "📋", title: t.rickIde.feature2_title, desc: t.rickIde.feature2_desc },
+              { icon: "⚡", title: t.rickIde.feature3_title, desc: t.rickIde.feature3_desc },
+              { icon: "💸", title: t.rickIde.feature4_title, desc: t.rickIde.feature4_desc },
+              { icon: "⚖️", title: t.rickIde.feature5_title, desc: t.rickIde.feature5_desc },
+              { icon: "🔗", title: t.rickIde.feature6_title, desc: t.rickIde.feature6_desc },
+              { icon: "🌐", title: t.rickIde.feature7_title, desc: t.rickIde.feature7_desc },
+              { icon: "🧩", title: t.rickIde.feature8_title, desc: t.rickIde.feature8_desc },
+            ].map((f) => (
+              <div key={f.title} className="morty-card rounded-xl p-5">
+                <div className="text-2xl mb-2">{f.icon}</div>
+                <h4 className="font-bold text-[var(--portal-green)] text-sm mb-1">
+                  {f.title}
+                </h4>
+                <p className="text-gray-400 text-xs">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Platforms */}
+          <div className="text-center mb-12">
+            <p className="text-gray-500 text-sm uppercase tracking-widest mb-4">
+              {t.rickIde.platforms_title}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <span className="px-4 py-2 rounded-full bg-[var(--space-purple)] border border-[var(--portal-green)]/20 text-gray-300 text-sm">
+                 {t.rickIde.platform_mac}
+              </span>
+              <span className="px-4 py-2 rounded-full bg-[var(--space-purple)] border border-[var(--portal-green)]/20 text-gray-300 text-sm">
+                🐧 {t.rickIde.platform_linux}
+              </span>
+              <span className="px-4 py-2 rounded-full bg-[var(--space-purple)] border border-[var(--portal-green)]/20 text-gray-300 text-sm">
+                🪟 {t.rickIde.platform_windows}
+              </span>
+            </div>
+          </div>
+
+          {/* Rick IDE payment gate */}
+          <div id="get-rick-ide" className="max-w-3xl mx-auto text-center">
+            <h3 className="text-3xl font-bold mb-2">
+              <span className="text-[var(--portal-green)]">{t.rickIde.buy_title}</span>
+            </h3>
+            <p className="text-gray-400 mb-8">{t.rickIde.buy_subtitle}</p>
+            <PaymentGate
+              product="rick-ide"
+              t={{
+                buy_title: t.rickIde.buy_title,
+                buy_subtitle: t.rickIde.buy_locked_label,
+                buy_button: t.rickIde.buy_button,
+                buy_price: t.rickIde.buy_price,
+                buy_processing: t.install.buy_processing,
+                buy_error: t.install.buy_error,
+                buy_powered_by: t.install.buy_powered_by,
+              }}
+              installCommand="Rick-IDE-0.2.35-arm64.dmg · Rick-IDE-0.2.35.AppImage · Rick-IDE-Setup-0.2.35.exe"
+            />
+          </div>
         </div>
       </section>
 
@@ -593,6 +707,32 @@ export default async function Home({
                 <p className="text-gray-400 text-xs">{t.prometheus.stats_categories}</p>
               </div>
 
+              {/* Latest evolutions (cycles 5–7) */}
+              <div className="mb-8">
+                <p className="text-[var(--morty-yellow)] font-bold text-sm mb-3">
+                  {t.prometheus.latest_title}
+                </p>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {[
+                    { title: t.prometheus.latest1_title, desc: t.prometheus.latest1_desc },
+                    { title: t.prometheus.latest2_title, desc: t.prometheus.latest2_desc },
+                    { title: t.prometheus.latest3_title, desc: t.prometheus.latest3_desc },
+                    { title: t.prometheus.latest4_title, desc: t.prometheus.latest4_desc },
+                  ].map((item) => (
+                    <div
+                      key={item.title}
+                      className="flex gap-3 items-start p-3 rounded-lg bg-[var(--morty-yellow)]/5 border border-[var(--morty-yellow)]/10"
+                    >
+                      <span className="text-[var(--morty-yellow)] mt-0.5">▸</span>
+                      <div>
+                        <p className="text-white text-sm font-bold">{item.title}</p>
+                        <p className="text-gray-400 text-xs">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Example commands */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="code-block rounded-lg p-4">
@@ -683,6 +823,78 @@ export default async function Home({
                     {t.sleepy.example_review}
                   </code>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Explain Like I'm Morty Section */}
+      <section className="py-20 px-4 bg-[var(--space-blue)]/30 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="morty-card rounded-2xl p-8 md:p-12 relative overflow-hidden border-2 border-[var(--rick-blue)]/30">
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-full bg-[var(--rick-blue)]/20 flex items-center justify-center text-4xl">
+                  🎓
+                </div>
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold">
+                    <span className="text-[var(--rick-blue)]">{t.explain.title}</span>
+                  </h2>
+                  <p className="text-[var(--rick-blue)]/60 font-mono text-sm mt-1">
+                    {t.explain.tagline}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-lg mb-8 max-w-2xl">
+                {t.explain.description}
+              </p>
+
+              {/* Morty level scale */}
+              <div className="flex items-center justify-between gap-2 mb-8 p-4 rounded-xl bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20">
+                <div className="text-center">
+                  <div className="text-3xl">🥴</div>
+                  <p className="text-gray-400 text-xs mt-1">{t.explain.level_low}</p>
+                </div>
+                <div className="flex-1 flex items-center gap-1 px-2">
+                  {["😕", "🙂", "😎"].map((e) => (
+                    <div key={e} className="flex-1 text-center">
+                      <span className="text-xl opacity-60">{e}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl">🧪</div>
+                  <p className="text-gray-400 text-xs mt-1">{t.explain.level_high}</p>
+                </div>
+              </div>
+
+              {/* Explain features */}
+              <div className="grid md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🧭</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.explain.feature1_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.explain.feature1_desc}</p>
+                </div>
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🪜</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.explain.feature2_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.explain.feature2_desc}</p>
+                </div>
+                <div className="bg-[var(--rick-blue)]/5 border border-[var(--rick-blue)]/20 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">🌍</div>
+                  <h4 className="font-bold text-[var(--rick-blue)] text-sm">{t.explain.feature3_title}</h4>
+                  <p className="text-gray-400 text-xs mt-1">{t.explain.feature3_desc}</p>
+                </div>
+              </div>
+
+              {/* Example command */}
+              <div className="code-block rounded-lg p-4">
+                <code className="text-[var(--rick-blue)] text-sm">
+                  {t.explain.example_command}
+                </code>
               </div>
             </div>
           </div>
@@ -900,6 +1112,14 @@ export default async function Home({
                 className="hover:text-[var(--portal-green)] transition-colors"
               >
                 {t.footer.how_it_works}
+              </TrackedLink>
+              <TrackedLink
+                href="#rick-ide"
+                trackingName="rick_ide"
+                trackingSection="footer"
+                className="hover:text-[var(--portal-green)] transition-colors"
+              >
+                {t.footer.rick_ide}
               </TrackedLink>
               <TrackedLink
                 href="#install"
