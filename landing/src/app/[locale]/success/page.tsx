@@ -7,20 +7,15 @@ import TrackedLink from "@/components/TrackedLink";
 import Link from "next/link";
 
 /**
- * Rick IDE download URLs. Configure via env (e.g. Vercel Blob URLs) —
- * fall back to GitHub Releases asset paths once the repo goes public.
+ * Rick IDE download URLs, served from Vercel Blob via env vars.
+ * Platforms without a configured artifact are hidden — paying customers
+ * never see a download button that 404s.
  */
-const IDE_DOWNLOADS = {
-  mac:
-    process.env.RICK_IDE_DOWNLOAD_URL_MAC ||
-    "https://github.com/OmleNessumsa/rick-ide/releases/latest",
-  linux:
-    process.env.RICK_IDE_DOWNLOAD_URL_LINUX ||
-    "https://github.com/OmleNessumsa/rick-ide/releases/latest",
-  windows:
-    process.env.RICK_IDE_DOWNLOAD_URL_WIN ||
-    "https://github.com/OmleNessumsa/rick-ide/releases/latest",
-};
+const IDE_DOWNLOADS = [
+  { key: "mac", icon: "", url: process.env.RICK_IDE_DOWNLOAD_URL_MAC },
+  { key: "linux", icon: "🐧", url: process.env.RICK_IDE_DOWNLOAD_URL_LINUX },
+  { key: "windows", icon: "🪟", url: process.env.RICK_IDE_DOWNLOAD_URL_WIN },
+].filter((d): d is { key: string; icon: string; url: string } => Boolean(d.url));
 
 export default async function SuccessPage({
   params,
@@ -63,34 +58,28 @@ export default async function SuccessPage({
               <h2 className="text-[var(--portal-green)] font-bold mb-4">
                 {t.success.ide_download_title}
               </h2>
-              <div className="grid sm:grid-cols-3 gap-3">
-                <TrackedLink
-                  href={IDE_DOWNLOADS.mac}
-                  trackingName="download_ide_mac"
-                  trackingSection="success"
-                  external
-                  className="px-4 py-3 bg-[var(--portal-green)] text-black font-bold rounded-xl hover:bg-[var(--portal-green-dim)] transition-all hover:scale-105"
-                >
-                   {t.success.ide_mac}
-                </TrackedLink>
-                <TrackedLink
-                  href={IDE_DOWNLOADS.linux}
-                  trackingName="download_ide_linux"
-                  trackingSection="success"
-                  external
-                  className="px-4 py-3 border border-[var(--portal-green)] text-[var(--portal-green)] font-bold rounded-xl hover:bg-[var(--portal-green)]/10 transition-all"
-                >
-                  🐧 {t.success.ide_linux}
-                </TrackedLink>
-                <TrackedLink
-                  href={IDE_DOWNLOADS.windows}
-                  trackingName="download_ide_windows"
-                  trackingSection="success"
-                  external
-                  className="px-4 py-3 border border-[var(--portal-green)] text-[var(--portal-green)] font-bold rounded-xl hover:bg-[var(--portal-green)]/10 transition-all"
-                >
-                  🪟 {t.success.ide_windows}
-                </TrackedLink>
+              <div className="flex flex-col sm:flex-row justify-center gap-3">
+                {IDE_DOWNLOADS.map((d, i) => (
+                  <TrackedLink
+                    key={d.key}
+                    href={d.url}
+                    trackingName={`download_ide_${d.key}`}
+                    trackingSection="success"
+                    external
+                    className={
+                      i === 0
+                        ? "px-4 py-3 bg-[var(--portal-green)] text-black font-bold rounded-xl hover:bg-[var(--portal-green-dim)] transition-all hover:scale-105"
+                        : "px-4 py-3 border border-[var(--portal-green)] text-[var(--portal-green)] font-bold rounded-xl hover:bg-[var(--portal-green)]/10 transition-all"
+                    }
+                  >
+                    {d.icon}{" "}
+                    {d.key === "mac"
+                      ? t.success.ide_mac
+                      : d.key === "linux"
+                        ? t.success.ide_linux
+                        : t.success.ide_windows}
+                  </TrackedLink>
+                ))}
               </div>
             </div>
 
