@@ -1,0 +1,20 @@
+{
+  "id": "PROM-132",
+  "title": "Virtualized, auto-scrolling event log with LazyVStack + ScrollViewReader",
+  "category": "ui-ux",
+  "source": "Apple HIG (Lists and tables) + SwiftUI performance guidance on lazy stacks and scroll anchoring for streaming logs",
+  "description": "A streaming roro event feed rendered in a plain VStack or List keeps all rows materialized and janks as the buffer grows. Using LazyVStack inside a ScrollView with a stable row identity plus ScrollViewReader for 'follow tail' behavior (auto-scroll only when the user is already at the bottom, pause when they scroll up) matches terminal-log UX expectations and keeps memory bounded via a ring-buffer cap.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "RickTerminal/Views/EventFeedView.swift",
+    "RickTerminal/ViewModels/EventStore.swift"
+  ],
+  "proposed_changes": "Wrap the feed in `ScrollViewReader { proxy in ScrollView { LazyVStack(spacing:0) { ForEach(events) { row.id($0.id) } } } }`. Track an `isAtBottom` flag; on new event call `proxy.scrollTo(last.id, anchor: .bottom)` only when isAtBottom is true. Cap EventStore.events to the last N (e.g. 2000) with a ring buffer so long sessions don't grow unbounded. Give each event a stable UUID id emitted from roro_events.py.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:03:11.365251+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No files were actually modified (false success)"
+}

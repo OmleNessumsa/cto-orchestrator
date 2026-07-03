@@ -1,0 +1,14 @@
+{
+  "proposal_id": "PROM-144",
+  "created_at": "2026-07-02T19:22:10.588486+00:00",
+  "files": {
+    "scripts/persona.py": {
+      "snapshot_name": "scripts__persona.py",
+      "original_size": 23610
+    },
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 138301
+    }
+  }
+}

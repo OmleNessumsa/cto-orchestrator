@@ -1,0 +1,20 @@
+{
+  "id": "PROM-127",
+  "title": "Wrap delegation prompts in XML-tagged sections",
+  "category": "prompt-engineering",
+  "source": "Anthropic 'Use XML tags to structure your prompts' guidance \u2014 improves instruction-following and reduces context bleed in long agent prompts",
+  "description": "Delegation and persona prompts concatenate role, project context, ticket detail, and task instructions as plain text, so the model can conflate reference context with directives. Delimiting each block with XML tags (<role>, <context>, <ticket>, <task>, <constraints>) measurably improves instruction adherence and lets agents cite specific sections.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ],
+  "proposed_changes": "Refactor the prompt-building functions in persona.py and delegate.py to assemble prompts from named XML sections rather than string concatenation. Add a small `build_tagged_prompt(sections: dict)` helper that renders each key as `<key>...</key>`. Move immutable Rick/Morty persona text into a <role> block and per-ticket data into <ticket>/<task>/<constraints> blocks so instructions are unambiguous.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:02:18.760488+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-127-20260702T155708",
+  "reject_reason": "Apply failed: Evolve delegation failed: (no stderr)"
+}

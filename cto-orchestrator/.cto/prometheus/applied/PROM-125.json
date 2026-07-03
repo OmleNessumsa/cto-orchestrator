@@ -1,0 +1,25 @@
+{
+  "id": "PROM-125",
+  "title": "Swarm-style dynamic handoffs between specialist Morty roles",
+  "category": "agent-patterns",
+  "source": "OpenAI Swarm / handoff routing pattern & LangGraph Command-based handoffs (from prior knowledge; live fetch blocked)",
+  "description": "Swarm-style orchestration lets an agent hand off control to a more appropriate specialist mid-task instead of the orchestrator pre-assigning one role for the whole ticket. Today a ticket is delegated to a single Morty role for its lifetime; if the work turns out to need a different specialty (e.g. a backend ticket that needs a security pass), there's no clean way to route it without orchestrator intervention. Letting a worker emit a structured handoff request enables adaptive routing and better role-to-work matching.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/team.py",
+    "scripts/persona.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Extend the MortyHandoff schema (schemas.py) with an optional `handoff_to: {role: str, reason: str}` field. In persona.py define the available specialist roles and their trigger conditions in the worker system prompt. In orchestrate.py, when a handoff object contains handoff_to, re-delegate the ticket to that role with the prior worker's summary as context (guard against loops with a visited-roles set and a max-hops limit). Emit a roro 'handoff' event so the terminal renders the role transition.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:01:25.893485+00:00",
+  "applied_at": "2026-07-02T20:15:45.047302+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-125-20260702T200436",
+  "files_actually_changed": [
+    "scripts/orchestrate.py",
+    "scripts/persona.py",
+    "scripts/team.py"
+  ]
+}

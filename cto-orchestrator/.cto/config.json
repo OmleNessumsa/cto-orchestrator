@@ -1,11 +1,17 @@
 {
   "project_name": "ZeasparkDashboard",
   "ticket_prefix": "ZEAS",
-  "next_ticket_number": 68,
+  "next_ticket_number": 69,
   "created_at": "2026-03-08T19:51:55.610923+00:00",
   "agents_used": [],
   "current_sprint": 1,
   "default_model": "opus-4-7",
+  "prompt_caching": {
+    "enabled": true
+  },
+  "native_subagents": {
+    "enabled": false
+  },
   "hooks": {
     "pre_delegate": [],
     "post_delegate": [],

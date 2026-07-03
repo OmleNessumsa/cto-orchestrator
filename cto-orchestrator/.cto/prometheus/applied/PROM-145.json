@@ -1,0 +1,25 @@
+{
+  "id": "PROM-145",
+  "title": "Migrate Morty roles to native Claude Code subagent definitions",
+  "category": "tooling",
+  "source": "Claude Code subagents (.claude/agents/*.md with name/description/tools/model frontmatter) \u2014 knowledge cutoff Jan 2026; verify at docs.claude.com/claude-code",
+  "description": "The system hand-rolls agent delegation via `claude -p` subprocesses. Claude Code now supports first-class subagent definitions in `.claude/agents/` with per-agent tool allowlists, model overrides, and isolated context. Defining each Morty role (reviewer, tester, implementer, security/Unity) as a native subagent gives per-role least-privilege tool scoping and lets the orchestrator invoke them by type, reducing custom subprocess plumbing and improving safety.",
+  "impact_score": 6,
+  "risk_score": 5,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/team.py",
+    "scripts/delegate.py",
+    ".claude/agents/"
+  ],
+  "proposed_changes": "Create `.claude/agents/<role>.md` files for each Morty role with frontmatter (name, description, tools allowlist scoped to what the role needs, model). Update team.py/delegate.py to invoke the matching subagent type and restrict its tools via the definition rather than passing full permissions. Keep the existing subprocess path as a fallback behind a config flag while validating parity on a low-risk ticket first.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:07:01.405395+00:00",
+  "applied_at": "2026-07-02T20:01:13.099128+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-145-20260702T195323",
+  "files_actually_changed": [
+    "scripts/team.py",
+    "scripts/delegate.py",
+    ".claude/agents/"
+  ]
+}

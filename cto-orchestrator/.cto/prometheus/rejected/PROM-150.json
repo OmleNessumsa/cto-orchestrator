@@ -1,0 +1,19 @@
+{
+  "id": "PROM-150",
+  "title": "Message Batches API fan-out for Prometheus multi-category scans",
+  "category": "claude-features",
+  "source": "Anthropic Message Batches API (~50% discount, async) \u2014 docs.anthropic.com/en/docs/build-with-claude/batch-processing; live fetch blocked this run",
+  "description": "A full Prometheus evolve cycle runs many independent scans (one per category, like this claude-features scan) that are not latency-sensitive. Running them as serial `claude -p` subprocesses is slower and full-price. The Message Batches API processes independent requests asynchronously at roughly half the token cost, ideal for the nightly/full-board evolve run.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/prometheus.py"
+  ],
+  "proposed_changes": "Add a batch execution path (SDK-based, since the CLI doesn't expose Batches) that submits all category scans of a full-board evolve cycle as one batch, polls for completion, and writes results into .cto/prometheus/proposals as they land. Keep the current per-scan subprocess path as the default/interactive mode and gate batching behind a `--batch` flag for non-interactive full-board runs. Record batch cost at the discounted rate in the ledger.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:09:06.884995+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Self-protection: cannot modify Prometheus engine"
+}

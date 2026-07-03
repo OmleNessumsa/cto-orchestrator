@@ -1,0 +1,22 @@
+{
+  "id": "PROM-133",
+  "title": "Consistent semantic color roles + light/dark adaptation for terminal output",
+  "category": "ui-ux",
+  "source": "macOS HIG (Color) \u2014 semantic system colors, Increase Contrast & Reduce Transparency accessibility settings; ANSI 256/truecolor terminal conventions",
+  "description": "Ad-hoc ANSI codes in the Python CLI and hardcoded hex in the SwiftUI app drift apart and ignore user accessibility settings. Define a single semantic palette (success/warn/error/info/muted/accent) shared conceptually between visual.py and the SwiftUI app, mapped to system semantic colors on macOS so it adapts to Dark Mode, Increase Contrast, and Reduce Transparency automatically. This makes agent status color-consistent across the terminal transcript and the GUI.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/visual.py",
+    "RickTerminal/DesignTokens/Colors.swift"
+  ],
+  "proposed_changes": "In visual.py, centralize all ANSI usage behind a `Palette` enum with named roles (SUCCESS, WARN, ERROR, INFO, MUTED, ACCENT) and detect NO_COLOR / non-TTY to disable codes. Mirror the same role names in a SwiftUI `Color` asset catalog using semantic system colors (Color.green\u2192.primary variants, or named color set with light/dark appearances). Respect `accessibilityDifferentiateWithoutColor` by pairing color with an icon/glyph prefix (\u2714 \u26a0 \u2716) rather than color alone.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:03:11.368523+00:00",
+  "applied_at": "2026-07-02T20:04:36.196415+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-133-20260702T200240",
+  "files_actually_changed": [
+    "scripts/visual.py"
+  ]
+}

@@ -569,6 +569,109 @@ ROLE_TOOL_ALLOWLISTS: dict = {
 _DEFAULT_TOOL_ALLOWLIST: list = ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"]
 
 
+# ── Agent Capability Tokens (MCP role authorization) ──────────────────────────
+
+_SESSION_SECRET_BYTES = 32
+
+
+def _session_secret_path(root_dir: Optional[Union[str, Path]] = None) -> Path:
+    """Resolve the path to the per-project HMAC session secret."""
+    if root_dir is not None:
+        return Path(root_dir) / ".cto" / "security" / "session.key"
+
+    cwd = Path(os.getcwd())
+    while True:
+        if (cwd / ".cto").is_dir():
+            return cwd / ".cto" / "security" / "session.key"
+        parent = cwd.parent
+        if parent == cwd:
+            return Path(os.getcwd()) / ".cto" / "security" / "session.key"
+        cwd = parent
+
+
+def get_session_secret(root_dir: Optional[Union[str, Path]] = None) -> bytes:
+    """Load (or lazily create) the HMAC secret used to sign agent capability tokens.
+
+    Generated once per project and persisted with 0600 permissions so it stays
+    on the local machine. delegate.py and mcp_server.py share this secret to
+    mint and verify tokens without ever exposing it to a delegated subprocess.
+
+    Args:
+        root_dir: Project root (defaults to walking up from cwd to find .cto/)
+
+    Returns:
+        Raw secret bytes.
+    """
+    path = _session_secret_path(root_dir)
+    if path.exists():
+        return path.read_bytes()
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    secret = os.urandom(_SESSION_SECRET_BYTES)
+    path.write_bytes(secret)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return secret
+
+
+def issue_agent_token(role: str, ticket_id: str, root_dir: Optional[Union[str, Path]] = None) -> str:
+    """Mint a short-lived HMAC capability token binding a delegated agent to its role + ticket.
+
+    Passed to the agent subprocess via CTO_AGENT_TOKEN alongside CTO_AGENT_ROLE
+    so mcp_server.py can verify the caller's identity instead of trusting
+    CTO_AGENT_ROLE alone — an env var any subprocess could otherwise override
+    to spoof a different role (OWASP LLM06 Excessive Agency).
+
+    Args:
+        role: Agent role being spawned (e.g. backend-morty)
+        ticket_id: Ticket the agent is being delegated to work on
+        root_dir: Project root (defaults to walking up from cwd to find .cto/)
+
+    Returns:
+        Token string of the form "<nonce>.<hmac_hex>".
+    """
+    import hashlib
+    import hmac
+    import secrets
+
+    secret = get_session_secret(root_dir)
+    nonce = secrets.token_hex(16)
+    message = f"{role}|{ticket_id}|{nonce}".encode("utf-8")
+    digest = hmac.new(secret, message, hashlib.sha256).hexdigest()
+    return f"{nonce}.{digest}"
+
+
+def verify_agent_token(role: str, ticket_id: str, token: str, root_dir: Optional[Union[str, Path]] = None) -> bool:
+    """Verify a capability token was issued for exactly this role/ticket_id pair.
+
+    Args:
+        role: Claimed agent role (from CTO_AGENT_ROLE)
+        ticket_id: Claimed ticket ID (from CTO_TICKET_ID)
+        token: Capability token to verify (from CTO_AGENT_TOKEN)
+        root_dir: Project root (defaults to walking up from cwd to find .cto/)
+
+    Returns:
+        True only if the token's HMAC matches role/ticket_id under the
+        project's session secret.
+    """
+    import hashlib
+    import hmac
+
+    if not role or not token or "." not in token:
+        return False
+
+    nonce, _, digest = token.partition(".")
+    if not nonce or not digest:
+        return False
+
+    secret = get_session_secret(root_dir)
+    message = f"{role}|{ticket_id}|{nonce}".encode("utf-8")
+    expected = hmac.new(secret, message, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, digest)
+
+
 # ── Deprecated Pattern Warning ────────────────────────────────────────────────
 
 def warn_dangerous_pattern(pattern: str, location: str):
@@ -855,6 +958,37 @@ def redact_secrets(text: str) -> str:
         text = compiled.sub(f"[REDACTED-{secret_type}]", text)
 
     return text
+
+
+def sanitize_agent_stdout(text: str) -> tuple[str, list[str]]:
+    """Sanitize raw agent subprocess stdout before it re-enters the loop.
+
+    Agent output is untrusted (OWASP LLM05): a compromised or manipulated
+    agent can emit injection payloads or exfiltrated secrets that would
+    otherwise be logged to ticket JSON and fed to downstream reviewer
+    agents unfiltered. This always runs in "warn" mode — it never raises —
+    so a legitimate ticket is never hard-failed by a false positive; callers
+    are expected to act on the returned findings (e.g. flag for human
+    review) instead.
+
+    Args:
+        text: Raw agent stdout
+
+    Returns:
+        Tuple of (redacted_text, injection_findings). injection_findings is
+        empty when no patterns were detected.
+    """
+    if not text:
+        return text, []
+
+    clean_text = redact_secrets(text)
+
+    try:
+        findings = detect_injection_patterns(clean_text)
+    except SecurityViolationError as exc:
+        findings = list(getattr(exc, "patterns", None) or [str(exc)])
+
+    return clean_text, findings
 
 
 # ── Least-Agency Output Validation (PROM-018) ─────────────────────────────
@@ -1203,6 +1337,84 @@ def scan_bash_command(command: str) -> tuple[bool, str]:
     return False, ""
 
 
+# ── Network Egress Allowlist ──────────────────────────────────────────────────
+
+# Known-good hosts agents may reach even with no CTO_EGRESS_ALLOWLIST configured.
+# A host is considered allowed if it exactly matches an entry or is a subdomain
+# of one (e.g. "api.github.com" is allowed by the "github.com" entry).
+_DEFAULT_EGRESS_ALLOWLIST = frozenset({
+    "github.com",
+    "pypi.org",
+    "files.pythonhosted.org",
+    "registry.npmjs.org",
+    "anthropic.com",
+})
+
+_EGRESS_URL_PATTERN = re.compile(r'https?://([a-zA-Z0-9][a-zA-Z0-9.\-]*)')
+_EGRESS_SSH_GIT_PATTERN = re.compile(r'git@([a-zA-Z0-9][a-zA-Z0-9.\-]*):')
+_EGRESS_NC_PATTERN = re.compile(
+    r'\b(?:nc|ncat|netcat)\s+(?:-\S+\s+)*([a-zA-Z0-9][a-zA-Z0-9.\-]*)\s+\d{1,5}\b'
+)
+
+
+def _egress_allowlist() -> set[str]:
+    """Return the configured egress allowlist (lowercased hostnames).
+
+    Controlled by the CTO_EGRESS_ALLOWLIST env var (comma-separated
+    hostnames). Falls back to _DEFAULT_EGRESS_ALLOWLIST when unset.
+    """
+    raw = os.environ.get("CTO_EGRESS_ALLOWLIST", "")
+    if raw.strip():
+        return {h.strip().lower() for h in raw.split(",") if h.strip()}
+    return set(_DEFAULT_EGRESS_ALLOWLIST)
+
+
+def _egress_host_allowed(host: str, allowlist: set[str]) -> bool:
+    host = host.rstrip(".").lower()
+    for allowed in allowlist:
+        allowed = allowed.rstrip(".").lower()
+        if host == allowed or host.endswith("." + allowed):
+            return True
+    return False
+
+
+def scan_command_egress(command: str) -> tuple[bool, str]:
+    """Scan a shell command for outbound network requests to disallowed hosts.
+
+    Extracts destination hosts from http(s):// URLs (curl, wget, git remote
+    over HTTPS, pip/npm --index-url/--registry, etc.), SSH-style git remotes
+    (git@host:...), and raw nc/netcat invocations, then checks each against
+    the egress allowlist (see _egress_allowlist).
+
+    Enforcement mode (block vs. warn) is left to the caller — this function
+    only detects and reports, it never raises or exits.
+
+    Returns:
+        Tuple of (is_denied, reason)
+    """
+    if not command:
+        return False, ""
+
+    hosts: set[str] = set()
+    for m in _EGRESS_URL_PATTERN.finditer(command):
+        hosts.add(m.group(1).lower())
+    for m in _EGRESS_SSH_GIT_PATTERN.finditer(command):
+        hosts.add(m.group(1).lower())
+    for m in _EGRESS_NC_PATTERN.finditer(command):
+        hosts.add(m.group(1).lower())
+
+    if not hosts:
+        return False, ""
+
+    allowlist = _egress_allowlist()
+    denied = sorted(h for h in hosts if not _egress_host_allowed(h, allowlist))
+
+    if denied:
+        return True, f"Egress to disallowed host(s): {', '.join(denied)}"
+
+    return False, ""
+
+
 # ── Module Integrity Verification ────────────────────────────────────────────
 
 def verify_module_integrity(
@@ -1323,23 +1535,77 @@ def verify_module_integrity(
     }
 
 
+_SEVERITY_LEVELS = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def _verify_lockfile_hash_pinned(lockfile: Path) -> list[str]:
+    """Return package names in *lockfile* missing a --hash= pin.
+
+    pip-audit's --require-hashes flag already refuses to run against an
+    unpinned lockfile, but checking here surfaces a clear pre-flight error
+    (with the offending package names) before spawning the subprocess.
+
+    Args:
+        lockfile: Path to the requirements lock file.
+
+    Returns:
+        List of package names that have no --hash= entry.
+    """
+    text = lockfile.read_text()
+    # Join backslash line-continuations so a requirement and its hashes read as one logical line
+    joined = re.sub(r'\\\s*\n\s*', ' ', text)
+
+    unpinned: list[str] = []
+    for line in joined.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("-"):
+            continue
+        if "--hash=" not in line:
+            pkg_name = re.split(r'[=<>!~\s]', line, 1)[0]
+            if pkg_name:
+                unpinned.append(pkg_name)
+    return unpinned
+
+
+def _severity_meets_threshold(severity: str, fail_on: str) -> bool:
+    """Return True if *severity* is at or above the *fail_on* threshold.
+
+    Vulnerabilities pip-audit cannot classify ("unknown") always meet the
+    threshold — unknown risk is treated as blocking, not as low risk.
+    """
+    threshold = _SEVERITY_LEVELS.get(fail_on.lower(), _SEVERITY_LEVELS["low"])
+    level = _SEVERITY_LEVELS.get(severity.lower())
+    if level is None:
+        return True
+    return level >= threshold
+
+
 def supply_chain_check(
     lockfile: Optional[Union[str, Path]] = None,
     log_dir: Optional[Union[str, Path]] = None,
+    fail_on: str = "low",
 ) -> dict:
     """Run pip-audit against the pinned requirements.lock and surface CVEs.
 
     Requires pip-audit to be installed (`pip install pip-audit`).
     The lockfile defaults to requirements.lock at the project root.
+    Before auditing, verifies every requirement in the lockfile carries a
+    --hash= pin so an unpinned dependency can't silently slip past
+    --require-hashes.
 
     Args:
         lockfile: Path to the requirements lock file (hash-pinned).
         log_dir:  Directory for the security audit log.
+        fail_on:  Minimum severity ("low" | "medium" | "high" | "critical")
+                  that marks the result "vulnerable". CVEs below the
+                  threshold are still reported but don't block. Vulnerabilities
+                  pip-audit can't classify always block, regardless of threshold.
 
     Returns:
         Dict with keys:
             "status"        — "ok" | "vulnerable" | "error"
-            "vulnerabilities" — list of dicts with 'package', 'version', 'id', 'description'
+            "vulnerabilities" — list of dicts with 'package', 'version', 'id',
+                                'description', 'severity'
             "error"         — error message if pip-audit could not run
     """
     import json as _json
@@ -1365,6 +1631,12 @@ def supply_chain_check(
     if not lockfile.exists():
         msg = f"requirements.lock not found at {lockfile}"
         audit_log_security_event("supply_chain_check_error", msg, severity="warning", log_dir=log_dir)
+        return {"status": "error", "vulnerabilities": [], "error": msg}
+
+    unpinned = _verify_lockfile_hash_pinned(lockfile)
+    if unpinned:
+        msg = f"Lockfile is not fully hash-pinned — missing --hash= for: {', '.join(unpinned[:10])}"
+        audit_log_security_event("supply_chain_check_error", msg, severity="critical", log_dir=log_dir)
         return {"status": "error", "vulnerabilities": [], "error": msg}
 
     # pip-audit must be on PATH; guide users to install it if missing
@@ -1400,19 +1672,31 @@ def supply_chain_check(
                     "version": dep.get("version", "unknown"),
                     "id": vuln.get("id", "unknown"),
                     "description": vuln.get("description", "")[:300],
+                    "severity": str(vuln.get("severity") or "unknown").lower(),
                 })
     except (_json.JSONDecodeError, AttributeError):
         pass  # pip-audit may print non-JSON warnings to stdout; ignore parse failures
 
-    if vulns:
+    blocking = [v for v in vulns if _severity_meets_threshold(v["severity"], fail_on)]
+
+    if blocking:
         audit_log_security_event(
             "supply_chain_vulnerability",
-            f"pip-audit found {len(vulns)} CVE(s): "
-            + ", ".join(f"{v['package']}@{v['version']} [{v['id']}]" for v in vulns[:5]),
+            f"pip-audit found {len(blocking)} CVE(s) at/above fail_on={fail_on}: "
+            + ", ".join(f"{v['package']}@{v['version']} [{v['id']}]" for v in blocking[:5]),
             severity="critical",
             log_dir=log_dir,
         )
         return {"status": "vulnerable", "vulnerabilities": vulns, "error": None}
+
+    if vulns:
+        audit_log_security_event(
+            "supply_chain_low_severity",
+            f"pip-audit found {len(vulns)} CVE(s) below fail_on={fail_on} threshold in {lockfile.name}",
+            severity="warning",
+            log_dir=log_dir,
+        )
+        return {"status": "ok", "vulnerabilities": vulns, "error": None}
 
     audit_log_security_event(
         "supply_chain_ok",
@@ -1452,22 +1736,34 @@ if __name__ == "__main__":
         metavar="PATH",
         help="Path to requirements.lock (default: auto-detected project root)",
     )
+    _audit_parser.add_argument(
+        "--fail-on",
+        default="low",
+        choices=["low", "medium", "high", "critical"],
+        help="Minimum severity that fails the build (default: low = fail on any known-severity CVE)",
+    )
 
     _args = _parser.parse_args()
 
     if _args.command == "supply-chain-check":
         print("=== CTO Orchestrator — Supply-Chain Check ===\n")
         _lockfile = getattr(_args, "lockfile", None)
-        _sc = supply_chain_check(lockfile=_lockfile)
+        _fail_on = getattr(_args, "fail_on", "low")
+        _sc = supply_chain_check(lockfile=_lockfile, fail_on=_fail_on)
         if _sc["status"] == "error":
             print(f"ERROR: {_sc['error']}")
             raise SystemExit(2)
         elif _sc["status"] == "ok":
-            print("Supply chain: OK — no known CVEs in requirements.lock")
+            if _sc["vulnerabilities"]:
+                print(f"Supply chain: OK — {len(_sc['vulnerabilities'])} CVE(s) below --fail-on={_fail_on} threshold (not blocking)")
+                for v in _sc["vulnerabilities"]:
+                    print(f"  [{v['id']}] {v['package']}=={v['version']} (severity={v['severity']}): {v['description'][:120]}")
+            else:
+                print("Supply chain: OK — no known CVEs in requirements.lock")
         else:
-            print(f"VULNERABLE — {len(_sc['vulnerabilities'])} CVE(s) found:")
+            print(f"VULNERABLE — {len(_sc['vulnerabilities'])} CVE(s) found, at/above --fail-on={_fail_on}:")
             for v in _sc["vulnerabilities"]:
-                print(f"  [{v['id']}] {v['package']}=={v['version']}: {v['description'][:120]}")
+                print(f"  [{v['id']}] {v['package']}=={v['version']} (severity={v['severity']}): {v['description'][:120]}")
             raise SystemExit(1)
 
     elif _args.command == "security-check":

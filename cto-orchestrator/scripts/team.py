@@ -33,6 +33,17 @@ try:
 except ImportError:
     AGENT_PROFILES: dict = {}
 
+
+def _native_agent_definition_exists(root: Path, role_name: str) -> bool:
+    """Return True if role_name has a native Claude Code subagent definition.
+
+    Presence alone doesn't switch dispatch behavior — delegate.py's
+    use_native_subagent() also checks .cto/config.json's native_subagents.enabled
+    flag at dispatch time. This just lets team status/audit views show which
+    roles are migrated to .claude/agents/{role}.md tool scoping.
+    """
+    return (root / ".claude" / "agents" / f"{role_name}.md").exists()
+
 # Import security utilities
 try:
     from security_utils import sanitize_team_id, sanitize_ticket_id, sanitize_text_input
@@ -202,6 +213,7 @@ def create_team_session(
             "tool_scope": {
                 "allowedTools": profile.get("allowedTools", []),
                 "disallowedTools": profile.get("disallowedTools", []),
+                "native_subagent_available": _native_agent_definition_exists(root, role_name),
             },
         })
 
@@ -513,6 +525,34 @@ def mark_messages_read(root: Path, team_id: str, role: str, message_ids: Optiona
             save_json(fp, msg)
 
 
+# Swarm-style handoffs can chain (worker A -> B -> C -> ...) as each specialist
+# discovers the work needs a different role. Without a cap, a misbehaving loop
+# (e.g. two roles handing off back to each other) would burn the whole sprint
+# budget re-delegating forever, so every hop is checked against a per-team
+# visited-roles set and this hard cap before it's allowed to route.
+MAX_HANDOFF_HOPS = 4
+
+
+def get_handoff_chain(team: dict) -> dict:
+    """Return this team's handoff chain state: {"visited": [roles], "hops": int}."""
+    return team.get("handoff_chain") or {"visited": [], "hops": 0}
+
+
+def _check_handoff_hop(team: dict, from_role: str, to_role: str) -> tuple[bool, str]:
+    """Guard a proposed handoff hop against cycles and the max-hop limit.
+
+    Returns (allowed, reason). On the first hop for a team, seeds the visited
+    set with from_role so a same-team round-trip (A -> B -> A) is caught too.
+    """
+    chain = get_handoff_chain(team)
+    visited = list(chain["visited"]) or [from_role]
+    if chain["hops"] >= MAX_HANDOFF_HOPS:
+        return False, f"max handoff hops ({MAX_HANDOFF_HOPS}) reached"
+    if to_role in visited:
+        return False, f"handoff loop detected — @{to_role} already visited this ticket ({' -> '.join(visited)})"
+    return True, ""
+
+
 def send_handoff_message(
     root: Path,
     team_id: str,
@@ -522,8 +562,44 @@ def send_handoff_message(
     """Route an agent handoff through the team message stream.
 
     Makes the control transfer visible on the roro event stream so Rick
-    can track which agent is taking over and why.
+    can track which agent is taking over and why. Guards against handoff
+    loops with a visited-roles set and MAX_HANDOFF_HOPS before routing —
+    a blocked hop is logged and surfaced as a roro event instead of being
+    silently routed into a cycle.
     """
+    team = load_team(root, team_id)
+    allowed, block_reason = _check_handoff_hop(team, from_role, handoff.target_role)
+
+    if not allowed:
+        emit("cto.team.handoff.blocked", {
+            "team_id": team_id,
+            "from_role": from_role,
+            "to_role": handoff.target_role,
+            "reason": block_reason,
+        }, role=from_role, team_id=team_id)
+        return send_message(
+            root,
+            team_id=team_id,
+            from_role=from_role,
+            to_role="@*",
+            message=f"HANDOFF BLOCKED (@{from_role} → @{handoff.target_role}): {block_reason}",
+            message_type="blocked",
+        )
+
+    chain = get_handoff_chain(team)
+    visited = list(chain["visited"]) or [from_role]
+    visited.append(handoff.target_role)
+    team["handoff_chain"] = {"visited": visited, "hops": chain["hops"] + 1}
+    save_team(root, team)
+
+    emit("cto.team.handoff", {
+        "team_id": team_id,
+        "from_role": from_role,
+        "to_role": handoff.target_role,
+        "reason": handoff.reason,
+        "hop": team["handoff_chain"]["hops"],
+    }, role=from_role, team_id=team_id)
+
     message = f"HANDOFF → @{handoff.target_role}: {handoff.reason}"
     if handoff.context_summary:
         message += f"\nContext: {handoff.context_summary[:200]}"

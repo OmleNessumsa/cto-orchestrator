@@ -1,0 +1,20 @@
+{
+  "id": "PROM-147",
+  "title": "Context editing + memory tool to prevent context exhaustion in long agent runs",
+  "category": "claude-features",
+  "source": "Anthropic context management (context editing / memory tool beta) \u2014 docs.anthropic.com/en/docs/build-with-claude/context-editing; live fetch blocked this run",
+  "description": "Long delegate/team runs accumulate large tool-result blocks (file reads, command output) that eventually exhaust the context window and force truncation, degrading output quality on L/XL tickets. Anthropic's context-editing feature auto-clears stale tool results once a token threshold is hit, and the memory tool lets an agent persist facts to files across the run. This directly improves reliability of the longest, highest-value tickets.",
+  "impact_score": 8,
+  "risk_score": 4,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/session.py"
+  ],
+  "proposed_changes": "In delegate_to_agent, enable context editing on L/XL/complexity-gated runs (clear tool-result blocks above a configurable token trigger, keeping the most recent N). Wire the memory tool to the existing .cto/session or a per-ticket .cto/scratchpad directory so a Morty can offload intermediate findings to a file rather than holding them in-context. Add a config flag in .cto/config.json (context_editing.enabled, trigger_tokens, keep_recent) and emit a roro event when context is compacted so the Rick Terminal can visualize it.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:09:06.878313+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-147-20260702T145958",
+  "reject_reason": "Apply failed: Evolve delegation failed: (no stderr)"
+}

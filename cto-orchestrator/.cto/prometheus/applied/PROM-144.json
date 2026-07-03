@@ -1,0 +1,22 @@
+{
+  "id": "PROM-144",
+  "title": "Prompt caching for repeated Morty persona/system prompts",
+  "category": "tooling",
+  "source": "Anthropic prompt caching (cache_control) applied to stable agent system prompts \u2014 knowledge cutoff Jan 2026; verify at docs.anthropic.com",
+  "description": "Every delegated Morty subprocess likely re-sends the same large persona/system prompt (role instructions, project context, coding standards). Marking the stable prefix with cache_control breakpoints (or, for CLI, keeping the system prompt byte-stable so implicit caching hits) cuts input-token cost and latency substantially across a sprint that fans out dozens of agents.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/persona.py",
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "In persona.py, split each Morty prompt into a stable prefix (role charter, standards, repo conventions) and a volatile suffix (this ticket's task). Keep the prefix byte-identical across calls and pass it via `--append-system-prompt`/system prompt so implicit caching applies. If delegate.py uses the Messages API directly instead of the CLI, add `cache_control: {type: 'ephemeral'}` to the final system block. Log cache_read vs cache_creation tokens from the result event to confirm hit rates.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:07:01.402559+00:00",
+  "applied_at": "2026-07-02T19:23:02.411057+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-144-20260702T192210",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

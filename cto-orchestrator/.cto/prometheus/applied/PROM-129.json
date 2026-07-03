@@ -1,0 +1,23 @@
+{
+  "id": "PROM-129",
+  "title": "Add few-shot examples to ticket-breakdown prompts",
+  "category": "prompt-engineering",
+  "source": "Few-shot prompting best practice \u2014 2-4 curated examples raise output consistency more than instructions alone",
+  "description": "Ticket generation quality (granularity, acceptance criteria, sizing) varies run-to-run because the prompt is zero-shot. Embedding 2-3 canonical example tickets (a well-scoped one, a split-required one, and a rejected too-vague one) anchors the model to the house style and reduces oversized or underspecified tickets.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/ticket.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Create a `TICKET_FEWSHOT` constant in ticket.py holding 3 example (input feature \u2192 output ticket JSON) pairs wrapped in <example> tags, including one 'this is too vague, split it' negative example. Inject it into the breakdown prompt in orchestrate.py before the actual feature description. Keep examples short (\u2264120 tokens each) to limit prompt bloat.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:02:18.765704+00:00",
+  "applied_at": "2026-07-02T20:02:40.893628+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-129-20260702T200128",
+  "files_actually_changed": [
+    "scripts/orchestrate.py",
+    "scripts/ticket.py"
+  ]
+}

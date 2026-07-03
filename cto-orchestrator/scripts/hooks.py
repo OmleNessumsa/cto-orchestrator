@@ -15,6 +15,15 @@ Each hook entry is an object with:
 
 Environment variables available to shell hooks:
   CTO_TICKET_ID, CTO_AGENT, CTO_STATUS, CTO_ROOT
+
+The PreToolUse guardrail hook additionally enforces a network egress
+allowlist on Bash commands (see security_utils.scan_command_egress):
+  CTO_EGRESS_ALLOWLIST — comma-separated hostnames agents may reach.
+                         Defaults to github.com, pypi.org,
+                         files.pythonhosted.org, registry.npmjs.org,
+                         anthropic.com (subdomains included).
+  CTO_EGRESS_MODE       — 'warn' (default): log denied egress and continue.
+                         'block': deny the tool call (exit 2).
 """
 
 import importlib
@@ -178,6 +187,16 @@ def _emit_guardrail_block(event_data: dict) -> None:
         pass
 
 
+def _emit_egress_denied(event_data: dict) -> None:
+    """Fire-and-forget egress.denied event to roro (best-effort)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from roro_events import emit
+        emit("egress.denied", event_data)
+    except Exception:
+        pass
+
+
 def guardrail_hook() -> None:
     """Claude Code PreToolUse hook entry point.
 
@@ -192,7 +211,12 @@ def guardrail_hook() -> None:
     sys.path.insert(0, str(Path(__file__).parent))
 
     try:
-        from security_utils import is_path_in_denylist, scan_bash_command
+        from security_utils import (
+            audit_log_security_event,
+            is_path_in_denylist,
+            scan_bash_command,
+            scan_command_egress,
+        )
     except ImportError:
         sys.exit(0)  # fail open if security_utils unavailable
 
@@ -258,6 +282,26 @@ def guardrail_hook() -> None:
         dangerous, reason = scan_bash_command(command)
         if dangerous:
             block(f"GUARDRAIL: {reason}", {"command": command[:200]})
+
+        denied, egress_reason = scan_command_egress(command)
+        if denied:
+            egress_mode = os.environ.get("CTO_EGRESS_MODE", "warn").lower().strip()
+            if egress_mode == "block":
+                block(f"GUARDRAIL: {egress_reason}", {"command": command[:200]})
+            else:
+                audit_log_security_event(
+                    "egress_denied",
+                    f"{egress_reason} — command: {command[:200]}",
+                    severity="warning",
+                    log_dir=root / ".cto" / "logs",
+                )
+                _emit_egress_denied({
+                    "tool_name": tool_name,
+                    "reason": egress_reason,
+                    "session_id": session_id,
+                    "caller_role": caller_role,
+                    "command": command[:200],
+                })
 
     sys.exit(0)
 

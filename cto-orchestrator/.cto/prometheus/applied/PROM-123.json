@@ -1,0 +1,25 @@
+{
+  "id": "PROM-123",
+  "title": "Add an evaluator/critic Morty reflection loop before closing tickets",
+  "category": "agent-patterns",
+  "source": "AutoGen reflection pattern + Anthropic evaluator-optimizer agent pattern (from prior knowledge; live fetch blocked)",
+  "description": "The evaluator-optimizer / reflection pattern spawns a second agent that adversarially reviews the first agent's output against acceptance criteria before it is accepted. This measurably reduces silently-wrong completions in multi-agent systems. The CTO closes tickets after a worker reports done, but there's no independent verification step. Inserting a lightweight reviewer Morty that checks the diff and the ticket's acceptance criteria \u2014 and can bounce the ticket back to 'in progress' \u2014 improves correctness without a human in the loop.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/orchestrate.py",
+    "scripts/delegate.py",
+    "scripts/roro_events.py"
+  ],
+  "proposed_changes": "Add a `review_ticket(ticket, handoff)` function that spawns a dedicated reviewer `claude -p` with a critic persona, passing the git diff of files_changed plus the ticket's acceptance_criteria, and returns a structured verdict {approved: bool, issues: list[str]}. In orchestrate.py, gate close_ticket behind this verdict: if not approved, re-delegate with the issues appended (max 2 retries) before escalating. Emit `roro` events for review_started/review_passed/review_failed so the Rick Terminal visualizes the reflection loop.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:01:25.888493+00:00",
+  "applied_at": "2026-07-02T15:21:43.249735+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-123-20260702T151027",
+  "files_actually_changed": [
+    "scripts/roro_events.py",
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ]
+}

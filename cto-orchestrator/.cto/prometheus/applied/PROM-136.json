@@ -1,0 +1,23 @@
+{
+  "id": "PROM-136",
+  "title": "Scan agent subprocess OUTPUT for injection and secrets before it re-enters the loop",
+  "category": "security",
+  "source": "OWASP LLM Top 10 (2025) \u2014 LLM05 Improper Output Handling & LLM02 Sensitive Information Disclosure; codebase gap: delegate.py:2630 treats agent stdout as trusted",
+  "description": "Incoming ticket descriptions are scanned (delegate.py:1581) but Morty agent OUTPUT is only path/status-sanitized, never scanned for prompt injection or leaked secrets. A compromised or manipulated agent can emit injection payloads or exfiltrated credentials that are logged to ticket JSON and fed to downstream reviewer/reviewer agents \u2014 closing an untrusted feedback loop. Treat agent output as untrusted per OWASP LLM05.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/security_utils.py"
+  ],
+  "proposed_changes": "In delegate.py where parse_agent_output()/parsed is produced (~line 2630), run detect_injection_patterns() and redact_secrets() over the raw subprocess stdout BEFORE it is saved to the ticket, logged via append_log (~2864), or passed to another agent. On injection detection, call audit_log_security_event('agent_output_injection', ...) and mark the ticket for human review rather than auto-advancing. Add a helper sanitize_agent_stdout(text) in security_utils.py that returns (clean_text, findings) combining redact_secrets + detect_injection_patterns in 'warn' mode so it never hard-fails a legit ticket.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:06:01.164692+00:00",
+  "applied_at": "2026-07-02T11:12:51.829884+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-136-20260702T110936",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/security_utils.py"
+  ]
+}

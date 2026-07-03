@@ -22,6 +22,8 @@ def _animated_output() -> bool:
     """Return True only when the terminal supports in-place animation."""
     if os.environ.get("RICK_REDUCE_MOTION"):
         return False
+    if os.environ.get("NO_COLOR") or os.environ.get("CI"):
+        return False
     return sys.stdout.isatty()
 
 

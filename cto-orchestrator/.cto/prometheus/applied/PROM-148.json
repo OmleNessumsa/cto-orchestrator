@@ -1,0 +1,24 @@
+{
+  "id": "PROM-148",
+  "title": "Strict structured outputs (tool_choice / JSON schema) for routing and plan parsing",
+  "category": "claude-features",
+  "source": "Anthropic tool use forced tool_choice + strict input schemas \u2014 docs.anthropic.com/en/docs/build-with-claude/tool-use; live fetch blocked this run",
+  "description": "smart_select_agent (delegate.py) and the sprint planner (orchestrate.py) rely on prompting the model to 'Respond with ONLY {json}' and then string/regex-parsing the reply. This is brittle: prose leakage or markdown fences break parsing and silently fall back to keyword heuristics. Forcing a defined tool with a strict JSON schema guarantees schema-valid output and eliminates the fallback path for well-formed responses.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Define JSON Schemas in schemas.py for the routing decision ({agent, complexity}) and the sprint plan ({tickets:[...]}). Add a helper that invokes claude with a single tool whose input_schema is the schema and tool_choice forcing that tool (SDK path) or `--output-format json` with post-validation against the schema (CLI path). Replace the ad-hoc parsing in smart_select_agent and the plan parser with schema validation; keep the keyword fallback only for transport errors, not for parse failures.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:09:06.880734+00:00",
+  "applied_at": "2026-07-02T19:34:53.735355+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-148-20260702T192302",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/schemas.py"
+  ]
+}

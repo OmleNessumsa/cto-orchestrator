@@ -1,0 +1,20 @@
+{
+  "id": "PROM-141",
+  "title": "Declare MCP outputSchema + structured content on server tools",
+  "category": "tooling",
+  "source": "MCP spec 2025-06-18 (structured tool output / outputSchema) \u2014 knowledge cutoff Jan 2026, live search unavailable this run; verify at modelcontextprotocol.io/specification",
+  "description": "mcp_server.py tools appear to return free-form text/JSON strings. The MCP spec added `outputSchema` on tool definitions plus a `structuredContent` field on tool results, so clients can validate and machine-consume responses instead of re-parsing prose. Adding output schemas to board/project_status/list_tickets/get_ticket makes downstream agents (and the Rick Terminal) consume typed data reliably and lets Claude self-correct malformed tool responses.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/mcp_server.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "For each read tool in mcp_server.py, define a JSON Schema in schemas.py and attach it as the tool's `outputSchema`. Return results with both a text content block (backward compat) and a `structuredContent` object matching the schema. Start with project_status, board, list_tickets, get_ticket, prometheus_status. Add a small validation helper that asserts payloads conform before returning.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:07:01.390656+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-141-20260702T152143",
+  "reject_reason": "Apply failed: Evolve delegation failed: (no stderr)"
+}

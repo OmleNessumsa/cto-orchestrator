@@ -405,6 +405,143 @@ AGENT_PROFILES: dict = {
     },
 }
 
+# ── Swarm Handoff Roster (Dynamic Role Re-routing) ────────────────────────────
+# Trigger conditions describing when a worker holding a ticket should stop and
+# hand control to a more appropriate specialist instead of working outside its
+# expertise (Swarm-style dynamic handoffs). Keys mirror schemas.VALID_HANDOFF_ROLES
+# — the set of roles delegate.py will actually accept as a handoff target.
+try:
+    from schemas import VALID_HANDOFF_ROLES as _HANDOFF_TARGET_ROLES
+except ImportError:
+    _HANDOFF_TARGET_ROLES = frozenset({
+        "architect-morty", "backend-morty", "frontend-morty",
+        "fullstack-morty", "tester-morty", "security-morty",
+        "devops-morty", "reviewer-morty",
+    })
+
+HANDOFF_TRIGGERS: dict[str, str] = {
+    "architect-morty": "a design decision, API contract, or data model needs to be resolved before implementation can proceed",
+    "backend-morty": "the work requires server-side logic, database schema, migrations, or API endpoint changes",
+    "frontend-morty": "the work requires UI components, client-side state, or layout/styling changes",
+    "fullstack-morty": "the work spans both frontend and backend and no narrower specialist fits",
+    "tester-morty": "acceptance criteria need dedicated unit/integration/E2E test coverage beyond a quick smoke check",
+    "security-morty": "you find an auth flaw, injection risk, secret exposure, or other OWASP Top 10 concern",
+    "devops-morty": "the work touches CI/CD pipelines, deployment config, or infrastructure-as-code",
+    "reviewer-morty": "the implementation looks complete and needs an independent correctness/security pass before closing",
+}
+
+
+def build_handoff_guidance_block(current_role: str = "") -> str:
+    """Render the swarm handoff roster + emit format as one static block.
+
+    Lists every other specialist role and the trigger condition under which a
+    worker should hand off to it instead of working outside its specialty.
+    Appended to each role's systemPrompt in AGENT_PROFILES below. The current
+    role is excluded from its own roster (a worker doesn't hand off to itself).
+    """
+    lines = ["<handoff_roster>"]
+    lines.append(
+        "If mid-task you determine this ticket needs a different specialty, "
+        "STOP and hand off instead of working outside your expertise. "
+        "Emit this block at the END of your output:"
+    )
+    lines.append(
+        '<handoff>{"target_role": "<role>", "reason": "<why>", '
+        '"context_summary": "<what you found and what remains>"}</handoff>'
+    )
+    lines.append("Available specialists:")
+    for role in sorted(_HANDOFF_TARGET_ROLES):
+        if role == current_role:
+            continue
+        trigger = HANDOFF_TRIGGERS.get(role, "its specialty is a better fit for the remaining work")
+        lines.append(f"- @{role}: hand off when {trigger}")
+    lines.append("</handoff_roster>")
+    return "\n".join(lines)
+
+
+for _role_name, _profile in AGENT_PROFILES.items():
+    _profile["systemPrompt"] = _profile["systemPrompt"] + "\n\n" + build_handoff_guidance_block(_role_name)
+del _role_name, _profile
+
+# ── Prompt Cache Configuration ────────────────────────────────────────────────
+# Rick's persona rules, per-role identity, and the effort-guidance reference
+# below are byte-identical for every ticket a given role picks up in a sprint —
+# delegate.py places them first in the agent prompt (the "stable prefix") so
+# Anthropic's prompt cache can be reused across dozens of Morty runs instead of
+# expiring every 5 minutes. 1h is Anthropic's extended cache TTL; it costs more
+# per write (see PRICING["cache_write_1h"] in delegate.py) but stays hot across
+# a whole sprint instead of the 5-minute default, cutting repeat write cost.
+PROMPT_CACHE_TTL = "1h"
+
+
+def prefix_cache_control() -> dict:
+    """cache_control block for the last content block of the stable prefix.
+
+    Only meaningful when calling the Anthropic Messages API directly with
+    explicit content blocks. The `claude -p` CLI path (used by delegate.py
+    today) doesn't expose a cache_control hook — for that path, caching is
+    achieved by keeping the stable prefix first and byte-identical instead.
+    """
+    return {"type": "ephemeral", "ttl": PROMPT_CACHE_TTL}
+
+
+# ── Effort/Complexity Guidance (Stable, Cacheable) ─────────────────────────────
+# Reference table describing how agents should scale scope, testing depth, and
+# analysis depth per ticket complexity. Content is identical regardless of
+# which ticket or role is running, so the FULL table belongs in the stable
+# prompt prefix — delegate.py only adds a short per-ticket pointer (e.g.
+# "Current ticket complexity: M") in the volatile suffix.
+COMPLEXITY_GUIDANCE: dict[str, str] = {
+    "XL": (
+        "Complexity: XL — large multi-system change. "
+        "Touch as many files as needed; no artificial cap on scope. "
+        "Write unit tests for all new logic AND integration tests for every cross-system path. "
+        "Perform deep analysis: read all relevant modules, check for downstream side-effects, "
+        "and review existing ADRs for architectural constraints before writing a single line of code."
+    ),
+    "L": (
+        "Complexity: L — significant feature or refactor spanning multiple files. "
+        "Expect to touch 5-15 files. "
+        "Write unit tests for all new or changed logic; cover at least 2 edge cases per function. "
+        "Analyse the affected subsystem thoroughly — read related modules and check for "
+        "ripple effects — before implementing."
+    ),
+    "M": (
+        "Complexity: M — moderate change contained within one subsystem. "
+        "Expect to touch 2-6 files. "
+        "Write unit tests for new logic covering the happy path and at least 1 edge case. "
+        "Read directly related files to understand existing patterns before implementing."
+    ),
+    "S": (
+        "Complexity: S — small, focused change. "
+        "Expect to touch 1-3 files. "
+        "Add or update the nearest existing test; no new test infrastructure needed. "
+        "A quick scan of the target file is sufficient before implementing."
+    ),
+    "XS": (
+        "Complexity: XS — trivial change (typo, config value, single-line fix). "
+        "Touch at most 1-2 files. "
+        "No new tests required unless a test already exists for the affected code path. "
+        "No deep analysis needed — read only the target file, then apply the fix."
+    ),
+}
+
+_COMPLEXITY_TIER_ORDER = ("XS", "S", "M", "L", "XL")
+
+
+def build_effort_guidance_block() -> str:
+    """Render the full complexity/effort reference table as one static block.
+
+    Includes every tier so the text is byte-identical no matter which
+    complexity the current ticket happens to be — keeping it cache-stable.
+    """
+    lines = ["<effort_guidance_reference>"]
+    for tier in _COMPLEXITY_TIER_ORDER:
+        lines.append(f"- {tier}: {COMPLEXITY_GUIDANCE[tier]}")
+    lines.append("</effort_guidance_reference>")
+    return "\n".join(lines)
+
+
 # ── CLI Commands ──────────────────────────────────────────────────────────────
 
 def cmd_check(args):

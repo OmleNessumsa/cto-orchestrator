@@ -1,0 +1,23 @@
+{
+  "id": "PROM-122",
+  "title": "Add checkpoint/resume durability to sprint orchestration (LangGraph-style)",
+  "category": "agent-patterns",
+  "source": "LangGraph multi-agent supervisor + checkpointer/durable-state docs (from prior knowledge; live fetch blocked)",
+  "description": "LangGraph's core contribution over ad-hoc orchestration is a persisted graph state with checkpointing so a long multi-agent run can be interrupted and resumed without redoing completed work. The orchestrator already writes SESSION_STATE.json, but sprint execution in orchestrate.py appears to run tickets in a single pass \u2014 a crash or ctrl-C mid-sprint loses in-flight progress. Persisting per-ticket execution state (queued/running/review/done + last handoff) after each step makes sprints resumable and idempotent.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/orchestrate.py",
+    "scripts/session.py"
+  ],
+  "proposed_changes": "In session.py add `checkpoint_ticket(ticket_id, phase, handoff)` and `load_sprint_checkpoint()` that persist an execution ledger (e.g. .cto/session/sprint_checkpoint.json) atomically after every phase transition. In orchestrate.py, before running a ticket check the checkpoint and skip tickets already marked done; on start of each phase (delegate/review/close) write the checkpoint. Add a `--resume` flag to the sprint entrypoint that replays from the last checkpoint instead of re-delegating completed tickets.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:01:25.885800+00:00",
+  "applied_at": "2026-07-02T19:43:02.245844+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-122-20260702T193944",
+  "files_actually_changed": [
+    "scripts/session.py",
+    "scripts/orchestrate.py"
+  ]
+}

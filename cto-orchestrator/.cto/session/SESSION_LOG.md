@@ -21,3 +21,19 @@ Don't touch it. Actually, read it if you need to catch up.
 **Summary**: Delegated DEMO-003 to reviewer-morty: DEMO-003 was incorrectly assigned to reviewer-morty instead of a builder agent. No login/register UI
 
 ---
+
+## 2026-06-11 19:52 UTC
+
+**Focus**: landing
+
+**Summary**: Landing page flinke upgrade: Rick IDE als paywalled app download + alle nieuwe features (PROM 5-7, Explain, IDE features). ZEAS-068 closed. Build verified.
+
+---
+
+## 2026-06-12 05:10 UTC
+
+**Focus**: deploy
+
+**Summary**: Rick IDE Blob hosting live: dmg+zip op rick-ide-downloads store, env vars gezet, prod deploy + alias gefixt. Coinbase key ontbreekt in prod (pre-existing). Linux/Win builds vereisen GH Actions + secrets.
+
+---

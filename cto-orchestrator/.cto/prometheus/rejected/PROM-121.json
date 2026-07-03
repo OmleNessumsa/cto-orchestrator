@@ -1,0 +1,20 @@
+{
+  "id": "PROM-121",
+  "title": "Enforce structured JSON handoff schemas for subagent returns (context isolation)",
+  "category": "agent-patterns",
+  "source": "Anthropic Engineering \u2014 'Building a multi-agent research system' orchestrator-worker pattern (from prior knowledge; live web fetch was blocked by permissions)",
+  "description": "Anthropic's multi-agent research architecture shows the lead/orchestrator agent should never ingest raw subagent transcripts \u2014 subagents run in isolated context windows and return only a condensed, structured result. Currently delegate.py spawns `claude -p` Morty's whose free-text output is fed back to the orchestrator, which pollutes context and makes review brittle. Forcing each delegated worker to return a validated JSON envelope (files_changed, summary, tests_run, status, blockers) cuts token bloat and lets orchestrate.py branch deterministically instead of parsing prose.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "Add a `MortyHandoff` pydantic/dataclass schema in schemas.py with fields {status: enum[done|blocked|partial], summary: str, files_changed: list[str], tests_run: list[str], blockers: list[str], next_steps: list[str]}. In delegate.py, append the JSON schema to the `claude -p` system prompt and instruct the worker to end with a fenced ```json block. Parse and validate that block; on validation failure, re-prompt once with the error, then fall back to raw text with a status='partial'. Return the structured object to orchestrate.py instead of raw stdout.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:01:25.880083+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-121-20260702T143742",
+  "reject_reason": "Apply failed: Evolve delegation failed: (no stderr)"
+}

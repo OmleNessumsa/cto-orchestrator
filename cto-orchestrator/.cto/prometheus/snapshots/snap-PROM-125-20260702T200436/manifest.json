@@ -1,0 +1,18 @@
+{
+  "proposal_id": "PROM-125",
+  "created_at": "2026-07-02T20:04:36.200574+00:00",
+  "files": {
+    "scripts/team.py": {
+      "snapshot_name": "scripts__team.py",
+      "original_size": 35609
+    },
+    "scripts/persona.py": {
+      "snapshot_name": "scripts__persona.py",
+      "original_size": 23610
+    },
+    "scripts/orchestrate.py": {
+      "snapshot_name": "scripts__orchestrate.py",
+      "original_size": 77733
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "PROM-131",
+  "title": "Adopt SwiftUI Observation framework (@Observable) in Rick Terminal",
+  "category": "ui-ux",
+  "source": "Apple Developer docs \u2014 Observation framework / WWDC 'Discover Observation in SwiftUI'; migrating off ObservableObject",
+  "description": "The modern SwiftUI Observation framework (@Observable macro) replaces ObservableObject/@Published and only invalidates views that actually read a changed property, instead of re-rendering every observer. For a live-updating terminal that streams roro events into lists, this cuts wasted redraws and dropped frames when the event feed is busy. Migrating also removes @Published boilerplate and enables fine-grained diffing of the event/ticket view models.",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "RickTerminal/ViewModels/EventStore.swift",
+    "RickTerminal/ViewModels/TicketStore.swift"
+  ],
+  "proposed_changes": "Replace `class EventStore: ObservableObject { @Published var events }` with `@Observable final class EventStore { var events }`. Drop `@ObservedObject`/`@StateObject` wrappers where the type is now @Observable (use plain `let`/`@State`), keep `@Bindable` only where two-way bindings are needed. Set the app's minimum deployment target to macOS 14+ so the macro is available. Verify list rows subscribe only to the fields they read.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:03:11.357656+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "No files were actually modified (false success)"
+}

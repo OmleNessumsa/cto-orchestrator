@@ -604,6 +604,7 @@ def emit_progress(
 
 _STREAM_KIND_TO_EVENT: dict = {
     "tool_use": "cto.morty.tool",
+    "tool_result": "cto.morty.tool_result",
     "morty.token": "cto.morty.token",
 }
 
@@ -634,6 +635,29 @@ def emit_stream_progress(
         role=role,
         team_id=team_id,
     )
+
+
+def emit_review_event(
+    status: str,
+    ticket_id: str,
+    issues: Optional[list] = None,
+    role: str = "rick",
+    team_id: Optional[str] = None,
+):
+    """Emit a reviewer-morty reflection-loop event.
+
+    Args:
+        status: One of "started", "passed", "failed" — maps to
+                cto.ticket.review_{status}
+        ticket_id: Ticket being reviewed
+        issues: Reviewer-reported issues (only meaningful for "failed")
+        role: Agent role for ID generation
+        team_id: Optional team session ID
+    """
+    data = {"ticket_id": ticket_id}
+    if issues:
+        data["issues"] = [str(i) for i in issues][:10]
+    emit(f"cto.ticket.review_{status}", data, role=role, team_id=team_id)
 
 
 def emit_morty_done(

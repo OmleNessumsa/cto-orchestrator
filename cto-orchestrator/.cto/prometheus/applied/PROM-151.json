@@ -1,0 +1,24 @@
+{
+  "id": "PROM-151",
+  "title": "Evolve delegation inherits ANTHROPIC_API_KEY, breaking claude.ai login auth",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "prometheus evolve --max-applies 29 run on 2026-07-02; 2 auth failures, 2 timeouts at 600s, 1 false-success",
+  "description": "During evolve cycle 8, apply-Morty subprocesses failed for PROM-121/130 with 'claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set'. The key is exported in ~/.zshenv, so every claude -p subprocess silently switches from Pro Max login to API-key billing, and in this case failed delegation outright. Evolve/delegate should strip ANTHROPIC_API_KEY (or make auth source explicit) when spawning claude -p, and surface auth-source in the failure message.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Pass env={k:v for k,v in os.environ.items() if k != 'ANTHROPIC_API_KEY'} to subprocess.run for claude -p calls, or add a configurable env_blocklist in config.json",
+  "status": "applied",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-02T14:37:29.060802+00:00",
+  "applied_at": "2026-07-02T14:59:58.546968+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-151-20260702T145815",
+  "files_actually_changed": [
+    "scripts/delegate.py"
+  ]
+}

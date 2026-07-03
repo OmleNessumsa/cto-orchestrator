@@ -306,6 +306,129 @@ MEESEEKS_OUTPUT_SCHEMA: dict = {
 }
 
 
+# ── Routing / planning schemas (strict structured outputs) ───────────────────
+# These back forced-schema calls in delegate.smart_select_agent and
+# orchestrate.cmd_plan — the model is instructed to emit exactly this shape
+# and the reply is validated with validate_schema() instead of ad-hoc
+# field/regex checks.
+
+ROUTING_VALID_AGENTS: list = [
+    "architect-morty", "frontend-morty", "backend-morty",
+    "fullstack-morty", "tester-morty", "security-morty", "devops-morty",
+]
+ROUTING_VALID_COMPLEXITIES: list = ["XS", "S", "M", "L", "XL"]
+
+ROUTING_DECISION_SCHEMA: dict = {
+    "type": "object",
+    "description": "Ticket-to-agent routing decision.",
+    "properties": {
+        "agent": {"type": "string", "enum": ROUTING_VALID_AGENTS},
+        "complexity": {"type": "string", "enum": ROUTING_VALID_COMPLEXITIES},
+    },
+    "required": ["agent", "complexity"],
+    "additionalProperties": False,
+}
+
+SPRINT_TICKET_ITEM_SCHEMA: dict = {
+    "type": "object",
+    "description": "A single ticket produced by the sprint planner.",
+    "properties": {
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "type": {"type": "string", "enum": ["epic", "feature", "task", "spike", "bug"]},
+        "priority": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+        "complexity": {"type": "string", "enum": ROUTING_VALID_COMPLEXITIES},
+        "parent_index": {"type": ["integer", "null"]},
+        "dependency_indices": {"type": "array", "items": {"type": "integer"}},
+        "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+        "provides": {"type": ["string", "null"]},
+        "requires": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["title", "description", "type", "priority", "complexity"],
+}
+
+SPRINT_PLAN_SCHEMA: dict = {
+    "type": "object",
+    "description": "Sprint plan produced by the architect agent.",
+    "properties": {
+        "tickets": {"type": "array", "items": SPRINT_TICKET_ITEM_SCHEMA},
+    },
+    "required": ["tickets"],
+}
+
+
+def validate_schema(data, schema_def: dict) -> tuple[bool, list[str]]:
+    """Validate *data* against a JSON Schema dict.
+
+    Uses the jsonschema library if installed; otherwise falls back to a
+    lightweight stdlib-only validator that checks required fields, enums,
+    and types — including one level of array-of-object nesting, which is
+    enough for SPRINT_PLAN_SCHEMA's `tickets` array.
+
+    Returns:
+        Tuple of (is_valid, error_messages).
+    """
+    if not isinstance(data, dict):
+        return False, ["Output must be a JSON object (dict)"]
+
+    try:
+        import jsonschema
+        try:
+            jsonschema.validate(data, schema_def)
+            return True, []
+        except jsonschema.ValidationError as exc:
+            return False, [exc.message]
+        except jsonschema.SchemaError as exc:
+            return False, [f"Schema error: {exc.message}"]
+    except ImportError:
+        pass
+
+    errors: list[str] = []
+
+    def _type_matches(value, expected: str) -> bool:
+        if expected == "string":
+            return isinstance(value, str)
+        if expected == "array":
+            return isinstance(value, list)
+        if expected == "object":
+            return isinstance(value, dict)
+        if expected == "boolean":
+            return isinstance(value, bool)
+        if expected == "integer":
+            return isinstance(value, int) and not isinstance(value, bool)
+        if expected == "number":
+            return isinstance(value, (int, float)) and not isinstance(value, bool)
+        if expected == "null":
+            return value is None
+        return True
+
+    def _check_value(value, schema: dict, path: str):
+        expected = schema.get("type")
+        if expected is not None:
+            allowed = expected if isinstance(expected, list) else [expected]
+            if not any(_type_matches(value, t) for t in allowed):
+                errors.append(f"Field '{path}' must be type {allowed}, got {type(value).__name__}")
+                return
+        if "enum" in schema and value not in schema["enum"]:
+            errors.append(f"Field '{path}' must be one of {schema['enum']}, got {value!r}")
+        if schema.get("type") == "object" and isinstance(value, dict):
+            _check_object(value, schema, f"{path}.")
+        if schema.get("type") == "array" and "items" in schema and isinstance(value, list):
+            for i, item in enumerate(value):
+                _check_value(item, schema["items"], f"{path}[{i}]")
+
+    def _check_object(obj: dict, schema: dict, path: str = ""):
+        for field_name in schema.get("required", []):
+            if field_name not in obj:
+                errors.append(f"Missing required field: '{path}{field_name}'")
+        for prop, prop_schema in schema.get("properties", {}).items():
+            if prop in obj:
+                _check_value(obj[prop], prop_schema, f"{path}{prop}")
+
+    _check_object(data, schema_def)
+    return len(errors) == 0, errors
+
+
 # ── MCP tool response shape schemas ─────────────────────────────────────────
 # Used by list_tickets / board / project_status and consumed by roro/SwiftUI.
 

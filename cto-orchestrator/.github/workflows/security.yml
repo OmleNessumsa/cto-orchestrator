@@ -1,0 +1,39 @@
+name: Security
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain:
+    name: Supply-chain gate + SBOM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install audit tooling
+        run: pip install pip-audit cyclonedx-bom
+
+      - name: Supply-chain vulnerability gate
+        run: python scripts/security_utils.py supply-chain-check --fail-on low
+
+      - name: Generate CycloneDX SBOM
+        run: cyclonedx-py requirements requirements.lock -o sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json

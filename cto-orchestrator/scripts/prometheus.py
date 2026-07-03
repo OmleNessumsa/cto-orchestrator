@@ -186,7 +186,15 @@ def file_checksums(root: Path, target_files: list[str]) -> dict[str, str | None]
     checksums = {}
     for tf in target_files:
         fp = root / tf
-        if fp.exists():
+        if fp.is_dir():
+            # Directory target: hash the combined contents of all files inside
+            h = hashlib.sha256()
+            for child in sorted(fp.rglob("*")):
+                if child.is_file():
+                    h.update(str(child.relative_to(fp)).encode())
+                    h.update(child.read_bytes())
+            checksums[tf] = h.hexdigest()
+        elif fp.exists():
             checksums[tf] = hashlib.sha256(fp.read_bytes()).hexdigest()
         else:
             checksums[tf] = None

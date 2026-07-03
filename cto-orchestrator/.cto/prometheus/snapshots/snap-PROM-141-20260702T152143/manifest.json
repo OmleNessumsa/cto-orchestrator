@@ -1,0 +1,14 @@
+{
+  "proposal_id": "PROM-141",
+  "created_at": "2026-07-02T15:21:43.254626+00:00",
+  "files": {
+    "scripts/mcp_server.py": {
+      "snapshot_name": "scripts__mcp_server.py",
+      "original_size": 37000
+    },
+    "scripts/schemas.py": {
+      "snapshot_name": "scripts__schemas.py",
+      "original_size": 16102
+    }
+  }
+}

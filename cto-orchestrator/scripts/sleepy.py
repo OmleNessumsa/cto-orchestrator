@@ -171,6 +171,35 @@ def git_list_sleepy_branches(cwd: Path) -> list[str]:
     ]
 
 
+def git_is_dirty(cwd: Path) -> bool:
+    res = git(["status", "--porcelain"], cwd, check=False)
+    return bool(res.stdout.strip())
+
+
+def sanitize_worktree(cwd: Path, ticket_id: str) -> str:
+    """Ensure the worktree is clean before switching branches.
+
+    Commits any uncommitted changes onto the current (sleepy) branch so
+    partial Morty work is still captured for review. If the commit fails
+    for any reason, discards the dirty tree instead — a dirty tree must
+    never be allowed to cross a branch checkout onto the base branch.
+
+    Returns "committed", "discarded", or "clean".
+    """
+    if not git_is_dirty(cwd):
+        return "clean"
+    git(["add", "-A"], cwd, check=False)
+    res = git(
+        ["commit", "-m", f"sleepy: wip {ticket_id} (auto-committed uncommitted changes)"],
+        cwd, check=False,
+    )
+    if res.returncode == 0:
+        return "committed"
+    git(["reset", "--hard"], cwd, check=False)
+    git(["clean", "-fd"], cwd, check=False)
+    return "discarded"
+
+
 def fmt_tokens(n: int) -> str:
     if n >= 1_000_000:
         return f"{n / 1_000_000:.2f}M"
@@ -286,13 +315,16 @@ def should_downshift(cfg: dict, bud: dict) -> bool:
 # ───────────────────────── core loop ─────────────────────────
 
 
-def pick_next_ticket(root: Path) -> Optional[dict]:
+def pick_next_ticket(root: Path, exclude_ids: Optional[set] = None) -> Optional[dict]:
+    exclude_ids = exclude_ids or set()
     tickets = all_tickets(root)
     done_ids = {t["id"] for t in tickets if t["status"] == "done"}
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     candidates = []
     for t in tickets:
         if t["status"] not in ("backlog", "todo"):
+            continue
+        if t["id"] in exclude_ids:
             continue
         deps = t.get("dependencies") or []
         if all(d in done_ids for d in deps):
@@ -308,9 +340,13 @@ def agent_for_ticket(ticket: dict) -> str:
     ttype = (ticket.get("type") or "").lower()
     if ttype in ("epic", "spike"):
         return "architect-morty"
-    if ttype == "bug":
-        return "tester-morty"
     tags = {t.lower() for t in ticket.get("tags", [])}
+    if ttype == "bug":
+        # A bug needs an implementation fix, not a test-writer: route to
+        # architect-morty for complex/native bugs, fullstack-morty otherwise.
+        if ticket.get("estimated_complexity") in ("L", "XL") or tags & {"native", "architecture"}:
+            return "architect-morty"
+        return "fullstack-morty"
     if tags & {"security", "auth"}:
         return "security-morty"
     if tags & {"frontend", "ui", "ux"}:
@@ -529,7 +565,11 @@ def cmd_start(args):
         cfg["iteration"] += 1
         iteration = cfg["iteration"]
 
-        ticket = pick_next_ticket(root)
+        noop_ticket_ids = {
+            it["ticket_id"] for it in bud.get("iterations", [])
+            if it.get("status") == "no-op"
+        }
+        ticket = pick_next_ticket(root, exclude_ids=noop_ticket_ids)
         if not ticket:
             print(f"  [iter {iteration}] no actionable tickets — sleeping 5min")
             log_iter(root, {"iteration": iteration, "event": "idle"})
@@ -580,13 +620,19 @@ def cmd_start(args):
             # Heuristic: assume delegation burned the budget it was given.
             spent_tokens = task_budget if ok else task_budget // 2
 
+        sanitize_result = sanitize_worktree(root, ticket["id"])
+        if sanitize_result == "committed":
+            print(f"  📎 auto-committed uncommitted changes onto {branch}")
+        elif sanitize_result == "discarded":
+            print(f"  ⚠️  uncommitted changes could not be committed — discarded before branch switch")
+
         iter_sec = time.time() - iter_start
         post_sha = git(["rev-parse", "HEAD"], root).stdout.strip()
         diff_files = changed_files(root, pre_sha, post_sha)
 
         denied = [f for f in diff_files if matches_denylist(f, denylist)]
 
-        # Return to base branch; commits persist on feature branch.
+        # Worktree is guaranteed clean by sanitize_worktree() above — safe to switch.
         git(["checkout", cfg["base_branch"]], root, check=False)
 
         # Evaluate outcome.

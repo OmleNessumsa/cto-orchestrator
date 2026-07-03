@@ -1,0 +1,14 @@
+{
+  "proposal_id": "PROM-137",
+  "created_at": "2026-07-02T15:23:36.191952+00:00",
+  "files": {
+    "scripts/hooks.py": {
+      "snapshot_name": "scripts__hooks.py",
+      "original_size": 8992
+    },
+    "scripts/security_utils.py": {
+      "snapshot_name": "scripts__security_utils.py",
+      "original_size": 54807
+    }
+  }
+}

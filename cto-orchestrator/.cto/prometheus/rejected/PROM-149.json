@@ -1,0 +1,20 @@
+{
+  "id": "PROM-149",
+  "title": "1M-token context window for large-codebase Prometheus and review scans",
+  "category": "claude-features",
+  "source": "Anthropic 1M context beta for Sonnet (context-1m) \u2014 docs.anthropic.com/en/docs/build-with-claude/context-windows; live fetch blocked this run",
+  "description": "Prometheus scans and code reviews over large repos currently must chunk or sample files to fit the standard context window, which loses cross-file signal (architecture drift, duplicated logic, security patterns spanning modules). Sonnet's 1M-token context lets a single scan ingest a whole subsystem at once, producing higher-quality, more holistic proposals.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/prometheus.py",
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add an opt-in `--context-1m` flag (and config toggle) that selects Sonnet with the 1M-context beta enabled for whole-subsystem scans. Add a token-budget estimator that switches a scan into 1M mode when the assembled file set exceeds the standard window instead of truncating. Track the higher long-context pricing tier separately in the cost breakdown and log which scans used 1M mode.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:09:06.882954+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Self-protection: cannot modify Prometheus engine"
+}

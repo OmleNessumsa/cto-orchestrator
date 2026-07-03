@@ -179,6 +179,47 @@ Don't touch it. Actually, read it if you need to catch up.
         f.write("\n".join(entry_lines) + "\n")
 
 
+# ── Sprint Checkpoint (resumable sprint execution) ─────────────────────────────
+
+def sprint_checkpoint_path(root: Path) -> Path:
+    return root / ".cto" / "session" / "sprint_checkpoint.json"
+
+
+def load_sprint_checkpoint(root: Path) -> dict:
+    """Load the sprint execution ledger (per-ticket phase + last handoff)."""
+    data = load_json(sprint_checkpoint_path(root))
+    data.setdefault("tickets", {})
+    return data
+
+
+def checkpoint_ticket(root: Path, ticket_id: str, phase: str, handoff: Optional[dict] = None):
+    """Persist a ticket's execution phase to the sprint checkpoint ledger.
+
+    Called after every phase transition (delegate/review/done) so a crashed
+    or interrupted sprint can resume with `orchestrate.py sprint --resume`
+    instead of re-delegating tickets that already finished.
+
+    Args:
+        root: Project root path
+        ticket_id: Ticket being executed
+        phase: Execution phase, e.g. "delegate", "review", "done"
+        handoff: Optional dict capturing the last handoff for this ticket
+    """
+    state = load_sprint_checkpoint(root)
+    state["tickets"][ticket_id] = {
+        "phase": phase,
+        "handoff": handoff or {},
+        "updated_at": now_iso(),
+    }
+
+    fp = sprint_checkpoint_path(root)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    tmp_fp = fp.with_suffix(fp.suffix + ".tmp")
+    with open(tmp_fp, "w") as f:
+        json.dump(state, f, indent=2)
+    os.replace(tmp_fp, fp)
+
+
 # ── Resume / Context Retrieval ────────────────────────────────────────────────
 
 def get_resume_context(root: Path) -> str:

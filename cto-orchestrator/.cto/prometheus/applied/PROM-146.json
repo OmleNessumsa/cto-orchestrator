@@ -1,0 +1,23 @@
+{
+  "id": "PROM-146",
+  "title": "1-hour extended prompt-cache TTL for the stable Morty persona prefix",
+  "category": "claude-features",
+  "source": "Anthropic prompt caching docs (cache_control ttl:\"1h\" extended cache) \u2014 docs.anthropic.com/en/docs/build-with-claude/prompt-caching; live fetch blocked this run",
+  "description": "delegate.py already tracks cache_read/cache_write_5m pricing but relies on the default 5-minute cache TTL. Within a single sprint, dozens of Morty subprocesses reuse an identical persona/system prefix over a span far longer than 5 minutes, so the cache repeatedly expires and pays the write premium again. Anthropic's 1-hour cache TTL keeps the stable prefix hot across an entire sprint, cutting cache-write costs substantially.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ],
+  "proposed_changes": "Split each agent prompt into a stable prefix (persona + role rules + effort guidance from persona.py) and a volatile suffix (ticket body, file context). Ensure the stable prefix is byte-identical across Morty runs in a sprint. When invoking via the Anthropic SDK path, set cache_control {type:'ephemeral', ttl:'1h'} on the last block of the prefix; for the `claude -p` path, order the prompt so the cacheable prefix comes first and document the 1h-cache assumption. Add a 'cache_write_1h' pricing row (input * 2.0) to the PRICING table and surface 1h vs 5m savings in the cost breakdown.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:09:06.874532+00:00",
+  "applied_at": "2026-07-02T15:57:08.511151+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-146-20260702T152843",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ]
+}

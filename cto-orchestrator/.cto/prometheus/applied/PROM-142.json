@@ -1,0 +1,21 @@
+{
+  "id": "PROM-142",
+  "title": "Add MCP tool annotations (readOnly/destructive/idempotent hints)",
+  "category": "tooling",
+  "source": "MCP tool annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint) \u2014 knowledge cutoff Jan 2026; verify at modelcontextprotocol.io",
+  "description": "The cto-orchestrator MCP server exposes write tools (create_ticket, close_ticket, update_ticket_status, delegate, unity_scan) alongside read tools with no behavioral metadata. MCP tool annotations let clients label read-only vs destructive vs idempotent operations, which improves auto-approval UX, guardrails, and how orchestrating agents reason about side effects before calling.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/mcp_server.py"
+  ],
+  "proposed_changes": "In each tool registration in mcp_server.py, add an `annotations` object: readOnlyHint=true for board/list_tickets/get_ticket/project_status/prometheus_status/sleepy_status; destructiveHint=true for close_ticket; idempotentHint=true for update_ticket_status/reserve_files; openWorldHint=true for unity_scan/prometheus_scan (they reach external state). Keep titles human-readable via the `title` annotation.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:07:01.396363+00:00",
+  "applied_at": "2026-07-02T20:18:47.558574+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-142-20260702T201624",
+  "files_actually_changed": [
+    "scripts/mcp_server.py"
+  ]
+}

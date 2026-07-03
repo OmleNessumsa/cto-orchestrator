@@ -1,0 +1,22 @@
+{
+  "id": "PROM-134",
+  "title": "Respect Reduce Motion and add spinner/progress fallbacks in CLI + GUI",
+  "category": "ui-ux",
+  "source": "macOS HIG (Motion & Accessibility) \u2014 Reduce Motion; NO_COLOR and non-interactive terminal detection conventions",
+  "description": "Animated spinners and progress bars are good ambient feedback but break in non-TTY contexts (CI logs, piped output) and should be disabled when a user has Reduce Motion enabled or is on a dumb terminal. The GUI should likewise degrade animated transitions to instant when Reduce Motion is on. This improves accessibility and prevents garbled control characters in captured logs.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/progress.py",
+    "RickTerminal/Views/AgentStatusView.swift"
+  ],
+  "proposed_changes": "In progress.py, gate animated spinners behind `sys.stdout.isatty()` and honor NO_COLOR/CI env vars \u2014 fall back to plain line-per-update output otherwise. In SwiftUI, read `@Environment(\\.accessibilityReduceMotion)` and swap `.animation(.spring, value:)` for `.animation(nil)` / instant state changes when true; keep withAnimation transitions only when motion is allowed.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:03:11.371719+00:00",
+  "applied_at": "2026-07-02T20:16:24.193456+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-134-20260702T201545",
+  "files_actually_changed": [
+    "scripts/progress.py"
+  ]
+}

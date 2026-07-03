@@ -1,0 +1,23 @@
+{
+  "id": "PROM-139",
+  "title": "Network egress allowlist for agent Bash to prevent data exfiltration",
+  "category": "security",
+  "source": "OWASP LLM Top 10 (2025) \u2014 LLM06 Excessive Agency & LLM02 Sensitive Information Disclosure; codebase gap: no egress controls, most roles have Bash",
+  "description": "Agents with Bash access (backend/frontend/fullstack/devops/tester Morty's) can make arbitrary outbound requests (curl, wget, git remotes, package installs from any index). With no egress allowlist, a prompt-injected agent can exfiltrate repo contents or secrets to an attacker host. Add a domain allowlist enforced in the guardrail hook, defaulting to the known-good set (github.com, pypi.org, npmjs.com, the project's own APIs).",
+  "impact_score": 7,
+  "risk_score": 5,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/security_utils.py",
+    "scripts/hooks.py"
+  ],
+  "proposed_changes": "Add scan_command_egress(command) to security_utils.py that extracts URLs/hosts from Bash commands (curl, wget, nc, git remote, pip/npm --index-url) and checks them against a CTO_EGRESS_ALLOWLIST env-configurable set (sane defaults: github.com, pypi.org, files.pythonhosted.org, registry.npmjs.org, anthropic.com). Wire it into the hooks.py guardrail: unknown host in 'block' mode \u2192 exit 2; in 'warn' mode \u2192 audit_log_security_event 'egress_denied' + roro event. Document the env var in the security section of the README/config.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:06:01.176515+00:00",
+  "applied_at": "2026-07-02T19:49:54.354415+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-139-20260702T194646",
+  "files_actually_changed": [
+    "scripts/security_utils.py",
+    "scripts/hooks.py"
+  ]
+}

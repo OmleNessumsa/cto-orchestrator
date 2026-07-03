@@ -23,18 +23,35 @@ from rich.console import Console
 console = Console()
 err_console = Console(stderr=True)
 
-# Import agent profiles for least-privilege tool scoping
+# Import agent profiles for least-privilege tool scoping, plus the stable
+# effort-guidance reference and cache-TTL config used to build a cacheable
+# prompt prefix (see build_prompt()).
 try:
-    from persona import AGENT_PROFILES
+    from persona import AGENT_PROFILES, COMPLEXITY_GUIDANCE, PROMPT_CACHE_TTL, build_effort_guidance_block
 except ImportError:
     AGENT_PROFILES: dict = {}
+    COMPLEXITY_GUIDANCE: dict = {}
+    PROMPT_CACHE_TTL = "1h"
+
+    def build_effort_guidance_block() -> str:
+        return ""
+
+# Import routing schema + validator for strict structured-output routing
+# (smart_select_agent) — see schemas.validate_schema().
+try:
+    from schemas import ROUTING_DECISION_SCHEMA, validate_schema
+except ImportError:
+    ROUTING_DECISION_SCHEMA: dict = {}
+
+    def validate_schema(data, schema_def):
+        return False, ["schemas module unavailable"]
 
 # Flag set to True when security_utils is unavailable (set in except ImportError block below)
 SECURITY_DEGRADED = False
 
 # Import roro event emitter
 try:
-    from roro_events import emit, emit_progress, emit_stream_progress, emit_morty_done, get_agent_id
+    from roro_events import emit, emit_progress, emit_stream_progress, emit_morty_done, emit_review_event, get_agent_id
 except ImportError:
     # Fallback if module not found
     def emit(*args, **kwargs):
@@ -45,6 +62,8 @@ except ImportError:
         pass
     def emit_morty_done(*args, **kwargs):
         pass
+    def emit_review_event(*args, **kwargs):
+        pass
     def get_agent_id(role, team_id=None):
         return f"cto:{role}"
 
@@ -54,6 +73,14 @@ try:
 except ImportError:
     def run_hooks(hook_point, ticket, agent, output=None, root=None):
         return True
+
+# Import structured status-row formatter for compact/verbose Morty progress display
+try:
+    from visual import format_status_row
+except ImportError:
+    def format_status_row(agent, role, ticket, state, elapsed, detail=None):
+        row = f"? {agent} {role} {ticket} {state} {elapsed:>7.1f}s"
+        return f"{row}  {detail}" if detail else row
 
 # Import security utilities
 try:
@@ -70,11 +97,13 @@ try:
         detect_injection_patterns,
         detect_secrets,
         redact_secrets,
+        sanitize_agent_stdout,
         quarantine_prompt,
         SecurityViolationError,
         SANDWICH_REINFORCEMENT,
         ROLE_TOOL_ALLOWLISTS,
         _DEFAULT_TOOL_ALLOWLIST,
+        issue_agent_token,
     )
 except ImportError:
     # Security module unavailable — warn loudly and degrade gracefully
@@ -153,6 +182,9 @@ except ImportError:
     def redact_secrets(text):
         return text
 
+    def sanitize_agent_stdout(text):
+        return text, []
+
     def quarantine_prompt(content, patterns, source="unknown", log_dir=None):
         pass
 
@@ -163,22 +195,30 @@ except ImportError:
     ROLE_TOOL_ALLOWLISTS: dict = {}
     _DEFAULT_TOOL_ALLOWLIST: list = ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"]
 
+    def issue_agent_token(role, ticket_id, root_dir=None):
+        return ""
+
 
 # ── Cost Tracking ────────────────────────────────────────────────────────────
 
 # Rough model pricing per 1M tokens (USD) — estimates only, not billed amounts
-# cache_read: prompt-cache hit rate; cache_write_5m: cache-write premium (5-min TTL)
+# cache_read: prompt-cache hit rate; cache_write_5m: cache-write premium (5-min
+# TTL, default); cache_write_1h: extended cache-write premium (1-hour TTL,
+# input * 2.0 per Anthropic's pricing). 1h writes cost more up front but stay
+# hot across a whole sprint instead of expiring every 5 minutes, so dozens of
+# same-role Morty delegations reuse one write instead of paying the premium
+# repeatedly — see persona.PROMPT_CACHE_TTL and build_prompt()'s stable prefix.
 _MODEL_PRICING_USD_PER_1M: dict[str, dict[str, float]] = {
-    "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
-    "opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
-    "claude-opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
-    "claude-opus-4-8": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75},
-    "sonnet": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75},
-    "sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75},
-    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75},
-    "haiku": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00},
-    "claude-haiku-4-5": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00},
-    "claude-haiku-4-5-20251001": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00},
+    "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
+    "opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
+    "claude-opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
+    "claude-opus-4-8": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
+    "sonnet": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00},
+    "sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00},
+    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00},
+    "haiku": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00, "cache_write_1h": 1.60},
+    "claude-haiku-4-5": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00, "cache_write_1h": 1.60},
+    "claude-haiku-4-5-20251001": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00, "cache_write_1h": 1.60},
 }
 _CHARS_PER_TOKEN = 4  # rough approximation: 4 chars ≈ 1 token
 
@@ -205,8 +245,16 @@ class CostTracker:
         model: str,
         cache_read_tokens: int = 0,
         cache_creation_tokens: int = 0,
+        cache_ttl: str = "1h",
     ) -> dict:
-        """Return a cost breakdown dict for a single prompt/output pair."""
+        """Return a cost breakdown dict for a single prompt/output pair.
+
+        cache_ttl selects the cache-write premium ("1h" or "5m") and defaults
+        to "1h" — build_prompt() orders the stable persona/role/effort-guidance
+        prefix first in every agent prompt so it stays cache-hot across a
+        sprint's worth of same-role delegations instead of expiring every 5
+        minutes (see persona.PROMPT_CACHE_TTL).
+        """
         input_tokens = max(1, len(prompt) // _CHARS_PER_TOKEN)
         output_tokens = max(1, len(output) // _CHARS_PER_TOKEN)
         if model not in _MODEL_PRICING_USD_PER_1M:
@@ -215,7 +263,15 @@ class CostTracker:
         input_cost = input_tokens * pricing["input"] / 1_000_000
         output_cost = output_tokens * pricing["output"] / 1_000_000
         cache_read_cost = cache_read_tokens * pricing.get("cache_read", pricing["input"] * 0.1) / 1_000_000
-        cache_write_cost = cache_creation_tokens * pricing.get("cache_write_5m", pricing["input"] * 1.25) / 1_000_000
+        write_rate_key = "cache_write_1h" if cache_ttl == "1h" else "cache_write_5m"
+        cache_write_cost = cache_creation_tokens * pricing.get(write_rate_key, pricing["input"] * 1.25) / 1_000_000
+        # What this cache_read would have cost if the 5-minute default TTL had
+        # already lapsed and the same content needed a fresh 5m cache_write
+        # instead — i.e. the savings the 1h TTL realizes on this call.
+        cache_ttl_savings_usd = 0.0
+        if cache_ttl == "1h" and cache_read_tokens:
+            hypothetical_5m_cost = cache_read_tokens * pricing.get("cache_write_5m", pricing["input"] * 1.25) / 1_000_000
+            cache_ttl_savings_usd = max(0.0, hypothetical_5m_cost - cache_read_cost)
         return {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
@@ -225,6 +281,8 @@ class CostTracker:
             "output_cost_usd": round(output_cost, 6),
             "cache_read_cost_usd": round(cache_read_cost, 6),
             "cache_write_cost_usd": round(cache_write_cost, 6),
+            "cache_ttl": cache_ttl,
+            "cache_ttl_savings_usd": round(cache_ttl_savings_usd, 6),
             "total_cost_usd": round(input_cost + output_cost + cache_read_cost + cache_write_cost, 6),
             "model": model,
         }
@@ -238,9 +296,10 @@ class CostTracker:
         model: str,
         cache_read_tokens: int = 0,
         cache_creation_tokens: int = 0,
+        cache_ttl: str = "1h",
     ) -> dict:
         """Estimate and accumulate cost; return the breakdown."""
-        breakdown = self.estimate(prompt, output, model, cache_read_tokens, cache_creation_tokens)
+        breakdown = self.estimate(prompt, output, model, cache_read_tokens, cache_creation_tokens, cache_ttl=cache_ttl)
         self.total_cost_usd += breakdown["total_cost_usd"]
         self.total_input_tokens += breakdown["input_tokens"]
         self.total_output_tokens += breakdown["output_tokens"]
@@ -277,6 +336,23 @@ class CostTracker:
         if self.budget_usd is None:
             return None
         return max(0.0, self.budget_usd - self.total_cost_usd)
+
+
+# Env vars stripped from every `claude -p` / `claude --resume` subprocess call.
+# CLAUDECODE avoids a "nested session" error when delegate.py runs from within
+# Claude Code. ANTHROPIC_API_KEY, if exported (e.g. via ~/.zshenv), silently
+# switches subprocesses from claude.ai OAuth login to API-key billing and can
+# outright break claude.ai connector auth ("connectors are disabled because
+# ANTHROPIC_API_KEY or another auth source is set"). Extra keys can be added
+# via the comma-separated CTO_ENV_BLOCKLIST env var.
+_SUBPROCESS_ENV_STRIP_KEYS = {"CLAUDECODE", "ANTHROPIC_API_KEY"} | {
+    k.strip() for k in os.environ.get("CTO_ENV_BLOCKLIST", "").split(",") if k.strip()
+}
+
+
+def _clean_subprocess_env() -> dict:
+    """Build the env for a claude subprocess with auth-interfering keys stripped."""
+    return {k: v for k, v in os.environ.items() if k not in _SUBPROCESS_ENV_STRIP_KEYS}
 
 
 def find_cto_root(start=None) -> Path:
@@ -790,9 +866,13 @@ def _keyword_select_agent(ticket: dict) -> str:
 def smart_select_agent(ticket: dict, root: Optional[Path] = None) -> tuple:
     """Select agent role and estimate complexity using Haiku.
 
-    Calls Haiku with ticket details and requests a JSON routing response.
+    Calls Haiku with ticket details and forces the reply into
+    ROUTING_DECISION_SCHEMA (schemas.py) instead of hand-rolled field checks.
     Returns (agent_name, complexity) tuple. Falls back to keyword matching
-    with complexity from ticket on any error.
+    with complexity from ticket if the call fails outright (transport error)
+    or the reply doesn't validate against the schema (parse failure) — either
+    way there's no safe structured answer to act on, so the keyword heuristic
+    is the only sane floor.
     """
     fallback_agent = _keyword_select_agent(ticket)
     fallback_complexity = ticket.get("estimated_complexity", "M")
@@ -809,21 +889,25 @@ def smart_select_agent(ticket: dict, root: Optional[Path] = None) -> tuple:
         f"backend-morty (API/database/server), tester-morty (testing/QA), "
         f"security-morty (security/auth), devops-morty (CI/CD/infra), fullstack-morty (general).\n\n"
         f"Complexity scale: XS (trivial), S (small), M (medium), L (large), XL (very large).\n\n"
-        f'Respond with ONLY: {{"agent": "<agent-id>", "complexity": "<XS|S|M|L|XL>"}}'
+        f"Respond with ONLY a JSON object matching EXACTLY this schema, no other text:\n"
+        f"{json.dumps(ROUTING_DECISION_SCHEMA)}"
     )
 
     data = _call_helper_json(routing_prompt)
-    if data:
-        agent = data.get("agent", "").strip()
-        complexity = data.get("complexity", "").upper().strip()
-        valid_agents = {
-            "architect-morty", "frontend-morty", "backend-morty",
-            "fullstack-morty", "tester-morty", "security-morty", "devops-morty",
-        }
-        valid_complexities = {"XS", "S", "M", "L", "XL"}
-        if agent in valid_agents and complexity in valid_complexities:
-            return agent, complexity
+    if data is None:
+        # Transport error — no parseable reply at all.
+        return fallback_agent, fallback_complexity
 
+    is_valid, errors = validate_schema(data, ROUTING_DECISION_SCHEMA)
+    if is_valid:
+        return data["agent"], data["complexity"]
+
+    # Parse failure — got a reply but it doesn't conform to the schema.
+    audit_log_security_event(
+        "routing_schema_validation_failed",
+        f"smart_select_agent reply failed schema validation: {'; '.join(errors)[:300]}",
+        severity="warning",
+    )
     return fallback_agent, fallback_complexity
 
 
@@ -1207,43 +1291,9 @@ _COMPLEXITY_EFFORT_MAP = {
 }
 
 # Effort-scaling guidance injected into agent prompts based on ticket complexity.
-# Tells agents how many files to expect, what test coverage is required, and how
-# deeply to analyse before implementing — calibrated per size so XS tasks don't
-# spin up deep analysis loops and XL tasks don't cut corners on testing.
-COMPLEXITY_GUIDANCE: dict[str, str] = {
-    "XL": (
-        "Complexity: XL — large multi-system change. "
-        "Touch as many files as needed; no artificial cap on scope. "
-        "Write unit tests for all new logic AND integration tests for every cross-system path. "
-        "Perform deep analysis: read all relevant modules, check for downstream side-effects, "
-        "and review existing ADRs for architectural constraints before writing a single line of code."
-    ),
-    "L": (
-        "Complexity: L — significant feature or refactor spanning multiple files. "
-        "Expect to touch 5-15 files. "
-        "Write unit tests for all new or changed logic; cover at least 2 edge cases per function. "
-        "Analyse the affected subsystem thoroughly — read related modules and check for "
-        "ripple effects — before implementing."
-    ),
-    "M": (
-        "Complexity: M — moderate change contained within one subsystem. "
-        "Expect to touch 2-6 files. "
-        "Write unit tests for new logic covering the happy path and at least 1 edge case. "
-        "Read directly related files to understand existing patterns before implementing."
-    ),
-    "S": (
-        "Complexity: S — small, focused change. "
-        "Expect to touch 1-3 files. "
-        "Add or update the nearest existing test; no new test infrastructure needed. "
-        "A quick scan of the target file is sufficient before implementing."
-    ),
-    "XS": (
-        "Complexity: XS — trivial change (typo, config value, single-line fix). "
-        "Touch at most 1-2 files. "
-        "No new tests required unless a test already exists for the affected code path. "
-        "No deep analysis needed — read only the target file, then apply the fix."
-    ),
-}
+# The full reference table (COMPLEXITY_GUIDANCE, build_effort_guidance_block)
+# now lives in persona.py — it's identical for every ticket/role, so it belongs
+# in the stable, cacheable prompt prefix rather than being duplicated here.
 
 _EFFORT_LEVELS = ["low", "medium", "high", "max"]
 
@@ -1359,6 +1409,57 @@ def _check_claude_output_format_json_support() -> bool:
     return _claude_output_format_json_supported
 
 
+# ── Native Subagent Support ─────────────────────────────────────────────────
+# Migrates Morty tool-scoping from hand-rolled --allowedTools (AGENT_PROFILES /
+# ROLE_TOOL_ALLOWLISTS) to native Claude Code subagent definitions in
+# .claude/agents/{role}.md, invoked via --agent <role>. Gated behind
+# .cto/config.json's native_subagents.enabled (default off) so the existing
+# subprocess path keeps working while parity is validated on a low-risk ticket.
+
+_claude_agent_flag_supported: Optional[bool] = None
+
+
+def _check_claude_agent_flag_support() -> bool:
+    """Return True if the installed claude CLI supports --agent <name>."""
+    global _claude_agent_flag_supported
+    if _claude_agent_flag_supported is not None:
+        return _claude_agent_flag_supported
+    try:
+        result = subprocess.run(
+            ["claude", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        _claude_agent_flag_supported = "--agent <agent>" in (result.stdout + result.stderr)
+    except Exception:
+        _claude_agent_flag_supported = False
+    return _claude_agent_flag_supported
+
+
+def native_subagent_path(root: Path, agent_role: str) -> Path:
+    """Return the native Claude Code subagent definition path for agent_role."""
+    return root / ".claude" / "agents" / f"{agent_role}.md"
+
+
+def use_native_subagent(root: Path, agent_role: str) -> bool:
+    """Return True if agent_role should be dispatched via native `--agent` invocation.
+
+    Requires all three: native_subagents.enabled in .cto/config.json, a matching
+    .claude/agents/{role}.md definition, and an installed CLI that supports --agent.
+    Any missing piece silently falls back to the existing --allowedTools path.
+    """
+    try:
+        cfg = load_config(root)
+    except Exception:
+        return False
+    if not cfg.get("native_subagents", {}).get("enabled", False):
+        return False
+    if not native_subagent_path(root, agent_role).exists():
+        return False
+    return _check_claude_agent_flag_support()
+
+
 def _call_helper_json(prompt: str, model: str = "claude-haiku-4-5-20251001", timeout: int = 30) -> Optional[dict]:
     """Call a Haiku helper subprocess and return the parsed JSON response.
 
@@ -1370,7 +1471,7 @@ def _call_helper_json(prompt: str, model: str = "claude-haiku-4-5-20251001", tim
     json_suffix = "\n\nIMPORTANT: Respond with ONLY valid JSON — no prose, no markdown, no code fences."
     full_prompt = prompt + json_suffix
     resolved_model = _resolve_model_for_cli(model)
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    env = _clean_subprocess_env()
 
     def _run() -> str:
         if _check_claude_output_format_json_support():
@@ -1536,6 +1637,13 @@ def _render_fewshot_examples(examples: list[dict]) -> str:
 def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None, task_budget: Optional[int] = None) -> str:
     """Assemble the full prompt for the sub-agent.
 
+    The prompt is split into a STABLE PREFIX (persona, role rules, and the
+    full effort-guidance table — byte-identical for every ticket this role
+    picks up in a sprint) followed by a VOLATILE SUFFIX (ticket body, file
+    context, sprint/memory state). The stable content is assembled first so
+    Anthropic's prompt cache can reuse it across delegations instead of
+    re-writing it every 5 minutes — see persona.PROMPT_CACHE_TTL.
+
     Context is kept minimal here — agents pull ADRs, related ticket details,
     and team state on-demand via MCP tools (get_ticket, get_team_context,
     read_adr, reserve_files, send_team_message) instead of bloating the prompt.
@@ -1563,6 +1671,96 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
         f"</available_tools>\n"
     )
 
+    # ── STABLE PREFIX ────────────────────────────────────────────────────
+    # role_prompt, allowed_tools_block, and the effort-guidance table are
+    # identical for every ticket this role runs this sprint (the agent card,
+    # rubric, and guidance tables don't change mid-sprint), so they're
+    # assembled first, unmodified, ahead of any per-ticket content below.
+    # The `claude -p` CLI path has no cache_control hook, so consistent
+    # prefix ordering is the only lever available here; a direct Anthropic
+    # SDK call would additionally attach persona.prefix_cache_control()
+    # (ttl="1h") to this prefix's last content block.
+    stable_prefix = f"""{role_prompt}
+
+{allowed_tools_block}{build_effort_guidance_block()}
+"""
+    stable_prefix += """
+<reasoning_protocol>
+Use your internal thinking to reason deeply, then show a brief summary of your approach before executing.
+
+If extended thinking is not available, follow this fallback sequence:
+1. **ANALYZE** — Read the ticket, acceptance criteria, and any sprint context. Identify what exists, what's missing, and what constraints apply.
+2. **PLAN** — Outline your approach in 3-5 bullet points. List the files you'll create or modify and the interfaces you'll use.
+3. **VERIFY** — Check your plan against the acceptance criteria. Does it cover every requirement? Are there edge cases?
+4. **EXECUTE** — Implement the plan. Test as you go. If something doesn't work, loop back to ANALYZE with new information.
+5. **SELF_CRITIQUE** — Before reporting status, enumerate each acceptance criterion with a pass/fail/unknown verdict and one line of evidence (file:line or test name). Set status='needs_review' if any criterion is fail or unknown.
+
+Show a brief summary of your approach before diving into implementation — Rick respects agents who think before they code.
+</reasoning_protocol>
+
+<self_critique>
+After EXECUTE and before emitting the JSON report, perform a structured self-check:
+- For each acceptance criterion listed in the ticket, produce one entry with:
+  - "criterion": the criterion text (verbatim or paraphrased)
+  - "verdict": "pass", "fail", or "unknown"
+  - "evidence": a single pointer (file:line number, test name, or "no evidence found")
+- If ANY verdict is "fail" or "unknown", you MUST set status="needs_review" in the JSON report.
+- Include the full list as "criteria_check" in the JSON output.
+- Do NOT mark status="completed" unless every criterion has verdict="pass" with concrete evidence.
+</self_critique>
+
+<execution_rules>
+- Execute ALL tasks directly. Do NOT ask for permission or confirmation — Rick hates that.
+- Create and modify files as needed. Do NOT just describe what should be done — that's Jerry behavior.
+- Run commands directly. Do NOT suggest commands for someone else to run.
+- VERIFY by reading each file before modifying it — never assume its contents from prior reasoning; use Read/Grep on every file you intend to touch.
+- Address EVERY acceptance criterion individually — completing one does NOT implicitly satisfy similar ones.
+</execution_rules>
+
+<common_mistakes>NEVER do any of these — Rick has seen enough Jerry behavior:
+
+❌ WRONG: "I recommend creating a file at src/auth.py with the following content..." (describing instead of doing)
+✅ RIGHT: Actually create src/auth.py with the implementation.
+
+❌ WRONG: "Should I proceed with approach A or B?" (asking permission)
+✅ RIGHT: Pick the best approach, implement it, document why in the report.
+
+❌ WRONG: Adding logging, refactoring, or extra features not in the ticket (scope creep)
+✅ RIGHT: Complete exactly what the ticket asks — nothing more, nothing less.
+</common_mistakes>
+
+<output_format>
+End your work with a JSON report inside EXACTLY these XML tags — no other summary format needed:
+
+<result_json>
+{
+  "status": "completed|needs_review|blocked",
+  "files_changed": ["path/to/file1.py", "path/to/file2.py"],
+  "description": "What you did in 1-3 sentences",
+  "open_questions": "Any questions for Rick, or null",
+  "confidence": "high|medium|low",
+  "next_steps": ["optional follow-up actions, or empty array"],
+  "criteria_check": [
+    {"criterion": "acceptance criterion text", "verdict": "pass|fail|unknown", "evidence": "file:line or test name"}
+  ]
+}
+</result_json>
+
+IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
+The `criteria_check` array is REQUIRED when acceptance criteria are present — include one entry per criterion.
+As a backup, also emit a `## Files changed` markdown block listing every file you touched:
+
+## Files changed
+- path/to/file1.py
+- path/to/file2.py
+</output_format>
+"""
+
+    # ── VOLATILE SUFFIX ──────────────────────────────────────────────────
+    # Everything below is per-ticket: budget, file scope, ticket body,
+    # sprint/memory state, and few-shot examples. None of it is assumed
+    # stable across tickets, so it's appended after the cacheable prefix
+    # rather than interleaved with it.
     target_files = ticket.get("target_files") or []
     if target_files:
         task_boundaries_block = (
@@ -1574,6 +1772,21 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
         )
     else:
         task_boundaries_block = ""
+
+    review_issues = ticket.get("review_issues") or []
+    if review_issues:
+        issues_text = "\n".join(f"- {i}" for i in review_issues)
+        safe_review_feedback = wrap_untrusted_content(issues_text, label="REVIEWER_FEEDBACK")
+        review_feedback_block = (
+            f"<reviewer_feedback>\n"
+            f"Your previous attempt at this ticket was rejected by an independent reviewer-morty. "
+            f"Address EVERY issue below before reporting completion again.\n"
+            f"{safe_review_feedback}\n"
+            f"</reviewer_feedback>\n"
+        )
+    else:
+        review_feedback_block = ""
+
     criteria = ticket.get("acceptance_criteria") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "(none specified)"
     structure = get_project_structure(root)
@@ -1629,9 +1842,7 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
             f"finish gracefully as the budget approaches exhaustion.\n\n"
         )
 
-    prompt = f"""{budget_section}{role_prompt}
-
-{allowed_tools_block}{task_boundaries_block}
+    volatile_suffix = f"""{budget_section}{task_boundaries_block}{review_feedback_block}
 ## Your Mission, Morty
 
 **Ticket {ticket['id']}**: {ticket['title']}
@@ -1665,7 +1876,7 @@ You have MCP tools to pull context on-demand — use them instead of guessing:
     # repo files — route through wrap_untrusted_content to spotlight indirect injection.
     sprint_ctx = _load_sprint_context(root)
     if sprint_ctx:
-        prompt += f"\n{wrap_untrusted_content(sprint_ctx, label='REPO_CONTENT')}\n"
+        volatile_suffix += f"\n{wrap_untrusted_content(sprint_ctx, label='REPO_CONTENT')}\n"
 
     # Inject per-role agent memory (accumulated lessons from past tickets)
     memory_entries = _load_agent_memory(root, agent_role)
@@ -1678,7 +1889,7 @@ You have MCP tools to pull context on-demand — use them instead of guessing:
             if patterns:
                 memory_lines.append(f"- [{ts} {tid}]: " + "; ".join(patterns))
         if memory_lines:
-            prompt += (
+            volatile_suffix += (
                 "\n<agent_memory>\n"
                 "Lessons you've learned from past tickets in this project "
                 "(apply these patterns now):\n"
@@ -1688,47 +1899,25 @@ You have MCP tools to pull context on-demand — use them instead of guessing:
 
     # Inject persistent scratchpad / memory section
     memory_section = _build_memory_section(root, agent_role, team_id=team_id)
-    prompt += f"\n{memory_section}\n"
+    volatile_suffix += f"\n{memory_section}\n"
 
-    # Inject complexity-calibrated effort guidance so agents scale their work
-    # to the ticket size rather than applying the same depth to every task.
+    # Point at the complexity tier for this ticket — the full guidance text for
+    # every tier already lives in the stable prefix's effort_guidance_reference.
     ticket_complexity = ticket.get("estimated_complexity", "").upper()
     if ticket_complexity in COMPLEXITY_GUIDANCE:
-        prompt += f"\n<complexity_guidance>\n{COMPLEXITY_GUIDANCE[ticket_complexity]}\n</complexity_guidance>\n"
-
-    prompt += """
-<reasoning_protocol>
-Use your internal thinking to reason deeply, then show a brief summary of your approach before executing.
-
-If extended thinking is not available, follow this fallback sequence:
-1. **ANALYZE** — Read the ticket, acceptance criteria, and any sprint context. Identify what exists, what's missing, and what constraints apply.
-2. **PLAN** — Outline your approach in 3-5 bullet points. List the files you'll create or modify and the interfaces you'll use.
-3. **VERIFY** — Check your plan against the acceptance criteria. Does it cover every requirement? Are there edge cases?
-4. **EXECUTE** — Implement the plan. Test as you go. If something doesn't work, loop back to ANALYZE with new information.
-5. **SELF_CRITIQUE** — Before reporting status, enumerate each acceptance criterion with a pass/fail/unknown verdict and one line of evidence (file:line or test name). Set status='needs_review' if any criterion is fail or unknown.
-
-Show a brief summary of your approach before diving into implementation — Rick respects agents who think before they code.
-</reasoning_protocol>
-
-<self_critique>
-After EXECUTE and before emitting the JSON report, perform a structured self-check:
-- For each acceptance criterion listed in the ticket, produce one entry with:
-  - "criterion": the criterion text (verbatim or paraphrased)
-  - "verdict": "pass", "fail", or "unknown"
-  - "evidence": a single pointer (file:line number, test name, or "no evidence found")
-- If ANY verdict is "fail" or "unknown", you MUST set status="needs_review" in the JSON report.
-- Include the full list as "criteria_check" in the JSON output.
-- Do NOT mark status="completed" unless every criterion has verdict="pass" with concrete evidence.
-</self_critique>
-
-"""
+        volatile_suffix += (
+            f"\n<complexity_guidance>\n"
+            f"Current ticket complexity: {ticket_complexity}. "
+            f"See <effort_guidance_reference> above for the full per-tier breakdown.\n"
+            f"</complexity_guidance>\n"
+        )
 
     # Select few-shot examples: prefer similar completed tickets, fall back to static pair
     dynamic_examples = _select_fewshot_examples(root, agent_role, ticket)
     if dynamic_examples:
-        prompt += "<examples>\n" + _render_fewshot_examples(dynamic_examples) + "\n</examples>\n"
+        volatile_suffix += "<examples>\n" + _render_fewshot_examples(dynamic_examples) + "\n</examples>\n"
     else:
-        prompt += """<examples>
+        volatile_suffix += """<examples>
 <example>
 ANALYZE: Ticket asks to add a `created_at` timestamp field to the User model. The model lives in `models/user.py` and the DB migration folder is `migrations/`.
 PLAN:
@@ -1771,59 +1960,13 @@ EXECUTE: Created helper module and updated all three call sites.
 </examples>
 """
 
-    prompt += """
-<execution_rules>
-- Execute ALL tasks directly. Do NOT ask for permission or confirmation — Rick hates that.
-- Create and modify files as needed. Do NOT just describe what should be done — that's Jerry behavior.
-- Run commands directly. Do NOT suggest commands for someone else to run.
-- VERIFY by reading each file before modifying it — never assume its contents from prior reasoning; use Read/Grep on every file you intend to touch.
-- Address EVERY acceptance criterion individually — completing one does NOT implicitly satisfy similar ones.
-</execution_rules>
-
-<common_mistakes>NEVER do any of these — Rick has seen enough Jerry behavior:
-
-❌ WRONG: "I recommend creating a file at src/auth.py with the following content..." (describing instead of doing)
-✅ RIGHT: Actually create src/auth.py with the implementation.
-
-❌ WRONG: "Should I proceed with approach A or B?" (asking permission)
-✅ RIGHT: Pick the best approach, implement it, document why in the report.
-
-❌ WRONG: Adding logging, refactoring, or extra features not in the ticket (scope creep)
-✅ RIGHT: Complete exactly what the ticket asks — nothing more, nothing less.
-</common_mistakes>
-
-<output_format>
-End your work with a JSON report inside EXACTLY these XML tags — no other summary format needed:
-
-<result_json>
-{
-  "status": "completed|needs_review|blocked",
-  "files_changed": ["path/to/file1.py", "path/to/file2.py"],
-  "description": "What you did in 1-3 sentences",
-  "open_questions": "Any questions for Rick, or null",
-  "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"],
-  "criteria_check": [
-    {"criterion": "acceptance criterion text", "verdict": "pass|fail|unknown", "evidence": "file:line or test name"}
-  ]
-}
-</result_json>
-
-IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
-The `criteria_check` array is REQUIRED when acceptance criteria are present — include one entry per criterion.
-As a backup, also emit a `## Files changed` markdown block listing every file you touched:
-
-## Files changed
-- path/to/file1.py
-- path/to/file2.py
-</output_format>
-
+    volatile_suffix += """
 ---
 Now execute the ticket. After completing all work, your FINAL output must be the JSON report block — no text after it.
 
 Begin:
 """
-    return prompt
+    return stable_prefix + volatile_suffix
 
 
 def _reformat_retry_haiku(output: str) -> Optional[dict]:
@@ -1849,7 +1992,7 @@ def _reformat_retry_haiku(output: str) -> Optional[dict]:
             capture_output=True,
             text=True,
             timeout=60,
-            env={k: v for k, v in os.environ.items() if k != "CLAUDECODE"},
+            env=_clean_subprocess_env(),
         )
         raw = result.stdout.strip()
         match = re.search(r"<result_json>\s*(.*?)\s*</result_json>", raw, re.DOTALL)
@@ -2090,6 +2233,96 @@ def _collect_git_changed_files(cwd: str) -> list[str]:
         return []
 
 
+# ── Reviewer-Morty Reflection Gate ──────────────────────────────────────────
+
+_REVIEW_DIFF_MAX_CHARS = 6000
+
+
+def _collect_review_diff(root: Path, files_changed: list) -> str:
+    """Return a bounded git diff for the given files, or '' if unavailable."""
+    if not files_changed:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "HEAD", "--"] + files_changed,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            cwd=str(root),
+        )
+        diff = result.stdout.strip()
+        if not diff:
+            # No committed diff (e.g. HEAD has no history yet) — fall back to the
+            # working-tree diff against the index for uncommitted changes.
+            result = subprocess.run(
+                ["git", "diff", "--"] + files_changed,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                cwd=str(root),
+            )
+            diff = result.stdout.strip()
+        return diff[:_REVIEW_DIFF_MAX_CHARS]
+    except Exception:
+        return ""
+
+
+def review_ticket(root: Path, ticket: dict, handoff: dict, model: str = "sonnet", timeout: int = 120) -> dict:
+    """Spawn a dedicated reviewer-morty to adversarially check a worker's handoff.
+
+    Independent from the implementing agent: reviews the git diff of the files
+    the worker touched against the ticket's acceptance criteria and its own
+    summary, and reports whether the work should be accepted. Defaults to
+    approved=True when there's nothing to check or the review call itself
+    fails, so a broken reviewer never wedges the pipeline.
+
+    Args:
+        root: Project root path
+        ticket: Ticket dict (id, title, acceptance_criteria)
+        handoff: Worker's parsed completion report (files_changed, description, ...)
+        model: Model alias for the reviewer subprocess
+        timeout: Subprocess timeout in seconds
+
+    Returns:
+        {"approved": bool, "issues": [str, ...]}
+    """
+    criteria = ticket.get("acceptance_criteria") or []
+    if not criteria:
+        return {"approved": True, "issues": []}
+
+    files_changed = handoff.get("files_changed") or []
+    criteria_text = "\n".join(f"- {c}" for c in criteria)
+    diff = _collect_review_diff(root, files_changed)
+    diff_block = diff if diff else "(no git diff available — review the description below)"
+
+    prompt = (
+        "You are an independent, skeptical code reviewer — NOT the agent that wrote this code. "
+        "Your job is to catch silently-wrong completions before they ship. "
+        "Review the diff below against the acceptance criteria and the worker's own summary. "
+        "Reject if any criterion is unmet, the diff looks incomplete, or the summary overstates what was done. "
+        'Return ONLY a JSON object: {"approved": true/false, "issues": ["specific, actionable issue", ...]}\n\n'
+        f"Ticket: {ticket.get('id', '?')} — {ticket.get('title', '')}\n\n"
+        f"Acceptance criteria:\n{criteria_text}\n\n"
+        f"Worker's summary: {(handoff.get('description') or '')[:1000]}\n\n"
+        f"Files changed: {', '.join(files_changed) or '(none reported)'}\n\n"
+        f"Diff:\n{diff_block}"
+    )
+
+    data = _call_helper_json(prompt, model=model, timeout=timeout)
+    if data is not None:
+        return {
+            "approved": bool(data.get("approved", True)),
+            "issues": [str(i) for i in (data.get("issues") or [])],
+        }
+
+    audit_log_security_event(
+        "review_error",
+        f"Reviewer-morty pass failed for {ticket.get('id', '?')}: helper returned no JSON",
+        severity="info",
+    )
+    return {"approved": True, "issues": []}
+
+
 # ── Progress Phase Detection ─────────────────────────────────────────────────
 
 _PHASE_MARKERS = [
@@ -2114,7 +2347,59 @@ def _detect_phase(line: str) -> Optional[str]:
     return None
 
 
-def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None, agent_role: str = "rick", team_id: Optional[str] = None, task_budget: Optional[int] = None, effort: Optional[str] = None, stream: bool = True, session_id: Optional[str] = None) -> str:
+_STATUS_TTY = sys.stdout.isatty()
+
+
+def _team_status_rows(
+    root: Path,
+    team_id: str,
+    ticket_id: Optional[str],
+    self_role: str,
+    self_state: str,
+    self_elapsed: float,
+    detail: Optional[str],
+) -> list:
+    """Build one status row per active team member (self row uses live state)."""
+    team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
+    team = load_json(team_fp) if team_fp.exists() else {}
+    members = team.get("members", [])
+    if not members:
+        return [format_status_row(self_role, self_role, ticket_id or "-", self_state, self_elapsed, detail)]
+
+    rows = []
+    for m in members:
+        role = m.get("role", "?")
+        if role == self_role:
+            rows.append(format_status_row(role, role, ticket_id or "-", self_state, self_elapsed, detail))
+            continue
+        state = m.get("status", "pending")
+        elapsed = 0.0
+        started = m.get("started_at")
+        if started:
+            try:
+                started_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                elapsed = max((datetime.now(timezone.utc) - started_dt).total_seconds(), 0.0)
+            except ValueError:
+                elapsed = 0.0
+        rows.append(format_status_row(role, role, ticket_id or "-", state, elapsed))
+    return rows
+
+
+def _render_status_rows(rows: list, prior_count: int) -> int:
+    """Print status *rows*, re-rendering in place under a TTY (else append plain lines)."""
+    if _STATUS_TTY:
+        if prior_count:
+            sys.stdout.write(f"\033[{prior_count}F")
+        for row in rows:
+            sys.stdout.write("\033[2K" + row + "\n")
+        sys.stdout.flush()
+        return len(rows)
+    for row in rows:
+        print(row)
+    return 0
+
+
+def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None, agent_role: str = "rick", team_id: Optional[str] = None, task_budget: Optional[int] = None, effort: Optional[str] = None, stream: bool = True, session_id: Optional[str] = None, ticket_id: Optional[str] = None, verbose: bool = False) -> str:
     """Call a claude sub-agent with a specific prompt.
 
     SECURITY NOTE: The --dangerously-skip-permissions flag is only enabled when
@@ -2127,6 +2412,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         timeout: Timeout in seconds
         skip_permissions: If True, MAY skip permissions (requires env var)
         thinking_budget: Token budget for extended thinking (None = disabled)
+        ticket_id: Ticket this agent is being delegated to work on. Used to mint
+            a CTO_AGENT_TOKEN capability token so mcp_server.py can verify the
+            agent's role instead of trusting CTO_AGENT_ROLE alone.
         task_budget: Advisory token budget for the full agentic loop (None = disabled).
             Already injected into prompt by build_prompt(); this param is accepted
             for call-site documentation and future API-level integration.
@@ -2135,6 +2423,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         stream: If True (default), use --output-format stream-json for real-time
             streaming events; emits cto.morty.progress for tool_use and text_delta
             events. If False, falls back to blocking text output.
+        verbose: If True, append the current tool-call summary to each printed
+            status row. Default (False) keeps rows compact and greppable.
 
     Returns:
         Agent output
@@ -2167,6 +2457,10 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
 
     cmd = ["claude", "--resume", session_id] if session_id else ["claude", "-p"]
 
+    # Resolve the CTO root once — reused below for status rendering.
+    delegate_root = find_cto_root()
+    native_agent = use_native_subagent(delegate_root, agent_role)
+
     # Permission scoping: non-interactive via acceptEdits + per-role allowlist.
     # Full skip requires explicit_flag=True AND CTO_ALLOW_SKIP_PERMISSIONS=true
     # (double-gated by should_skip_permissions — OWASP LLM06 Excessive Agency fix).
@@ -2174,11 +2468,16 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.append("--dangerously-skip-permissions")
     else:
         cmd.extend(["--permission-mode", "acceptEdits"])
-        # Prefer AGENT_PROFILES (persona.py) as the authoritative tool scope;
-        # fall back to ROLE_TOOL_ALLOWLISTS (security_utils) then the global default.
-        _profile = AGENT_PROFILES.get(agent_role, {})
-        allowed = _profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
-        cmd.extend(["--allowedTools", ",".join(allowed)])
+        if native_agent:
+            # .claude/agents/{agent_role}.md is the authoritative tool scope —
+            # no need to pass --allowedTools separately.
+            cmd.extend(["--agent", agent_role])
+        else:
+            # Prefer AGENT_PROFILES (persona.py) as the authoritative tool scope;
+            # fall back to ROLE_TOOL_ALLOWLISTS (security_utils) then the global default.
+            _profile = AGENT_PROFILES.get(agent_role, {})
+            allowed = _profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
+            cmd.extend(["--allowedTools", ",".join(allowed)])
 
     # Attach MCP server so agents can query/update CTO state during execution
     mcp_server = Path(__file__).parent / "mcp_server.py"
@@ -2212,13 +2511,18 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.extend(["--output-format", "stream-json", "--verbose", "--include-partial-messages"])
     cmd.append(safe_prompt)
 
-    # Strip CLAUDECODE env var to prevent "nested session" error
-    # when this script is invoked from within Claude Code.
-    # Set CTO_AGENT_ROLE so the MCP server knows which agent is calling.
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    # Strip auth-interfering env vars (CLAUDECODE, ANTHROPIC_API_KEY, ...) so
+    # the subprocess doesn't get a "nested session" error or silently switch
+    # auth source. Set CTO_AGENT_ROLE so the MCP server knows which agent is calling.
+    env = _clean_subprocess_env()
     env["CTO_AGENT_ROLE"] = agent_role
     if team_id:
         env["CTO_TEAM_ID"] = team_id
+    if ticket_id:
+        # Bind role+ticket into a signed token so mcp_server.py can reject a
+        # spoofed CTO_AGENT_ROLE on state-mutating tools (OWASP LLM06).
+        env["CTO_TICKET_ID"] = ticket_id
+        env["CTO_AGENT_TOKEN"] = issue_agent_token(agent_role, ticket_id)
 
     start_time = time.time()
     output_chunks: list[str] = []
@@ -2226,6 +2530,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     stream_errors: list[str] = []
     current_step = "Starting"
     lines_since_progress = 0
+    status_root = delegate_root
+    status_line_count = 0
 
     try:
         proc = subprocess.Popen(
@@ -2286,6 +2592,31 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                                                 )
                                             except Exception:
                                                 pass
+                        elif etype == "user":
+                            content = event.get("message", {}).get("content", [])
+                            if isinstance(content, list):
+                                for block in content:
+                                    if not isinstance(block, dict) or block.get("type") != "tool_result":
+                                        continue
+                                    is_error = bool(block.get("is_error"))
+                                    result_content = block.get("content", "")
+                                    if isinstance(result_content, list):
+                                        result_text = "".join(
+                                            b.get("text", "") for b in result_content if isinstance(b, dict)
+                                        )
+                                    else:
+                                        result_text = str(result_content)
+                                    current_step = "Tool result" + (" (error)" if is_error else "")
+                                    detected = current_step
+                                    try:
+                                        emit_stream_progress(
+                                            "tool_result",
+                                            {"is_error": is_error, "result": result_text[:200]},
+                                            role=agent_role,
+                                            team_id=team_id,
+                                        )
+                                    except Exception:
+                                        pass
                         elif etype == "content_block_delta":
                             delta = event.get("delta", {})
                             if delta.get("type") == "text_delta":
@@ -2378,16 +2709,42 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                     except Exception:
                         pass  # Never let progress events block the main flow
 
+                    try:
+                        detail = current_step if verbose else None
+                        if team_id:
+                            rows = _team_status_rows(status_root, team_id, ticket_id, agent_role, "working", elapsed, detail)
+                        else:
+                            rows = [format_status_row(agent_role, agent_role, ticket_id or "-", "working", elapsed, detail)]
+                        status_line_count = _render_status_rows(rows, status_line_count)
+                    except Exception:
+                        pass  # Never let status rendering block the main flow
+
         proc.wait()
         if proc.returncode != 0:
             stderr = proc.stderr.read(500) if proc.stderr else "(no stderr)"
+            # Surface auth source for diagnosis: ANTHROPIC_API_KEY is stripped from the
+            # subprocess env (see _clean_subprocess_env), but if it's set in the parent
+            # shell that's a strong hint the failure is auth-related upstream of us.
+            auth_note = (
+                " | auth source: ANTHROPIC_API_KEY is set in the parent environment "
+                "(stripped for this subprocess; check claude CLI login state if this "
+                "looks auth-related)"
+                if "ANTHROPIC_API_KEY" in os.environ else ""
+            )
+            try:
+                _render_status_rows(
+                    [format_status_row(agent_role, agent_role, ticket_id or "-", "failed", time.time() - start_time)],
+                    status_line_count,
+                )
+            except Exception:
+                pass
             if stream and stream_errors:
                 stream_detail = "; ".join(stream_errors[:3])
                 raise RuntimeError(
                     f"Agent process exited with code {proc.returncode}: {stderr}"
-                    f" | stream errors: {stream_detail}"
+                    f" | stream errors: {stream_detail}{auth_note}"
                 )
-            raise RuntimeError(f"Agent process exited with code {proc.returncode}: {stderr}")
+            raise RuntimeError(f"Agent process exited with code {proc.returncode}: {stderr}{auth_note}")
         full_output = stream_result if (stream and stream_result is not None) else "".join(output_chunks)
         # Extract and audit-log thinking blocks from any agent that ran with thinking enabled
         if thinking_budget is not None:
@@ -2400,9 +2757,23 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                     f"{total_chars} chars total",
                     severity="info",
                 )
+        try:
+            _render_status_rows(
+                [format_status_row(agent_role, agent_role, ticket_id or "-", "done", time.time() - start_time)],
+                status_line_count,
+            )
+        except Exception:
+            pass
         return full_output
     except subprocess.TimeoutExpired:
         proc.kill()
+        try:
+            _render_status_rows(
+                [format_status_row(agent_role, agent_role, ticket_id or "-", "failed", time.time() - start_time)],
+                status_line_count,
+            )
+        except Exception:
+            pass
         raise RuntimeError(f"Agent timed out after {timeout}s. Consider splitting the ticket.")
 
 
@@ -2526,6 +2897,7 @@ def cmd_delegate(args):
     })
 
     # Emit cto.morty.delegation.started event (includes effective tool scope for audit)
+    _emit_native = use_native_subagent(root, agent)
     _emit_profile = AGENT_PROFILES.get(agent, {})
     _emit_allowed = _emit_profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent, _DEFAULT_TOOL_ALLOWLIST)
     _emit_disallowed = _emit_profile.get("disallowedTools", [])
@@ -2535,6 +2907,7 @@ def cmd_delegate(args):
         "agent": agent,
         "model": model,
         "team_id": team_id,
+        "native_subagent": _emit_native,
         "tool_scope": {
             "allowed": _emit_allowed,
             "disallowed": _emit_disallowed,
@@ -2568,7 +2941,7 @@ def cmd_delegate(args):
     # Execute
     run_hooks("pre_delegate", ticket, agent, root=root)
     try:
-        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id)
+        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id, ticket_id=ticket["id"], verbose=getattr(args, 'verbose', False))
     except RuntimeError as e:
         error_msg = str(e)
         run_hooks("on_failure", ticket, agent, root=root)
@@ -2626,12 +2999,35 @@ def cmd_delegate(args):
 
     run_hooks("post_delegate", ticket, agent, output=output, root=root)
 
+    # ── Scan raw agent stdout for injection payloads/secrets before it re-enters
+    # the loop — agent output is untrusted (OWASP LLM05) and would otherwise be
+    # logged to ticket JSON and fed to downstream reviewer agents unfiltered.
+    output, _injection_findings = sanitize_agent_stdout(output)
+    agent_output_flagged = bool(_injection_findings)
+    if _injection_findings:
+        audit_log_security_event(
+            "agent_output_injection",
+            f"Injection patterns detected in @{agent} output for {ticket['id']}: {_injection_findings[:5]}",
+            severity="critical",
+        )
+
     # Parse output
     parsed = parse_agent_output(output)
 
     # ── Agent-to-agent handoff detection ────────────────────────────────────
     handoff = _parse_handoff_from_output(output)
-    if handoff:
+    if handoff and agent_output_flagged:
+        console.print(
+            f"[red]*Burrrp* Skipping handoff to @{handoff.target_role} — "
+            f"@{agent} output flagged for injection patterns. Human review required.[/red]"
+        )
+        audit_log_security_event(
+            "agent_output_injection_handoff_blocked",
+            f"Handoff from @{agent} to @{handoff.target_role} skipped for {ticket['id']} "
+            f"due to flagged output",
+            severity="critical",
+        )
+    elif handoff:
         console.print(
             f"[cyan]*Burrrp* Handoff: @{agent} → @{handoff.target_role}[/cyan]\n"
             f"[dim]Reason: {handoff.reason[:120]}[/dim]"
@@ -2677,9 +3073,18 @@ def cmd_delegate(args):
                 team_id=team_id,
                 task_budget=task_budget,
                 effort=effort,
+                ticket_id=ticket["id"],
             )
             output = handoff_output
             agent = handoff.target_role
+            output, _handoff_injection_findings = sanitize_agent_stdout(output)
+            if _handoff_injection_findings:
+                agent_output_flagged = True
+                audit_log_security_event(
+                    "agent_output_injection",
+                    f"Injection patterns detected in @{agent} handoff output for {ticket['id']}: {_handoff_injection_findings[:5]}",
+                    severity="critical",
+                )
             parsed = parse_agent_output(output)
         except RuntimeError as handoff_err:
             console.print(f"[yellow]Handoff re-delegation to @{handoff.target_role} failed: {handoff_err}[/yellow]")
@@ -2710,13 +3115,17 @@ def cmd_delegate(args):
         **cost_breakdown,
     }, role=agent, team_id=team_id)
     cache_read = cost_breakdown.get("cache_read_input_tokens", 0)
+    cache_creation = cost_breakdown.get("cache_creation_input_tokens", 0)
     cached_marker = " [dim cyan](cached)[/dim cyan]" if cache_read > 0 else ""
     cost_label = "Actual cost" if cost_breakdown.get("source") == "actual" else "Estimated cost"
     cache_info = f" / {cache_read:,} cache_read" if cache_read > 0 else ""
+    cache_info += f" / {cache_creation:,} cache_creation" if cache_creation > 0 else ""
+    ttl_savings = cost_breakdown.get("cache_ttl_savings_usd", 0.0)
+    savings_info = f" [dim green](1h cache saved ~${ttl_savings:.4f} vs 5m)[/dim green]" if ttl_savings > 0 else ""
     console.print(
         f"[dim]{cost_label}: ${cost_breakdown['total_cost_usd']:.4f} "
         f"({cost_breakdown['input_tokens']:,} in / {cost_breakdown['output_tokens']:,} out{cache_info} tokens)[/dim]"
-        f"{cached_marker}"
+        f"{cached_marker}{savings_info}"
     )
 
     # Reflection pass — check output against acceptance criteria (optional, skip with --no-reflect)
@@ -2794,7 +3203,16 @@ def cmd_delegate(args):
                         team_id=team_id,
                         task_budget=task_budget,
                         effort=effort,
+                        ticket_id=ticket["id"],
                     )
+                    output, _retry_injection_findings = sanitize_agent_stdout(output)
+                    if _retry_injection_findings:
+                        agent_output_flagged = True
+                        audit_log_security_event(
+                            "agent_output_injection",
+                            f"Injection patterns detected in @{agent} retry output for {ticket['id']}: {_retry_injection_findings[:5]}",
+                            severity="critical",
+                        )
                     parsed = parse_agent_output(output)
                     reflection_summary += " [retried]"
                     console.print("[dim]Reflection retry complete.[/dim]")
@@ -2841,6 +3259,10 @@ def cmd_delegate(args):
 
     # Update ticket
     agent_status = parsed["status"]
+    if agent_output_flagged and agent_status == "completed":
+        # Never let a flagged output auto-advance — force human review instead.
+        agent_status = "needs_review"
+
     if agent_status == "completed":
         ticket["status"] = "in_review"
     elif agent_status == "blocked":
@@ -2854,6 +3276,11 @@ def cmd_delegate(args):
     agent_output_text = parsed["description"][:2000]
     if reflection_summary:
         agent_output_text = f"{agent_output_text}\n[{reflection_summary}]"
+    if agent_output_flagged:
+        agent_output_text = (
+            f"{agent_output_text}\n[SECURITY] Agent output flagged for prompt-injection "
+            f"patterns — human review required before merge."
+        )
     ticket["agent_output"] = agent_output_text
     ticket["files_touched"] = parsed["files_changed"]
     ticket["updated_at"] = now_iso()
@@ -2927,6 +3354,9 @@ def build_parser():
                    help="Use Haiku-powered smart routing for agent selection instead of keyword matching.")
     p.add_argument("--no-stream", action="store_true",
                    help="Disable stream-json mode (blocking buffered output). Use for sleepy/batch runs.")
+    p.add_argument("--verbose", "-v", action="store_true",
+                   help="Append the current tool-call summary to each status row. "
+                        "Default output stays a compact one-line-per-agent view.")
     return p
 
 

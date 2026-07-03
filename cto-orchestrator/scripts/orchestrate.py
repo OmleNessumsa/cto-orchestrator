@@ -49,6 +49,7 @@ try:
     if _scripts_dir not in _sys_ticket.path:
         _sys_ticket.path.insert(0, _scripts_dir)
     from ticket import extract_keywords as _extract_keywords
+    from ticket import TICKET_FEWSHOT
     def extract_keywords(text: str) -> list[str]:
         return _extract_keywords(text)
 except Exception:
@@ -70,6 +71,7 @@ except Exception:
                 freq[tok] = freq.get(tok, 0) + 1
         sorted_tokens = sorted(freq, key=lambda k: freq[k], reverse=True)
         return sorted_tokens[:30]
+    TICKET_FEWSHOT = ""
 
 # Flag set to True when security_utils is unavailable (set in except ImportError block below)
 SECURITY_DEGRADED = False
@@ -259,6 +261,9 @@ except ImportError:
     _MODEL_PRICING_USD_PER_1M = {}
     _CHARS_PER_TOKEN = 4
 
+# Import sprint checkpoint helpers for resumable sprint execution
+from session import checkpoint_ticket, load_sprint_checkpoint
+
 
 def _estimate_ticket_cost_usd(ticket: dict, default_model: str = "sonnet") -> float:
     """Rough cost estimate for a completed delegation using agent_output as proxy."""
@@ -283,6 +288,95 @@ def _passes_quality_gate(ticket: dict) -> bool:
     if not (ticket.get("agent_output") or "").strip():
         return False
     return True
+
+
+MAX_REVIEW_RETRIES = 2
+
+
+def _review_and_close_ticket(root: Path, ticket: dict) -> bool:
+    """Gate a ticket's close-out behind an adversarial reviewer-morty pass.
+
+    Spawns a reviewer independent from the implementing agent, checking its
+    diff against the ticket's acceptance criteria. Approved tickets close as
+    done. Rejected tickets are re-delegated with the reviewer's issues
+    appended to the prompt (up to MAX_REVIEW_RETRIES times) before escalating
+    to blocked for a human to look at.
+
+    Assumes the ticket already passed _passes_quality_gate (in_review, with
+    files_touched and agent_output). Returns True if the ticket closed as done.
+    """
+    from delegate import review_ticket
+
+    attempt = 0
+    while True:
+        handoff = {
+            "files_changed": ticket.get("files_touched", []),
+            "description": ticket.get("agent_output", ""),
+            "open_questions": ticket.get("review_notes", ""),
+        }
+        emit("cto.ticket.review_started", {"ticket_id": ticket["id"], "attempt": attempt + 1}, role="rick")
+        verdict = review_ticket(root, ticket, handoff)
+
+        if verdict.get("approved", True):
+            emit("cto.ticket.review_passed", {"ticket_id": ticket["id"], "attempt": attempt + 1}, role="rick")
+            ticket["status"] = "done"
+            ticket["completed_at"] = now_iso()
+            ticket["updated_at"] = now_iso()
+            ticket.pop("review_issues", None)
+            save_ticket(root, ticket)
+            return True
+
+        issues = verdict.get("issues") or []
+        emit(
+            "cto.ticket.review_failed",
+            {"ticket_id": ticket["id"], "attempt": attempt + 1, "issues": issues[:10]},
+            role="rick",
+        )
+
+        if attempt >= MAX_REVIEW_RETRIES:
+            ticket["status"] = "blocked"
+            ticket["blocked_reason"] = "review_rejected"
+            ticket["review_notes"] = (
+                f"BLOCKED: reviewer-morty rejected after {attempt + 1} attempts — " + "; ".join(issues[:5])
+            )
+            ticket["updated_at"] = now_iso()
+            ticket.pop("review_issues", None)
+            save_ticket(root, ticket)
+            console.print(
+                f"  [red]{ticket['id']} → BLOCKED: reviewer-morty rejected after {attempt + 1} attempts.[/red]"
+            )
+            return False
+
+        console.print(
+            f"  [yellow]{ticket['id']} → reviewer-morty rejected (attempt {attempt + 1}/{MAX_REVIEW_RETRIES + 1}), "
+            f"re-delegating with feedback...[/yellow]"
+        )
+        ticket["review_issues"] = issues
+        ticket["review_notes"] = "Reviewer feedback (retry): " + "; ".join(issues[:5])
+        ticket["status"] = "todo"
+        ticket["updated_at"] = now_iso()
+        save_ticket(root, ticket)
+
+        try:
+            run_delegate(root, ticket["id"], timeout=600)
+        except Exception as e:
+            console.print(f"  [red]Re-delegation after review failure errored: {e}[/red]")
+            ticket = load_ticket(root, ticket["id"])
+            ticket["status"] = "blocked"
+            ticket["blocked_reason"] = "review_retry_error"
+            ticket["review_notes"] = f"BLOCKED: re-delegation after review rejection failed: {e}"
+            ticket["updated_at"] = now_iso()
+            save_ticket(root, ticket)
+            return False
+
+        ticket = load_ticket(root, ticket["id"])
+        if ticket["status"] != "in_review" or not _passes_quality_gate(ticket):
+            # Re-delegation didn't land back in a reviewable state (e.g. the
+            # worker itself came back blocked) — leave it for the normal sprint
+            # loop rather than looping the reviewer on a non-completion.
+            return False
+
+        attempt += 1
 
 
 COMPLEXITY_TEAM_THRESHOLD = {"L": True, "XL": True}  # These need teams
@@ -515,6 +609,43 @@ def delegate_team_member(root: Path, team_id: str, agent_role: str, ticket_id: s
         }
 
 
+def _reflect_swarm_handoff(root: Path, team_id: str, member_role: str, result: dict) -> dict:
+    """Surface a mid-ticket swarm handoff in a team member's delegation result.
+
+    delegate.py resolves Swarm-style handoffs internally (re-delegating to
+    the target role before its subprocess returns), guarded by
+    team.send_handoff_message's visited-roles set and MAX_HANDOFF_HOPS limit.
+    By the time delegate_team_member() returns here, the ticket may already
+    have been finished by a different specialist than the one Rick originally
+    dispatched — reload the team's handoff chain and annotate the result so
+    sprint reporting attributes the work to whoever actually did it.
+    """
+    try:
+        from team import get_handoff_chain, MAX_HANDOFF_HOPS
+    except ImportError:
+        return result
+
+    team = load_team(root, team_id)
+    if team is None:
+        return result
+
+    chain = get_handoff_chain(team)
+    visited = chain.get("visited") or []
+    if len(visited) > 1 and visited[-1] != member_role:
+        result["handoff_to"] = visited[-1]
+        result["handoff_chain"] = visited
+        console.print(
+            f"    [cyan]*Burrrp* @{member_role} handed off mid-ticket: "
+            f"{' → '.join('@' + r for r in visited)}[/cyan]"
+        )
+        if chain.get("hops", 0) >= MAX_HANDOFF_HOPS:
+            console.print(
+                f"    [yellow]Swarm handoff chain hit MAX_HANDOFF_HOPS ({MAX_HANDOFF_HOPS}) "
+                f"— no further re-routing for this ticket.[/yellow]"
+            )
+    return result
+
+
 def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], timeout: int = 600, execution_plan: Optional[dict] = None) -> dict:
     """Run a team sprint with parallel execution.
 
@@ -543,6 +674,7 @@ def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], ti
                 continue
             print(f"    Running @{member['role']} (sequential)...")
             result = delegate_team_member(root, team_id, member["role"], ticket_id, timeout)
+            result = _reflect_swarm_handoff(root, team_id, member["role"], result)
             results[member["role"]] = result
             if result["status"] != "completed":
                 print(f"    @{member['role']} failed, stopping sequential execution")
@@ -562,6 +694,7 @@ def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], ti
                 agent = futures[future]
                 try:
                     result = future.result()
+                    result = _reflect_swarm_handoff(root, team_id, agent, result)
                     results[agent] = result
                     print(f"    @{agent}: {result['status']}")
                 except Exception as e:
@@ -577,6 +710,7 @@ def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], ti
         if lead_member and lead_member["status"] not in ("completed", "blocked"):
             print(f"    Running lead @{lead} first...")
             result = delegate_team_member(root, team_id, lead, ticket_id, timeout)
+            result = _reflect_swarm_handoff(root, team_id, lead, result)
             results[lead] = result
             print(f"    @{lead}: {result['status']}")
 
@@ -596,6 +730,7 @@ def run_team_sprint(root: Path, team: Optional[dict], ticket: Optional[dict], ti
                     agent = futures[future]
                     try:
                         result = future.result()
+                        result = _reflect_swarm_handoff(root, team_id, agent, result)
                         results[agent] = result
                         print(f"    @{agent}: {result['status']}")
                     except Exception as e:
@@ -729,6 +864,9 @@ def cmd_plan(args):
         trajectories_block = ""
 
     plan_prompt = f"""You are Rick Sanchez, the smartest CTO in the multiverse. *burp* Your task is to create a detailed project plan with tickets for your Morty army to execute.
+
+## Ticket Style Examples
+{TICKET_FEWSHOT}
 
 ## Project Description
 {safe_description}
@@ -1079,6 +1217,10 @@ def cmd_sprint(args):
     iteration = 0
     use_teams = not args.no_teams  # Enable teams by default
     smart_routing = getattr(args, 'smart_routing', False)
+    resume = getattr(args, 'resume', False)
+
+    # Sprint checkpoint ledger (PROM-style resumability)
+    checkpoint = load_sprint_checkpoint(root) if resume else {"tickets": {}}
 
     # Sprint cost budget
     max_sprint_cost_usd: Optional[float] = cfg.get("max_sprint_cost_usd")
@@ -1086,6 +1228,9 @@ def cmd_sprint(args):
 
     team_msg = " (team mode enabled)" if use_teams else " (solo mode)"
     console.print(f"[bold green]Wubba lubba dub dub! Sending the Morty's to work. (max {max_iterations} adventures){team_msg}[/bold green]")
+    if resume:
+        done_count = sum(1 for info in checkpoint["tickets"].values() if info.get("phase") == "done")
+        console.print(f"[dim]--resume: loaded checkpoint, {done_count} ticket(s) already checkpointed done.[/dim]")
     if max_sprint_cost_usd is not None:
         console.print(f"[dim]Sprint cost budget: ${max_sprint_cost_usd:.2f}[/dim]")
     append_log(root, {
@@ -1159,6 +1304,11 @@ def cmd_sprint(args):
 
         # Get actionable tickets
         candidates = get_actionable_tickets(root)
+        if resume:
+            candidates = [
+                c for c in candidates
+                if checkpoint["tickets"].get(c["id"], {}).get("phase") != "done"
+            ]
         if not candidates:
             # Check if there are in_review or testing tickets to process
             review_tickets = [t for t in tickets if t["status"] == "in_review"]
@@ -1166,6 +1316,7 @@ def cmd_sprint(args):
                 console.print(f"\n  [cyan]No todo tickets, but {len(review_tickets)} in review. Let me see what the Morty's did...[/cyan]")
                 for rt in review_tickets[:3]:  # batch review
                     console.print(f"\n  [dim]Let me see what this Morty did...[/dim] [yellow]{rt['id']}[/yellow]: {rt['title']}")
+                    checkpoint_ticket(root, rt["id"], "review", {"files_touched": rt.get("files_touched", [])})
                     try:
                         output = run_delegate(root, rt["id"], agent="reviewer-morty")
                         console.print(f"  [dim]Review output:[/dim] {output[:200]}")
@@ -1175,21 +1326,20 @@ def cmd_sprint(args):
                     rt = load_ticket(root, rt["id"])
                     if rt["status"] == "in_review":
                         if _passes_quality_gate(rt):
-                            review_fail_counts.pop(rt["id"], None)
-                            rt["status"] = "done"
-                            rt["completed_at"] = now_iso()
-                            rt["updated_at"] = now_iso()
-                            save_ticket(root, rt)
-                            sprint_cost_usd += _estimate_ticket_cost_usd(rt, cfg.get("default_model", "sonnet"))
-                            append_log(root, {
-                                "timestamp": now_iso(),
-                                "ticket_id": rt["id"],
-                                "agent": "rick",
-                                "action": "completed",
-                                "message": f"Reviewed and approved: {rt['title']}",
-                                "files_changed": [],
-                            })
-                            console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
+                            if _review_and_close_ticket(root, rt):
+                                review_fail_counts.pop(rt["id"], None)
+                                rt = load_ticket(root, rt["id"])
+                                checkpoint_ticket(root, rt["id"], "done", {"files_touched": rt.get("files_touched", [])})
+                                sprint_cost_usd += _estimate_ticket_cost_usd(rt, cfg.get("default_model", "sonnet"))
+                                append_log(root, {
+                                    "timestamp": now_iso(),
+                                    "ticket_id": rt["id"],
+                                    "agent": "rick",
+                                    "action": "completed",
+                                    "message": f"Reviewed and approved: {rt['title']}",
+                                    "files_changed": [],
+                                })
+                                console.print(f"  [green]{rt['id']} → done. Good enough. Approved. *burp*[/green]")
                         else:
                             review_fail_counts[rt["id"]] = review_fail_counts.get(rt["id"], 0) + 1
                             fail_count = review_fail_counts[rt["id"]]
@@ -1251,6 +1401,10 @@ def cmd_sprint(args):
                 "roles": execution_plan["roles"],
             }, role="rick")
 
+            for phase in execution_plan["phases"]:
+                for item in phase:
+                    checkpoint_ticket(root, item["ticket_id"], "delegate", {"agent": item["agent"]})
+
             dag_results = run_team_sprint(root, None, None, timeout=600, execution_plan=execution_plan)
 
             completed_count = sum(1 for r in dag_results.values() if r["status"] == "completed")
@@ -1260,13 +1414,15 @@ def cmd_sprint(args):
                 try:
                     t = load_ticket(root, tid)
                     if t["status"] == "in_review":
+                        checkpoint_ticket(root, tid, "review", {"files_touched": t.get("files_touched", [])})
                         if _passes_quality_gate(t):
-                            t["status"] = "done"
-                            t["completed_at"] = now_iso()
-                            t["updated_at"] = now_iso()
-                            save_ticket(root, t)
-                            sprint_cost_usd += _estimate_ticket_cost_usd(t, cfg.get("default_model", "sonnet"))
-                            console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+                            if _review_and_close_ticket(root, t):
+                                t = load_ticket(root, tid)
+                                checkpoint_ticket(root, tid, "done", {"files_touched": t.get("files_touched", [])})
+                                sprint_cost_usd += _estimate_ticket_cost_usd(t, cfg.get("default_model", "sonnet"))
+                                console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+                            else:
+                                t = load_ticket(root, tid)
                         else:
                             console.print(
                                 f"  [yellow]{t['id']} → quality gate failed (missing files_changed or description) — "
@@ -1320,6 +1476,8 @@ def cmd_sprint(args):
             # Then auto-detect based on complexity
             if not team_template:
                 team_template = detect_team_need(ticket)
+
+        checkpoint_ticket(root, ticket["id"], "delegate", {"team_template": team_template})
 
         if team_template:
             # Team collaboration mode
@@ -1385,21 +1543,24 @@ def cmd_sprint(args):
         # Check if ticket ended up in_review — quality gate before auto-approve
         t = load_ticket(root, ticket["id"])
         if t["status"] == "in_review":
+            checkpoint_ticket(root, t["id"], "review", {"files_touched": t.get("files_touched", [])})
             if _passes_quality_gate(t):
-                t["status"] = "done"
-                t["completed_at"] = now_iso()
-                t["updated_at"] = now_iso()
-                save_ticket(root, t)
-                sprint_cost_usd += _estimate_ticket_cost_usd(t, cfg.get("default_model", "sonnet"))
-                append_log(root, {
-                    "timestamp": now_iso(),
-                    "ticket_id": t["id"],
-                    "agent": "rick",
-                    "action": "completed",
-                    "message": f"Good enough. Approved. *burp* {t['title']}",
-                    "files_changed": t.get("files_touched", []),
-                })
-                console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+                files_touched = t.get("files_touched", [])
+                if _review_and_close_ticket(root, t):
+                    t = load_ticket(root, ticket["id"])
+                    checkpoint_ticket(root, t["id"], "done", {"files_touched": files_touched})
+                    sprint_cost_usd += _estimate_ticket_cost_usd(t, cfg.get("default_model", "sonnet"))
+                    append_log(root, {
+                        "timestamp": now_iso(),
+                        "ticket_id": t["id"],
+                        "agent": "rick",
+                        "action": "completed",
+                        "message": f"Good enough. Approved. *burp* {t['title']}",
+                        "files_changed": files_touched,
+                    })
+                    console.print(f"  [green]{t['id']} → done. Good enough. Approved. *burp*[/green]")
+                else:
+                    t = load_ticket(root, ticket["id"])
             else:
                 console.print(
                     f"  [yellow]{t['id']} → quality gate failed (missing files_changed or description) — "
@@ -1681,6 +1842,7 @@ def build_parser():
     sp.add_argument("--max-iterations", type=int, default=50, help="Max iterations (default: 50)")
     sp.add_argument("--no-teams", action="store_true", help="Disable team collaboration (solo mode only)")
     sp.add_argument("--smart-routing", action="store_true", help="Use Haiku-powered smart routing for agent selection and complexity estimation")
+    sp.add_argument("--resume", action="store_true", help="Resume from the last sprint checkpoint, skipping tickets already checkpointed done")
 
     # review
     sub.add_parser("review", help="Review all completed tickets")

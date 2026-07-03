@@ -1934,5 +1934,508 @@
     "target_files": [
       "scripts/delegate.py"
     ]
+  },
+  {
+    "timestamp": "2026-06-19T04:35:37.285172+00:00",
+    "proposal_id": "PROM-120",
+    "action": "self-reported",
+    "title": "Sleepy no-op iteration leaks uncommitted Morty changes onto base branch",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-02T11:01:25.882040+00:00",
+    "proposal_id": "PROM-121",
+    "action": "created",
+    "title": "Enforce structured JSON handoff schemas for subagent returns (context isolation)",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-02T11:01:25.886141+00:00",
+    "proposal_id": "PROM-122",
+    "action": "created",
+    "title": "Add checkpoint/resume durability to sprint orchestration (LangGraph-style)",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-02T11:01:25.888757+00:00",
+    "proposal_id": "PROM-123",
+    "action": "created",
+    "title": "Add an evaluator/critic Morty reflection loop before closing tickets",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-02T11:01:25.891290+00:00",
+    "proposal_id": "PROM-124",
+    "action": "created",
+    "title": "Per-ticket token budgeting and parallelism caps for fan-out delegation",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-02T11:01:25.893718+00:00",
+    "proposal_id": "PROM-125",
+    "action": "created",
+    "title": "Swarm-style dynamic handoffs between specialist Morty roles",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-02T11:02:18.757134+00:00",
+    "proposal_id": "PROM-126",
+    "action": "created",
+    "title": "Enforce structured output with JSON schema + response prefill in delegation prompts",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-07-02T11:02:18.760824+00:00",
+    "proposal_id": "PROM-127",
+    "action": "created",
+    "title": "Wrap delegation prompts in XML-tagged sections",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-07-02T11:02:18.763388+00:00",
+    "proposal_id": "PROM-128",
+    "action": "created",
+    "title": "Add explicit chain-of-thought scratchpad for planning and review agents",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-07-02T11:02:18.766013+00:00",
+    "proposal_id": "PROM-129",
+    "action": "created",
+    "title": "Add few-shot examples to ticket-breakdown prompts",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-07-02T11:02:18.768523+00:00",
+    "proposal_id": "PROM-130",
+    "action": "created",
+    "title": "Apply prompt caching to static persona/context prefixes",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-07-02T11:03:11.359608+00:00",
+    "proposal_id": "PROM-131",
+    "action": "created",
+    "title": "Adopt SwiftUI Observation framework (@Observable) in Rick Terminal",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-07-02T11:03:11.365655+00:00",
+    "proposal_id": "PROM-132",
+    "action": "created",
+    "title": "Virtualized, auto-scrolling event log with LazyVStack + ScrollViewReader",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-07-02T11:03:11.368826+00:00",
+    "proposal_id": "PROM-133",
+    "action": "created",
+    "title": "Consistent semantic color roles + light/dark adaptation for terminal output",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-07-02T11:03:11.372297+00:00",
+    "proposal_id": "PROM-134",
+    "action": "created",
+    "title": "Respect Reduce Motion and add spinner/progress fallbacks in CLI + GUI",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-07-02T11:03:11.375514+00:00",
+    "proposal_id": "PROM-135",
+    "action": "created",
+    "title": "Structured, scannable agent status lines with progressive disclosure",
+    "category": "ui-ux"
+  },
+  {
+    "timestamp": "2026-07-02T11:06:01.166772+00:00",
+    "proposal_id": "PROM-136",
+    "action": "created",
+    "title": "Scan agent subprocess OUTPUT for injection and secrets before it re-enters the loop",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-07-02T11:06:01.171359+00:00",
+    "proposal_id": "PROM-137",
+    "action": "created",
+    "title": "Human-in-the-loop approval gate for irreversible agent actions (git push, deploy, rm -rf)",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-07-02T11:06:01.174238+00:00",
+    "proposal_id": "PROM-138",
+    "action": "created",
+    "title": "Enforce MCP role authorization with per-delegation capability tokens",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-07-02T11:06:01.176799+00:00",
+    "proposal_id": "PROM-139",
+    "action": "created",
+    "title": "Network egress allowlist for agent Bash to prevent data exfiltration",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-07-02T11:06:01.179988+00:00",
+    "proposal_id": "PROM-140",
+    "action": "created",
+    "title": "CI-enforced supply-chain gate with CycloneDX SBOM generation",
+    "category": "security"
+  },
+  {
+    "timestamp": "2026-07-02T11:07:01.392330+00:00",
+    "proposal_id": "PROM-141",
+    "action": "created",
+    "title": "Declare MCP outputSchema + structured content on server tools",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-02T11:07:01.396843+00:00",
+    "proposal_id": "PROM-142",
+    "action": "created",
+    "title": "Add MCP tool annotations (readOnly/destructive/idempotent hints)",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-02T11:07:01.399579+00:00",
+    "proposal_id": "PROM-143",
+    "action": "created",
+    "title": "Use stream-json output format for claude -p delegation observability",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-02T11:07:01.402968+00:00",
+    "proposal_id": "PROM-144",
+    "action": "created",
+    "title": "Prompt caching for repeated Morty persona/system prompts",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-02T11:07:01.405665+00:00",
+    "proposal_id": "PROM-145",
+    "action": "created",
+    "title": "Migrate Morty roles to native Claude Code subagent definitions",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-02T11:09:06.875586+00:00",
+    "proposal_id": "PROM-146",
+    "action": "created",
+    "title": "1-hour extended prompt-cache TTL for the stable Morty persona prefix",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-07-02T11:09:06.878625+00:00",
+    "proposal_id": "PROM-147",
+    "action": "created",
+    "title": "Context editing + memory tool to prevent context exhaustion in long agent runs",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-07-02T11:09:06.880983+00:00",
+    "proposal_id": "PROM-148",
+    "action": "created",
+    "title": "Strict structured outputs (tool_choice / JSON schema) for routing and plan parsing",
+    "category": "claude-features"
+  },
+  {
+    "timestamp": "2026-07-02T11:09:06.883127+00:00",
+    "proposal_id": "PROM-149",
+    "action": "rejected",
+    "reason": "self-protection"
+  },
+  {
+    "timestamp": "2026-07-02T11:09:06.885127+00:00",
+    "proposal_id": "PROM-150",
+    "action": "rejected",
+    "reason": "self-protection"
+  },
+  {
+    "timestamp": "2026-07-02T11:12:51.831628+00:00",
+    "proposal_id": "PROM-136",
+    "action": "applied",
+    "title": "Scan agent subprocess OUTPUT for injection and secrets before it re-enters the loop",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T11:14:38.804816+00:00",
+    "proposal_id": "PROM-120",
+    "action": "applied",
+    "title": "Sleepy no-op iteration leaks uncommitted Morty changes onto base branch",
+    "target_files": [
+      "scripts/sleepy.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T11:37:47.834240+00:00",
+    "proposal_id": "PROM-121",
+    "action": "failed",
+    "reason": "Evolve delegation failed: \u26a0 claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login \u00b7 Unset it to load your organizatio"
+  },
+  {
+    "timestamp": "2026-07-02T12:58:57.207172+00:00",
+    "proposal_id": "PROM-130",
+    "action": "failed",
+    "reason": "Evolve delegation failed: \u26a0 claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login \u00b7 Unset it to load your organizatio"
+  },
+  {
+    "timestamp": "2026-07-02T14:05:07.128100+00:00",
+    "proposal_id": "PROM-126",
+    "action": "failed",
+    "reason": "Evolve timed out after 600s"
+  },
+  {
+    "timestamp": "2026-07-02T14:15:07.157864+00:00",
+    "proposal_id": "PROM-147",
+    "action": "failed",
+    "reason": "Evolve timed out after 600s"
+  },
+  {
+    "timestamp": "2026-07-02T14:16:58.830396+00:00",
+    "proposal_id": "PROM-132",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-07-02T14:18:28.717767+00:00",
+    "proposal_id": "PROM-143",
+    "action": "applied",
+    "title": "Use stream-json output format for claude -p delegation observability",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/roro_events.py",
+      "scripts/workers.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T14:37:29.062089+00:00",
+    "proposal_id": "PROM-151",
+    "action": "self-reported",
+    "title": "Evolve delegation inherits ANTHROPIC_API_KEY, breaking claude.ai login auth",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-02T14:37:55.505683+00:00",
+    "proposal_id": "PROM-121",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T14:48:05.462535+00:00",
+    "proposal_id": "PROM-130",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T14:58:15.039379+00:00",
+    "proposal_id": "PROM-126",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T14:59:58.548099+00:00",
+    "proposal_id": "PROM-151",
+    "action": "applied",
+    "title": "Evolve delegation inherits ANTHROPIC_API_KEY, breaking claude.ai login auth",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T15:10:27.350350+00:00",
+    "proposal_id": "PROM-147",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T15:21:43.251909+00:00",
+    "proposal_id": "PROM-123",
+    "action": "applied",
+    "title": "Add an evaluator/critic Morty reflection loop before closing tickets",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/delegate.py",
+      "scripts/roro_events.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T15:23:36.189675+00:00",
+    "proposal_id": "PROM-141",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T15:28:43.503411+00:00",
+    "proposal_id": "PROM-137",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T15:57:08.715765+00:00",
+    "proposal_id": "PROM-146",
+    "action": "applied",
+    "title": "1-hour extended prompt-cache TTL for the stable Morty persona prefix",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/persona.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T17:54:52.180218+00:00",
+    "proposal_id": "PROM-127",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T18:12:09.164893+00:00",
+    "proposal_id": "PROM-131",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-07-02T19:19:10.336018+00:00",
+    "proposal_id": "PROM-124",
+    "action": "failed",
+    "reason": "no files changed (false success)"
+  },
+  {
+    "timestamp": "2026-07-02T19:22:10.585808+00:00",
+    "proposal_id": "PROM-128",
+    "action": "failed",
+    "reason": "Evolve delegation failed: (no stderr)"
+  },
+  {
+    "timestamp": "2026-07-02T19:23:02.412473+00:00",
+    "proposal_id": "PROM-144",
+    "action": "applied",
+    "title": "Prompt caching for repeated Morty persona/system prompts",
+    "target_files": [
+      "scripts/persona.py",
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T19:34:53.736826+00:00",
+    "proposal_id": "PROM-148",
+    "action": "applied",
+    "title": "Strict structured outputs (tool_choice / JSON schema) for routing and plan parsing",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/schemas.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T19:39:44.206365+00:00",
+    "proposal_id": "PROM-138",
+    "action": "applied",
+    "title": "Enforce MCP role authorization with per-delegation capability tokens",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/mcp_server.py",
+      "scripts/security_utils.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T19:43:02.247357+00:00",
+    "proposal_id": "PROM-122",
+    "action": "applied",
+    "title": "Add checkpoint/resume durability to sprint orchestration (LangGraph-style)",
+    "target_files": [
+      "scripts/orchestrate.py",
+      "scripts/session.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T19:46:46.182425+00:00",
+    "proposal_id": "PROM-135",
+    "action": "applied",
+    "title": "Structured, scannable agent status lines with progressive disclosure",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/visual.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T19:49:54.355555+00:00",
+    "proposal_id": "PROM-139",
+    "action": "applied",
+    "title": "Network egress allowlist for agent Bash to prevent data exfiltration",
+    "target_files": [
+      "scripts/security_utils.py",
+      "scripts/hooks.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T19:53:23.743816+00:00",
+    "proposal_id": "PROM-140",
+    "action": "applied",
+    "title": "CI-enforced supply-chain gate with CycloneDX SBOM generation",
+    "target_files": [
+      "scripts/security_utils.py",
+      ".github/workflows/security.yml"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T20:01:13.099128+00:00",
+    "proposal_id": "PROM-145",
+    "action": "applied",
+    "title": "Migrate Morty roles to native Claude Code subagent definitions",
+    "note": "finalized manually after file_checksums IsADirectoryError crash; Morty work verified complete"
+  },
+  {
+    "timestamp": "2026-07-02T20:02:40.895003+00:00",
+    "proposal_id": "PROM-129",
+    "action": "applied",
+    "title": "Add few-shot examples to ticket-breakdown prompts",
+    "target_files": [
+      "scripts/ticket.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T20:04:36.197818+00:00",
+    "proposal_id": "PROM-133",
+    "action": "applied",
+    "title": "Consistent semantic color roles + light/dark adaptation for terminal output",
+    "target_files": [
+      "scripts/visual.py",
+      "RickTerminal/DesignTokens/Colors.swift"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T20:15:45.049446+00:00",
+    "proposal_id": "PROM-125",
+    "action": "applied",
+    "title": "Swarm-style dynamic handoffs between specialist Morty roles",
+    "target_files": [
+      "scripts/team.py",
+      "scripts/persona.py",
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T20:16:24.194805+00:00",
+    "proposal_id": "PROM-134",
+    "action": "applied",
+    "title": "Respect Reduce Motion and add spinner/progress fallbacks in CLI + GUI",
+    "target_files": [
+      "scripts/progress.py",
+      "RickTerminal/Views/AgentStatusView.swift"
+    ]
+  },
+  {
+    "timestamp": "2026-07-02T20:18:47.560321+00:00",
+    "proposal_id": "PROM-142",
+    "action": "applied",
+    "title": "Add MCP tool annotations (readOnly/destructive/idempotent hints)",
+    "target_files": [
+      "scripts/mcp_server.py"
+    ]
   }
 ]

@@ -8,6 +8,7 @@ and query ADRs during execution.
 Usage: claude -p --mcp-config '{"mcpServers":{"cto-orchestrator":{"command":"python3","args":["scripts/mcp_server.py"]}}}' '<prompt>'
 """
 
+import functools
 import json
 import os
 import subprocess
@@ -18,6 +19,7 @@ from typing import Literal
 
 try:
     from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
 except ImportError:
     print("Error: mcp package not installed. Run: pip install mcp", file=sys.stderr)
     sys.exit(1)
@@ -28,6 +30,7 @@ try:
         sanitize_path_component,
         audit_log_security_event,
         verify_module_integrity,
+        verify_agent_token,
         ROLE_TOOL_ALLOWLISTS,
         SAFE_ID_PATTERN,
     )
@@ -42,6 +45,7 @@ except ImportError:
     def audit_log_security_event(*a, **kw): pass  # type: ignore[misc]
     def verify_module_integrity(**kwargs):  # type: ignore[misc]
         return {"status": "degraded", "mismatches": [], "missing": [], "hashes": {}}
+    def verify_agent_token(role, ticket_id, token): return True  # type: ignore[misc]
 
 
 def _plugin_version() -> str:
@@ -84,7 +88,32 @@ def _save_json(fp: Path, data: dict):
         json.dump(data, f, indent=2)
 
 
-@mcp.tool()
+def _require_agent_token(fn):
+    """Reject state-mutating tool calls whose CTO_AGENT_TOKEN doesn't verify.
+
+    CTO_AGENT_ROLE alone is just an env var — any subprocess spawned by a
+    delegated agent (e.g. via Bash) could override it to spoof a different
+    role. Tools wrapped with this decorator instead check CTO_AGENT_TOKEN,
+    an HMAC minted by delegate.py at spawn time and bound to the role +
+    ticket that were assigned, so a role override no longer verifies.
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        role = os.environ.get("CTO_AGENT_ROLE", "")
+        ticket_id = os.environ.get("CTO_TICKET_ID", "")
+        token = os.environ.get("CTO_AGENT_TOKEN", "")
+        if not verify_agent_token(role, ticket_id, token):
+            audit_log_security_event(
+                "mcp_authz_fail",
+                f"Rejected {fn.__name__}() — CTO_AGENT_TOKEN invalid for role={role!r}, ticket_id={ticket_id!r}",
+                severity="critical",
+            )
+            return json.dumps({"error": "unauthorized: missing or invalid agent capability token"})
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+@mcp.tool(annotations=ToolAnnotations(title="Get Ticket", readOnlyHint=True))
 def get_ticket(ticket_id: str) -> str:
     """Read ticket state and dependencies.
 
@@ -125,7 +154,8 @@ def get_ticket(ticket_id: str) -> str:
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Update Ticket Status", idempotentHint=True))
+@_require_agent_token
 def update_ticket_status(ticket_id: str, status: str, output: str = "") -> str:
     """Write a partial progress update to a ticket.
 
@@ -162,7 +192,8 @@ def update_ticket_status(ticket_id: str, status: str, output: str = "") -> str:
     return json.dumps({"ok": True, "ticket_id": ticket_id, "status": status})
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Send Team Message"))
+@_require_agent_token
 def send_team_message(team_id: str, to: str, message: str, msg_type: str = "info") -> str:
     """Send a real-time message to another agent in the same team.
 
@@ -210,7 +241,7 @@ def send_team_message(team_id: str, to: str, message: str, msg_type: str = "info
     return json.dumps({"ok": True, "message_id": msg_id, "to": to})
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Get Team Context"))
 def get_team_context(team_id: str) -> str:
     """Read shared team decisions and interfaces for a team session.
 
@@ -256,7 +287,7 @@ def get_team_context(team_id: str) -> str:
     }, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="List Files Reserved"))
 def list_files_reserved(team_id: str) -> str:
     """List file reservations for a team session to check ownership.
 
@@ -289,7 +320,8 @@ def list_files_reserved(team_id: str) -> str:
     }, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Reserve Files", idempotentHint=True))
+@_require_agent_token
 def reserve_files(team_id: str, files: list[str]) -> str:
     """Reserve files for the calling agent to prevent conflicts with teammates.
 
@@ -341,7 +373,7 @@ def reserve_files(team_id: str, files: list[str]) -> str:
     }, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Read ADR"))
 def read_adr(name: str) -> str:
     """Read an Architecture Decision Record by name.
 
@@ -457,7 +489,7 @@ def _load_config() -> dict:
 
 # -------------------- Ticket management --------------------
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="List Tickets", readOnlyHint=True))
 def list_tickets(
     status: str = "",
     agent: str = "",
@@ -521,7 +553,7 @@ def list_tickets(
     return json.dumps({"count": len(rows), "total": total, "offset": offset, "tickets": rows}, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Board", readOnlyHint=True))
 def board(response_format: Literal["concise", "detailed"] = "concise") -> str:
     """Kanban board view — tickets grouped by status.
 
@@ -557,7 +589,7 @@ def board(response_format: Literal["concise", "detailed"] = "concise") -> str:
     return json.dumps({"totals": totals, "ids": ids}, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Create Ticket"))
 def create_ticket(
     title: str,
     description: str = "",
@@ -618,7 +650,8 @@ def create_ticket(
     return json.dumps({"ok": True, "ticket_id": ticket_id, "path": str(fp.relative_to(_find_cto_root()))})
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Close Ticket", destructiveHint=True))
+@_require_agent_token
 def close_ticket(ticket_id: str, output: str = "") -> str:
     """Close a ticket (mark completed) with a final output summary.
 
@@ -644,7 +677,7 @@ def close_ticket(ticket_id: str, output: str = "") -> str:
     return json.dumps({"ok": True, "ticket_id": ticket_id, "status": "completed"})
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Project Status", readOnlyHint=True))
 def project_status(response_format: Literal["concise", "detailed"] = "concise") -> str:
     """Overall project dashboard — config, ticket counts by status, sprint.
 
@@ -688,7 +721,7 @@ def project_status(response_format: Literal["concise", "detailed"] = "concise") 
     }, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="List Active Teams"))
 def list_active_teams() -> str:
     """List active team sessions (parallel Morty collaborations).
 
@@ -716,7 +749,7 @@ def list_active_teams() -> str:
 
 # -------------------- Sleepy Mode --------------------
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Sleepy Status", readOnlyHint=True))
 def sleepy_status() -> str:
     """Sleepy Mode dashboard — budget, iteration count, queue depth, state.
 
@@ -746,7 +779,7 @@ def sleepy_status() -> str:
     }, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Sleepy Queue"))
 def sleepy_queue() -> str:
     """Pending sleepy review branches awaiting apply/discard.
 
@@ -762,7 +795,7 @@ def sleepy_queue() -> str:
 
 # -------------------- Prometheus self-evolution --------------------
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Prometheus Status", readOnlyHint=True))
 def prometheus_status() -> str:
     """Prometheus dashboard — pending/applied/rejected proposals + ledger tail.
 
@@ -809,7 +842,7 @@ def prometheus_status() -> str:
 
 # -------------------- Unity security --------------------
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Unity List"))
 def unity_list() -> str:
     """List all Unity security scans (code + pentest + Greenlight compliance).
 
@@ -821,7 +854,7 @@ def unity_list() -> str:
 
 # -------------------- Long-running spawns --------------------
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Delegate"))
 def delegate(ticket_id: str, agent: str, model: str = "", detached: bool = True) -> str:
     """Spawn a Morty to work a ticket.
 
@@ -861,7 +894,7 @@ def delegate(ticket_id: str, agent: str, model: str = "", detached: bool = True)
     return json.dumps(_run_script("delegate.py", args, timeout=600))
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Meeseeks"))
 def meeseeks(task: str, files: list[str] | None = None, detached: bool = True) -> str:
     """Summon a Mr. Meeseeks for a quick one-shot task (no ticket needed).
 
@@ -883,7 +916,7 @@ def meeseeks(task: str, files: list[str] | None = None, detached: bool = True) -
     return json.dumps(_run_script("meeseeks.py", args, timeout=600))
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Prometheus Scan", openWorldHint=True))
 def prometheus_scan(categories: str = "") -> str:
     """Trigger a Prometheus scan for self-evolution proposals (detached).
 
@@ -900,7 +933,7 @@ def prometheus_scan(categories: str = "") -> str:
     return json.dumps(_spawn_detached("prometheus.py", args, f"prometheus-scan-{_now_iso().replace(':', '-')}.log"))
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Unity Scan", openWorldHint=True))
 def unity_scan(repo_path: str = ".", url: str = "") -> str:
     """Trigger a Unity security scan (code or live pentest, detached).
 
@@ -918,7 +951,7 @@ def unity_scan(repo_path: str = ".", url: str = "") -> str:
     return json.dumps(_spawn_detached("unity.py", args, f"unity-scan-{_now_iso().replace(':', '-')}.log"))
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Explain Code"))
 def explain_code(path: str, level: int = 3, lang: str = "nl") -> str:
     """Have Professor-Morty explain a file at a given Morty-level.
 
@@ -943,7 +976,7 @@ def explain_code(path: str, level: int = 3, lang: str = "nl") -> str:
     ))
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Explain Concept"))
 def explain_concept(topic: str, level: int = 3, lang: str = "nl") -> str:
     """Professor-Morty explains a concept (e.g. 'dependency injection').
 
@@ -966,7 +999,7 @@ def explain_concept(topic: str, level: int = 3, lang: str = "nl") -> str:
     ))
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Emit Handoff"))
 def emit_handoff(
     messages: list[dict] | None = None,
     artifacts: list[dict] | None = None,
@@ -1085,7 +1118,7 @@ def _run_integrity_check():
         )
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Plugin Info"))
 def plugin_info() -> dict:
     """Return plugin name and semver version from .claude-plugin/plugin.json."""
     return {"name": "cto-orchestrator", "version": PLUGIN_VERSION}

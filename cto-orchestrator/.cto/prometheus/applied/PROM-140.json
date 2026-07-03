@@ -1,0 +1,23 @@
+{
+  "id": "PROM-140",
+  "title": "CI-enforced supply-chain gate with CycloneDX SBOM generation",
+  "category": "security",
+  "source": "OWASP LLM Top 10 (2025) \u2014 LLM03 Supply Chain; codebase: supply_chain_check() (security_utils.py:1326) runs pip-audit but is never enforced as a gate or paired with an SBOM",
+  "description": "supply_chain_check() already runs pip-audit against a hash-pinned requirements.lock, but nothing enforces it in CI and there's no Software Bill of Materials artifact. OWASP LLM03 calls for continuous dependency vulnerability gating plus an SBOM for provenance/auditability. Wire the existing function into a failing CI gate and emit a CycloneDX SBOM per build.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/security_utils.py",
+    ".github/workflows/security.yml"
+  ],
+  "proposed_changes": "Add a small CLI entrypoint (e.g. `python scripts/security_utils.py --supply-chain`) that calls supply_chain_check() and exits non-zero on status=='vulnerable'. Create .github/workflows/security.yml that installs pip-audit + cyclonedx-bom, runs the gate on PRs/push, generates a CycloneDX SBOM (`cyclonedx-py requirements requirements.lock -o sbom.json`), and uploads it as a build artifact. Extend supply_chain_check() to also verify the lockfile is hash-pinned (already uses --require-hashes) and to accept a `fail_on` severity threshold so low-severity CVEs can be triaged without blocking every build.",
+  "status": "applied",
+  "created_at": "2026-07-02T11:06:01.179682+00:00",
+  "applied_at": "2026-07-02T19:53:23.742745+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-140-20260702T194954",
+  "files_actually_changed": [
+    "scripts/security_utils.py",
+    ".github/workflows/security.yml"
+  ]
+}

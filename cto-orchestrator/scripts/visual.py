@@ -18,6 +18,7 @@ import sys
 import time
 import unicodedata
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
@@ -88,18 +89,43 @@ _COLOR_RGB: dict = {
     "white":   (204, 204, 204),
 }
 
-# Maps status key → (fg color name | None, style name | None)
-STATUS_COLORS: dict = {
-    "completed":   ("green",   None),
-    "done":        ("green",   None),
-    "working":     ("yellow",  None),
-    "in_progress": ("yellow",  None),
-    "active":      ("yellow",  None),
-    "blocked":     ("red",     None),
-    "failed":      ("red",     None),
-    "in_review":   ("cyan",    None),
-    "testing":     ("magenta", None),
-    "pending":     (None,      "dim"),
+class Palette(Enum):
+    """Semantic color roles for terminal output.
+
+    Centralizes ad-hoc ANSI usage behind named roles (mirrored conceptually
+    by the SwiftUI app's color assets) so status colors stay consistent
+    across the CLI transcript and the GUI.
+    """
+    SUCCESS = "success"
+    WARN = "warn"
+    ERROR = "error"
+    INFO = "info"
+    MUTED = "muted"
+    ACCENT = "accent"
+
+
+# Palette role → (ANSI fg color name | None, style name | None)
+_PALETTE_ANSI: dict = {
+    Palette.SUCCESS: ("green",   None),
+    Palette.WARN:    ("yellow", None),
+    Palette.ERROR:   ("red",    None),
+    Palette.INFO:    ("cyan",   None),
+    Palette.ACCENT:  ("magenta", None),
+    Palette.MUTED:   (None,     "dim"),
+}
+
+# Status key → semantic Palette role
+STATUS_ROLE: dict = {
+    "completed":   Palette.SUCCESS,
+    "done":        Palette.SUCCESS,
+    "working":     Palette.WARN,
+    "in_progress": Palette.WARN,
+    "active":      Palette.WARN,
+    "blocked":     Palette.ERROR,
+    "failed":      Palette.ERROR,
+    "in_review":   Palette.INFO,
+    "testing":     Palette.ACCENT,
+    "pending":     Palette.MUTED,
 }
 
 
@@ -197,7 +223,16 @@ def colorize(
 
 def colorize_status(text: str, status: str) -> str:
     """Wrap *text* in color for the given *status* key. No-ops when colors disabled."""
-    fg, style = STATUS_COLORS.get(status, (None, None))
+    role = STATUS_ROLE.get(status)
+    if role is None:
+        return text
+    fg, style = _PALETTE_ANSI[role]
+    return colorize(text, fg, style)
+
+
+def colorize_role(text: str, role: Palette) -> str:
+    """Wrap *text* in color for a semantic Palette role. No-ops when colors disabled."""
+    fg, style = _PALETTE_ANSI[role]
     return colorize(text, fg, style)
 
 
@@ -292,6 +327,74 @@ def _status_color(status: str) -> str:
     if status == "in_review":
         return "blue"
     return "white"
+
+
+# ── Structured Status Rows ──────────────────────────────────────────────────
+# clig.dev: human-readable by default, greppable when piped. Fixed-width
+# columns + a stable glyph prefix per state so multi-Morty runs stay scannable
+# in a TTY and stay parseable (stable field order, no color codes) when piped.
+
+STATE_GLYPHS = {
+    "queued": "○",
+    "pending": "○",
+    "running": "◐",
+    "working": "◐",
+    "in_progress": "◐",
+    "active": "◐",
+    "done": "●",
+    "completed": "●",
+    "failed": "✖",
+    "blocked": "✖",
+}
+
+_ROW_COL_AGENT = 20
+_ROW_COL_ROLE = 16
+_ROW_COL_TICKET = 12
+_ROW_COL_STATE = 12
+
+
+def format_status_row(
+    agent: str,
+    role: str,
+    ticket: str,
+    state: str,
+    elapsed: float,
+    detail: Optional[str] = None,
+) -> str:
+    """Render one aligned, greppable status line for an agent/Morty.
+
+    Columns are padded to fixed widths in a stable order (agent, role,
+    ticket, state, elapsed[, detail]) so the line stays parseable with
+    awk/grep even when piped — no color codes are ever added here. A state
+    glyph (○ queued, ◐ running, ● done, ✖ failed) prefixes the state field
+    for fast visual scanning in a TTY.
+
+    Args:
+        agent: Agent/Morty identifier (e.g. ``"backend-morty"``).
+        role: Agent role (e.g. ``"backend-morty"``).
+        ticket: Ticket ID this agent is working on.
+        state: One of the keys in ``STATE_GLYPHS`` (unrecognized states
+            render with a ``?`` glyph).
+        elapsed: Seconds elapsed since the agent started.
+        detail: Optional extra detail (e.g. current tool-call summary) —
+            appended only when the caller wants a verbose row; omitted by
+            default to keep the compact view stable and greppable.
+
+    Returns:
+        A single formatted line, no trailing newline.
+    """
+    glyph = STATE_GLYPHS.get(state, "?")
+    row = (
+        f"{glyph} "
+        f"{pad_to_width(agent, _ROW_COL_AGENT)}"
+        f"{pad_to_width(role, _ROW_COL_ROLE)}"
+        f"{pad_to_width(ticket, _ROW_COL_TICKET)}"
+        f"{pad_to_width(state, _ROW_COL_STATE)}"
+        f"{elapsed:>7.1f}s"
+    )
+    if detail:
+        row += f"  {detail}"
+    return row
 
 
 # ── Portal Animation ──────────────────────────────────────────────────────────

@@ -1,0 +1,20 @@
+{
+  "id": "PROM-126",
+  "title": "Enforce structured output with JSON schema + response prefill in delegation prompts",
+  "category": "prompt-engineering",
+  "source": "Anthropic prompt engineering docs \u2014 'Increase output consistency' (prefilling responses + explicit JSON schema); established 2025-2026 best practice for agentic parsing",
+  "description": "Morty sub-agent results are currently parsed from free-form text, which is brittle when a `claude -p` subprocess wraps output in prose or markdown fences. Define explicit output schemas and instruct agents to emit a single fenced JSON block, then prefill the assistant turn with the opening token to force schema adherence. Reduces parse failures and retries.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "In schemas.py add a `DELEGATE_RESULT_SCHEMA` dict (fields: status, summary, files_changed, blockers, next_steps). In delegate.py, append the schema to the delegation prompt with an instruction 'Respond with exactly one ```json block matching this schema and nothing else', and when invoking `claude -p` add a prefilled assistant hint ('```json\\n{') where supported. Wrap the parse in a schema-validating helper that retries once with a 'your last output failed schema validation' correction prompt before falling back to text parsing.",
+  "status": "rejected",
+  "created_at": "2026-07-02T11:02:18.755299+00:00",
+  "applied_at": null,
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-126-20260702T144805",
+  "reject_reason": "Apply failed: Evolve delegation failed: (no stderr)"
+}

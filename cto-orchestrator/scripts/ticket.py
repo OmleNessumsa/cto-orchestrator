@@ -250,6 +250,28 @@ def morty_display(agent: Optional[str]) -> str:
     return MORTY_NAMES.get(agent, agent)
 
 
+# ── Few-shot examples for breakdown prompts ─────────────────────────────────
+
+TICKET_FEWSHOT = """<example>
+Feature: Add CSV export to the orders table
+Output:
+{"title": "Add CSV export button to orders table", "type": "feature", "complexity": "S",
+ "description": "Add an 'Export CSV' button above the orders table that streams the current filtered view to a downloaded .csv file.",
+ "acceptance_criteria": ["Button appears above the table", "Export respects active filters", "File downloads with a timestamped name", "Handles 10k+ rows without blocking the UI"]}
+</example>
+<example>
+Feature: Add user notifications
+Output (too large for one ticket — split into an epic):
+{"title": "User notifications system", "type": "epic", "complexity": "XL",
+ "description": "Split into: (1) notification data model + API, (2) in-app notification bell/dropdown UI, (3) email digest delivery, (4) user preference settings for channels.",
+ "acceptance_criteria": ["Each sub-ticket independently shippable", "No sub-ticket exceeds M complexity"]}
+</example>
+<example>
+Feature: Make it better
+Output: REJECTED — too vague to ticket. Missing: which surface, what "better" means (perf, UX, reliability), success criteria. Ask the requester to specify a concrete outcome before a ticket can be created.
+</example>"""
+
+
 # ── Commands ────────────────────────────────────────────────────────────────
 
 

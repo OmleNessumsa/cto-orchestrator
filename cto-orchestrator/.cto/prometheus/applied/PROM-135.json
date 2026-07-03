@@ -1,0 +1,23 @@
+{
+  "id": "PROM-135",
+  "title": "Structured, scannable agent status lines with progressive disclosure",
+  "category": "ui-ux",
+  "source": "CLI UX guidance (Command Line Interface Guidelines / clig.dev) \u2014 human-first output, alignment, and progressive disclosure of detail",
+  "description": "Delegate/team output benefits from aligned, columnar status lines (agent name, role, ticket, state, elapsed) with a compact default view and a verbose flag for full detail, following clig.dev's 'human-readable by default, greppable when needed' principle. Consistent alignment and a stable glyph prefix per state (queued/running/done/failed) makes multi-Morty runs far easier to scan in the terminal and mirrors the GUI's row layout.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/visual.py"
+  ],
+  "proposed_changes": "Add a `format_status_row(agent, role, ticket, state, elapsed)` helper in visual.py that pads columns to fixed widths and prefixes a state glyph (\u25cb queued, \u25d0 running, \u25cf done, \u2716 failed). Have delegate.py emit these rows for each active Morty and re-render in place under a TTY. Add a `--verbose/-v` flag that appends the tool-call summary; keep the default one-line-per-agent view greppable (stable field order, no color codes when piped).",
+  "status": "applied",
+  "created_at": "2026-07-02T11:03:11.375213+00:00",
+  "applied_at": "2026-07-02T19:46:46.180800+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-135-20260702T194302",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/visual.py"
+  ]
+}
