@@ -188,7 +188,13 @@ def sanitize_worktree(cwd: Path, ticket_id: str) -> str:
     """
     if not git_is_dirty(cwd):
         return "clean"
-    git(["add", "-A"], cwd, check=False)
+    # Sleepy's own runtime state must never ride along on a ticket branch —
+    # it would trip the .cto/sleepy/** denylist and, once the branch is
+    # deleted, wipe the state files off disk (KeyError on the next iter).
+    git(["add", "-A", "--", ".", ":(exclude).cto/sleepy"], cwd, check=False)
+    staged = git(["diff", "--cached", "--quiet"], cwd, check=False)
+    if staged.returncode == 0:
+        return "clean"  # only untracked sleepy state was dirty
     res = git(
         ["commit", "-m", f"sleepy: wip {ticket_id} (auto-committed uncommitted changes)"],
         cwd, check=False,
@@ -196,7 +202,7 @@ def sanitize_worktree(cwd: Path, ticket_id: str) -> str:
     if res.returncode == 0:
         return "committed"
     git(["reset", "--hard"], cwd, check=False)
-    git(["clean", "-fd"], cwd, check=False)
+    git(["clean", "-fd", "-e", ".cto/sleepy"], cwd, check=False)
     return "discarded"
 
 
@@ -325,6 +331,12 @@ def pick_next_ticket(root: Path, exclude_ids: Optional[set] = None) -> Optional[
         if t["status"] not in ("backlog", "todo"):
             continue
         if t["id"] in exclude_ids:
+            continue
+        # Epics are containers tracked via sub-tickets (same rule as
+        # orchestrate.get_actionable_tickets). Delegating one gives a Morty
+        # an un-completable brief — seen 2026-07-07..13: 2100 failed
+        # iterations hammering one epic all week.
+        if (t.get("type") or "").lower() == "epic":
             continue
         deps = t.get("dependencies") or []
         if all(d in done_ids for d in deps):
@@ -560,14 +572,22 @@ def cmd_start(args):
             print(f"\n💸 token cap reached ({fmt_tokens(cap)})")
             break
 
-        cfg = load_json(config_path(root))
-        bud = load_json(budget_path(root))
-        cfg["iteration"] += 1
+        cfg = load_json(config_path(root)) or cfg
+        bud = load_json(budget_path(root)) or bud
+        cfg["iteration"] = cfg.get("iteration", 0) + 1
         iteration = cfg["iteration"]
 
+        # Exclude tickets that already produced a review branch this run —
+        # a "queued" ticket stays status=todo in the ticket system, so
+        # without this the picker re-selects it every iteration (seen
+        # 2026-07-06: 11 duplicate branches for one ticket). "failed" is in
+        # the set for the same reason: a deterministic failure (bad env,
+        # missing dep, un-delegatable ticket) otherwise gets retried every
+        # iteration for the whole run (seen 2026-07-07..13: 300 identical
+        # failures/night, phantom-burning the entire token budget).
         noop_ticket_ids = {
             it["ticket_id"] for it in bud.get("iterations", [])
-            if it.get("status") == "no-op"
+            if it.get("status") in ("no-op", "queued", "denied", "failed")
         }
         ticket = pick_next_ticket(root, exclude_ids=noop_ticket_ids)
         if not ticket:
@@ -618,7 +638,17 @@ def cmd_start(args):
                 model=args.model, timeout=DEFAULT_DELEGATE_TIMEOUT,
             )
             # Heuristic: assume delegation burned the budget it was given.
-            spent_tokens = task_budget if ok else task_budget // 2
+            # A sub-5s failure means the subprocess died before any model
+            # call (import error, argparse, refusal) — charging half the
+            # budget for those turned 300 instant crashes into a phantom
+            # "cap reached" (incident 2026-07-07..13). Charge 0 instead.
+            delegate_sec = time.time() - iter_start
+            if ok:
+                spent_tokens = task_budget
+            elif delegate_sec < 5:
+                spent_tokens = 0
+            else:
+                spent_tokens = task_budget // 2
 
         sanitize_result = sanitize_worktree(root, ticket["id"])
         if sanitize_result == "committed":
