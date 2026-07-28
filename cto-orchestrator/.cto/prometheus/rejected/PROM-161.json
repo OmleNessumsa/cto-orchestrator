@@ -1,0 +1,22 @@
+{
+  "id": "PROM-161",
+  "title": "Sleepy failure-loop: epic selection + no failed-ticket backoff + phantom token charge",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Onderzoeksfabriek TokenTanuki, launchd-context, python3-resolutie homebrew vs Frameworks",
+  "description": "Nachtelijke sleepy-runs in TokenTanuki draaiden 7 nachten (2026-07-07..13) 300 iteraties/nacht op hetzelfde epic-ticket: pick_next_ticket sloot epics niet uit, 'failed' zat niet in de exclusieset, en instant-crashes (delegate.py ModuleNotFoundError rich onder launchd homebrew-python) werden voor task_budget/2 aan fantoomtokens afgeboekt zodat de cap 'bereikt' werd. 2100 gefaalde delegaties, nul werk, geen alarm. Direct gefixt in commit op scripts/sleepy.py (epic-skip, failed-exclusie, 0-charge bij sub-5s failure) + failure-loop-alarm in de project-wrapper. Overweeg structureler: delegate-preflight (import-check) en een generieke stuck-loop-detector in de supervisor.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/sleepy.py"
+  ],
+  "proposed_changes": "Al gefixt; Prometheus kan preflight-check en stuck-detector toevoegen",
+  "status": "rejected",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-13T12:59:37.620352+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Triage reject-stale: All three described bugs were fixed in commit b680ed9 ('fix(sleepy): three fixes from the 2026-07-07..13 failure-loop incident'), filed the same day as this proposal \u2014 the proposal's own proposed_changes field says 'Al gefixt'. Epic-skip, failed-exclusion, and sub-5s 0-charge are all present in current scripts/sleepy.py with incident-citing comments. The residual 'consider a preflight import-check"
+}

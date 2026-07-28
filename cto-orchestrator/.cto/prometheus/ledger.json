@@ -2437,5 +2437,240 @@
     "target_files": [
       "scripts/mcp_server.py"
     ]
+  },
+  {
+    "timestamp": "2026-07-03T09:25:13.386486+00:00",
+    "proposal_id": "PROM-152",
+    "action": "self-reported",
+    "title": "team create: template registry leeg in projectworkspaces",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-03T09:25:13.494305+00:00",
+    "proposal_id": "PROM-153",
+    "action": "self-reported",
+    "title": "DAG sprint rapporteert 'completed' terwijl ticket op 'interrupted' eindigt",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-03T09:34:16.469702+00:00",
+    "proposal_id": "PROM-154",
+    "action": "self-reported",
+    "title": "Sprint-delegatie gebruikt vaste 600s timeout, te krap voor L/XL tickets",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-03T10:09:34.894424+00:00",
+    "proposal_id": "PROM-155",
+    "action": "self-reported",
+    "title": "MCP close_ticket/update_ticket_status reject Rick himself with capability-token error",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-03T10:31:33.386112+00:00",
+    "proposal_id": "PROM-156",
+    "action": "self-reported",
+    "title": "Default 600s delegate timeout too short for L/XL tickets",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-03T10:34:24.022530+00:00",
+    "proposal_id": "PROM-157",
+    "action": "self-reported",
+    "title": "Sprint-loop deadlockt: busy-wait op in_progress epic, interrupted tickets nooit gerequeued",
+    "severity": "critical",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-05T16:16:38.061044+00:00",
+    "proposal_id": "PROM-158",
+    "action": "self-reported",
+    "title": "Sprint error messages truncated in console output",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-06T04:53:39.622205+00:00",
+    "proposal_id": "PROM-159",
+    "action": "self-reported",
+    "title": "Sleepy commits own runtime state onto ticket branch, then denylist-deletes it and crashes",
+    "severity": "critical",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-06T07:05:12.143970+00:00",
+    "proposal_id": "PROM-160",
+    "action": "self-reported",
+    "title": "Sleepy re-picks the same ticket every iteration after queueing it",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-13T12:59:37.621348+00:00",
+    "proposal_id": "PROM-161",
+    "action": "self-reported",
+    "title": "Sleepy failure-loop: epic selection + no failed-ticket backoff + phantom token charge",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-14T13:48:09.481208+00:00",
+    "proposal_id": "PROM-162",
+    "action": "self-reported",
+    "title": "orchestrate.py plan crashes with ENAMETOOLONG on MCP config",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-14T14:26:57.596441+00:00",
+    "proposal_id": "PROM-163",
+    "action": "self-reported",
+    "title": "Morty's tamper with node_modules when packages appear missing",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-07-28T13:08:22.601344+00:00",
+    "proposal_id": "PROM-164",
+    "action": "created",
+    "title": "Prometheus plumbing: prompt/ingest/history-index subcommands, evolve --only, risk-aware ordering, needs-human queue (MANUAL APPLY)",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-28T13:08:22.601492+00:00",
+    "proposal_id": "PROM-165",
+    "action": "created",
+    "title": "In-session Workflow scan+evolve playbook: references/prometheus-workflow.md + SKILL.md routing",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-28T13:08:22.601608+00:00",
+    "proposal_id": "PROM-166",
+    "action": "created",
+    "title": "Backlog triage run: dedup and verify the 12 stale pending proposals, seed needs-human queue",
+    "category": "agent-patterns"
+  },
+  {
+    "timestamp": "2026-07-28T13:11:12.852052+00:00",
+    "proposal_id": "PROM-164",
+    "action": "applied-manual",
+    "title": "Prometheus plumbing: prompt/ingest/history-index subcommands, evolve --only, risk-aware ordering, needs-human queue (MANUAL APPLY)",
+    "target_files": [
+      "scripts/prometheus.py"
+    ],
+    "note": "Applied by Rick in supervised session (precedent PROM-067); verified via py_compile, scan/evolve --dry-run, ingest --dry-run smoke test, status, history-index"
+  },
+  {
+    "timestamp": "2026-07-28T13:12:34.928938+00:00",
+    "proposal_id": "PROM-165",
+    "action": "applied-manual",
+    "title": "In-session Workflow scan+evolve playbook: references/prometheus-workflow.md + SKILL.md routing",
+    "target_files": [
+      "SKILL.md",
+      "references/prometheus-workflow.md"
+    ]
+  },
+  {
+    "timestamp": "2026-07-28T13:13:19.118662+00:00",
+    "proposal_id": "PROM-026",
+    "action": "needs-human",
+    "reason": "moved from rejected/ \u2014 self-protection deadlock, awaiting Elmo review"
+  },
+  {
+    "timestamp": "2026-07-28T13:13:19.120997+00:00",
+    "proposal_id": "PROM-150",
+    "action": "needs-human",
+    "reason": "moved from rejected/ \u2014 self-protection deadlock, awaiting Elmo review"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.036697+00:00",
+    "proposal_id": "PROM-152",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=6 r=2 e=2 size=S"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.037179+00:00",
+    "proposal_id": "PROM-153",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=7 r=4 e=3 size=M"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.038136+00:00",
+    "proposal_id": "PROM-154",
+    "action": "rejected",
+    "reason": "duplicate of PROM-156 (triage 2026-07-28)"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.039323+00:00",
+    "proposal_id": "PROM-155",
+    "action": "rejected",
+    "reason": "triage reject-invalid (2026-07-28)"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.040185+00:00",
+    "proposal_id": "PROM-156",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=5 r=3 e=3 size=M"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.040873+00:00",
+    "proposal_id": "PROM-157",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=8 r=7 e=3 size=M"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.042014+00:00",
+    "proposal_id": "PROM-158",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=6 r=4 e=3 size=M"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.042775+00:00",
+    "proposal_id": "PROM-159",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=4 r=2 e=4 size=M"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.043489+00:00",
+    "proposal_id": "PROM-160",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=5 r=4 e=3 size=M"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.043972+00:00",
+    "proposal_id": "PROM-161",
+    "action": "rejected",
+    "reason": "triage reject-stale (2026-07-28)"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.045073+00:00",
+    "proposal_id": "PROM-162",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=7 r=2 e=2 size=S"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:16.045888+00:00",
+    "proposal_id": "PROM-163",
+    "action": "triaged",
+    "reason": "verified still-present, re-scored i=6 r=2 e=1 size=S"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:31.458987+00:00",
+    "proposal_id": "PROM-167",
+    "action": "created",
+    "title": "mcp_server.py: interactive orchestrator session blocked by agent capability token guard",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-07-28T13:16:31.539538+00:00",
+    "proposal_id": "PROM-166",
+    "action": "applied-manual",
+    "title": "Backlog triage run: dedup and verify the 12 stale pending proposals, seed needs-human queue",
+    "note": "Triage run wf_58b99884-2a5: 12 verified, 9 kept+re-scored, 3 rejected (1 dup, 1 stale, 1 invalid->refiled), PROM-026/150 moved to needs-human"
   }
 ]

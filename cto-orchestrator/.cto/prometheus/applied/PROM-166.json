@@ -1,0 +1,22 @@
+{
+  "id": "PROM-166",
+  "title": "Backlog triage run: dedup and verify the 12 stale pending proposals, seed needs-human queue",
+  "category": "agent-patterns",
+  "source": "ultracode-eval workflow wf_397088ba-6db (judge-panel synthesis, 2026-07-28)",
+  "description": "First live exercise of the new playbook: push the 12 pending proposals (PROM-152..163; 2 critical, 6 high, 14-25 days stale) through verifier + dedup agents. Expected: merge PROM-154/156 (identical 600s-delegate-timeout issue filed twice), staleness-check each against current code, re-rank criticals to the top of the next evolve batch by (impact - risk/2), move self-protection-deadlocked engine fixes (PROM-026, PROM-150) into needs-human/ for manual review. Doubles as acceptance test of the dedup/verifier prompts.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 2,
+  "target_files": [
+    "references/prometheus-workflow.md"
+  ],
+  "proposed_changes": "Run the triage workflow in-session; document the recurring at-flow-start triage step in the playbook.",
+  "status": "applied",
+  "created_at": "2026-07-28T13:08:22.601496+00:00",
+  "applied_at": "2026-07-28T13:16:31.538603+00:00",
+  "rollback_snapshot": null,
+  "apply_mode": "manual-supervised",
+  "applied_mode": "manual-supervised",
+  "files_actually_changed": [],
+  "result": "Triage run wf_58b99884-2a5: 12 verified, 9 kept+re-scored, 3 rejected (1 dup, 1 stale, 1 invalid->refiled), PROM-026/150 moved to needs-human"
+}

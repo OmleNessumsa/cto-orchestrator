@@ -1,0 +1,23 @@
+{
+  "id": "PROM-164",
+  "title": "Prometheus plumbing: prompt/ingest/history-index subcommands, evolve --only, risk-aware ordering, needs-human queue (MANUAL APPLY)",
+  "category": "tooling",
+  "source": "ultracode-eval workflow wf_397088ba-6db (judge-panel synthesis, 2026-07-28)",
+  "description": "Additive edit to the self-protected engine, applied manually in a supervised session (precedent: PROM-067 applied-manual). (1) Extract cmd_scan's per-item persist block into persist_scan_items() with per-item try/except hardening. (2) `prompt --category <c>`: print build_scan_prompt to stdout so workflow scanners single-source the prompt. (3) `ingest <file.json> --category <c> [--dry-run]`: validate a proposal JSON array through the identical sanitize/self-protection/score-clamp/low-value machinery plus fuzzy-title dedup (difflib ratio >0.75) against applied/rejected/pending, rejecting with 'duplicate of PROM-XXX'; serial invocation keeps next_proposal_id and ledger append race-free. (4) `history-index`: compact JSON digest of all proposals for scanner dedup-context injection. (5) `evolve --only PROM-NNN`: apply one named proposal through the unchanged snapshot/py_compile/checksum/rollback pipeline; add json.loads validation for .json targets and `bash -n` for .sh targets; change evolve ordering from impact DESC to (impact - risk/2). (6) Route proposals targeting SELF_PROTECTED_FILES to new .cto/prometheus/needs-human/ with status human-review, surfaced in cmd_status, instead of silent rejection.",
+  "impact_score": 9,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/prometheus.py"
+  ],
+  "proposed_changes": "See description. Legacy scan/evolve behavior otherwise byte-for-byte unchanged. Verify: py_compile, scan --dry-run, status, ingest --dry-run smoke test.",
+  "status": "applied",
+  "created_at": "2026-07-28T13:08:22.600616+00:00",
+  "applied_at": "2026-07-28T13:11:12.851001+00:00",
+  "rollback_snapshot": null,
+  "apply_mode": "manual-supervised",
+  "applied_mode": "manual-supervised",
+  "files_actually_changed": [
+    "scripts/prometheus.py"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "PROM-160",
+  "title": "Sleepy re-picks the same ticket every iteration after queueing it",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "JustFacts sleepy run 2026-07-06, iters 1-11 alle JF-007",
+  "description": "A queued iteration leaves the ticket status=todo, and pick_next_ticket only excludes no-op tickets, so the supervisor re-selects the same ticket indefinitely. Observed: 11 duplicate sleepy/JF-007-N branches, 620k tokens of redundant work in one run. Hotfixed 2026-07-06: exclude statuses no-op, queued and denied from re-selection within a run. Better structural fix: set the ticket to in_review in the ticket system when its branch is queued, and revert on discard.",
+  "impact_score": 5,
+  "risk_score": 4,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/sleepy.py"
+  ],
+  "proposed_changes": "Hotfix toegepast; overweeg ticketstatus in_review bij queue + regressietest",
+  "status": "pending",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-06T07:05:12.142857+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "triage": {
+    "verified_at": "2026-07-28T13:16:16.043009+00:00",
+    "size": "M",
+    "evidence": "sleepy.py:685-695 sets status_label=\"queued\" and calls append_queue() without any ticket-status update; cmd_apply (825-847) merges and only calls _mark_queue_processed; cmd_discard (850-864) deletes the branch, no status revert; cmd_start re-inits budget with \"iterations\": [] (527-534), so the exclusion set at lines 588-592 is empty at the start of every new run and a still-todo queued ticket is re-picked cross-run. No occurrence of in_review anywhere in sleepy.py.",
+    "note": "The within-run hotfix (exclude no-op/queued/denied/failed from re-selection) is in place and was extended by b680ed9, but the proposal's actual ask \u2014 the structural fix of setting ticket status to in_review when a branch is queued and reverting on discard \u2014 is not implemented. Because the budget file (source of the exclusion set) is re-initialized on every sleepy start, exclusion is per-run only: a queued-but-unreviewed ticket is still status=todo the next night and gets re-picked, producing one duplicate branch and one wasted delegation per ticket per subsequent run. Moderate residual impact (acute loop gone), M-sized multi-spot change within sleepy.py (queue point, apply, discard) plus a regression test. Not prometheus.py, so delegatable.",
+    "run": "wf_58b99884-2a5"
+  }
+}

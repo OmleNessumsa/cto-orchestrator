@@ -1,0 +1,28 @@
+{
+  "id": "PROM-153",
+  "title": "DAG sprint rapporteert 'completed' terwijl ticket op 'interrupted' eindigt",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "orchestrate.py sprint --auto, DAG phase 1/1 met 3 parallelle tickets, 2026-07-03",
+  "description": "In een DAG-fase van sprint 2 (Eren Rent) rapporteerde de sprint-output '[EREN-033] @fullstack-morty: completed' en 'DAG sprint results: 3/3 completed', maar het ticket stond daarna op status 'interrupted' met lege agent_output, met half werk in de working tree. De sprint-loop plande het ticket vervolgens niet opnieuw in \u2014 het bleef hangen tot handmatige interventie (status terug naar todo).",
+  "impact_score": 7,
+  "risk_score": 4,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Completion-status in de DAG-runner komt niet uit de ticket-JSON zelf; lees na afloop van elke parallelle delegatie de echte ticketstatus terug en requeue tickets met status interrupted/onbekend automatisch.",
+  "status": "pending",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-03T09:25:13.492967+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "triage": {
+    "verified_at": "2026-07-28T13:16:16.036931+00:00",
+    "size": "M",
+    "evidence": "orchestrate.py:510 `return {\"ticket_id\": ticket_id, \"agent\": agent, \"status\": \"completed\", \"output\": output[-500:]}` \u2014 status derived only from absence of exception; run_delegate (line 240) `subprocess.run(..., capture_output=True)` with no returncode check; delegate.py:2978 `ticket[\"status\"] = \"interrupted\"` then plain `return` (exit 0); orchestrate.py:1416 handles only `if t[\"status\"] == \"in_review\"`; orchestrate.py:1169 `if t[\"status\"] not in (\"todo\", \"backlog\"): continue` \u2014 interrupted never requeued. Last commits to orchestrate.py (c09b11b, e3d3a76) left all these lines intact; b680ed9 touched sleepy fixes, not this path.",
+    "note": "Bug still present and mechanism confirmed end-to-end: run_delegate (orchestrate.py:240) ignores the subprocess return code; _dag_delegate (line 510) labels any non-raising delegation 'completed' without reading the ticket JSON, while delegate.py:2978 sets status 'interrupted' on timeout and returns cleanly; the DAG result loop (1413-1441) only handles 'in_review', get_actionable_tickets (1169) only requeues todo/backlog, and the sprint exit check (1383) ignores 'interrupted' \u2014 so the ticket strands exactly as described. Fix is confined to orchestrate.py (not prometheus.py): read back real ticket status in _dag_delegate and requeue interrupted tickets (with a retry cap to avoid loops). Multi-spot, single-file change \u2192 M.",
+    "run": "wf_58b99884-2a5"
+  }
+}

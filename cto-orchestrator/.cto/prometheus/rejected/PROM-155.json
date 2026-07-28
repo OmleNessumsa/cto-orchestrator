@@ -1,0 +1,20 @@
+{
+  "id": "PROM-155",
+  "title": "MCP close_ticket/update_ticket_status reject Rick himself with capability-token error",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Closing RICK-027/RICK-029 after sprint review in rick-terminal project, 2026-07-03",
+  "description": "From a Rick session in another project (rick-terminal), mcp__cto-orchestrator__create_ticket and delegate work fine, but close_ticket and update_ticket_status return 'unauthorized: missing or invalid agent capability token'. Rick (the orchestrating session) has no capability token \u2014 those tools seem to expect a delegated-Morty token. Either exempt the orchestrator session or document that Rick must use ticket.py close as fallback.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [],
+  "proposed_changes": "Check the capability-token middleware on write tools in the MCP server: create_ticket is unguarded while close_ticket/update_ticket_status are guarded \u2014 make it consistent and allow the interactive Rick session.",
+  "status": "rejected",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-03T10:09:34.893013+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Triage reject-invalid: target_files is empty, which per verification rules is an automatic reject-invalid \u2014 nothing concrete to delegate. Note: the underlying bug is NOT stale; it is still present in scripts/mcp_server.py (create_ticket unguarded, update_ticket_status/close_ticket guarded by _require_agent_token with no orchestrator exemption in verify_agent_token). Recommend re-filing with target_files [scripts/mcp_ser"
+}

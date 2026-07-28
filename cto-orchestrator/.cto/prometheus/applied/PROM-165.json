@@ -1,0 +1,25 @@
+{
+  "id": "PROM-165",
+  "title": "In-session Workflow scan+evolve playbook: references/prometheus-workflow.md + SKILL.md routing",
+  "category": "agent-patterns",
+  "source": "ultracode-eval workflow wf_397088ba-6db (judge-panel synthesis, 2026-07-28)",
+  "description": "New references/prometheus-workflow.md plus a short SKILL.md Prometheus-section update: when in a Claude Code session with the Workflow tool, route 'Rick evolve'/'prometheus scan' through in-session workflow orchestration \u2014 parallel category scanners with structured-output schemas, one independent verifier per candidate that discards scanner self-scores and re-scores, serial `ingest` per survivor, evolve via ranked `evolve --only` + post-apply diff reviewer (demote-only). Plain CLI remains the headless/sleepy/cron fallback; nested claude -p ultracode rejected.",
+  "impact_score": 8,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "SKILL.md",
+    "references/prometheus-workflow.md"
+  ],
+  "proposed_changes": "Write references/prometheus-workflow.md (full playbook) and update the Prometheus section of SKILL.md with routing rules. Hard rules: never write .cto/prometheus/ directly, ingest is the only sanctioned write path, MAX_AUTO_APPLIES_PER_RUN=3 preserved.",
+  "status": "applied",
+  "created_at": "2026-07-28T13:08:22.601350+00:00",
+  "applied_at": "2026-07-28T13:12:34.928035+00:00",
+  "rollback_snapshot": null,
+  "apply_mode": "manual-supervised",
+  "applied_mode": "manual-supervised",
+  "files_actually_changed": [
+    "SKILL.md",
+    "references/prometheus-workflow.md"
+  ]
+}

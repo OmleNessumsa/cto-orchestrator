@@ -1,0 +1,28 @@
+{
+  "id": "PROM-162",
+  "title": "orchestrate.py plan crashes with ENAMETOOLONG on MCP config",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "SnapWizard project in ~/Projects/screenshot, plan command with ~1500 char description",
+  "description": "Running 'orchestrate.py plan' with a long project description fails: 'Claude failed: Error: Invalid MCP configuration: Failed to read file: Error: ENAMETOOLONG'. Looks like the project description (or a path built from it) is passed where a file path is expected, or the MCP config path is constructed from the prompt text.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Check how the claude -p subprocess gets its --mcp-config argument; likely the description string leaks into a file path. Write the plan prompt to a temp file instead of inlining it.",
+  "status": "pending",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-14T13:48:09.480127+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "triage": {
+    "verified_at": "2026-07-28T13:16:16.044559+00:00",
+    "size": "S",
+    "evidence": "scripts/orchestrate.py lines 786-797 (current HEAD): cmd.extend([\"--mcp-config\", mcp_config]) ... cmd.append(safe_prompt) \u2014 prompt directly follows the variadic --mcp-config option with no intervening flag. git log: last commit to orchestrate.py is c09b11b dated 2026-07-03, before the 2026-07-14 report; grep shows no ENAMETOOLONG handling or temp-file workaround anywhere in scripts/.",
+    "note": "Bug still present and root cause confirmed. In claude_prompt() the positional prompt is appended immediately after the variadic --mcp-config flag, so Claude CLI consumes the long prompt as an extra MCP config value, fails JSON parse, treats it as a file path, and dies with ENAMETOOLONG \u2014 exactly the reported crash, length-dependent as described. orchestrate.py has not been touched since 2026-07-03 (proposal filed 2026-07-14), so no fix has landed. Fix is a small argument-ordering change (separate the prompt from --mcp-config with a non-variadic flag or option terminator) and does not involve scripts/prometheus.py. Same latent pattern exists at delegate.py:2494 but is out of this proposal's declared scope.",
+    "run": "wf_58b99884-2a5"
+  }
+}

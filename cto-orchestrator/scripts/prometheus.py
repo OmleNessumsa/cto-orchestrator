@@ -16,6 +16,7 @@ Commands:
 """
 
 import argparse
+import difflib
 import hashlib
 import json
 import os
@@ -116,6 +117,7 @@ def ensure_prometheus_dirs(root: Path) -> dict[str, Path]:
         "proposals": base / "proposals",
         "applied": base / "applied",
         "rejected": base / "rejected",
+        "needs_human": base / "needs-human",
         "snapshots": base / "snapshots",
     }
     for d in dirs.values():
@@ -144,16 +146,57 @@ def append_ledger(root: Path, entry: dict):
 
 # ── Proposal ID generation ───────────────────────────────────────────────────
 
+PROPOSAL_DIRS = ("proposals", "applied", "rejected", "needs_human")
+
+
 def next_proposal_id(dirs: dict[str, Path]) -> str:
     """Generate next PROM-NNN ID based on existing proposals across all dirs."""
     max_num = 0
-    for subdir in ("proposals", "applied", "rejected"):
+    for subdir in PROPOSAL_DIRS:
         d = dirs[subdir]
         for fp in d.glob("PROM-*.json"):
             match = re.match(r"PROM-(\d+)", fp.stem)
             if match:
                 max_num = max(max_num, int(match.group(1)))
     return f"PROM-{max_num + 1:03d}"
+
+
+def proposal_index(dirs: dict[str, Path]) -> list[dict]:
+    """Compact digest of every proposal across all state dirs."""
+    index = []
+    for subdir in PROPOSAL_DIRS:
+        for fp in sorted(dirs[subdir].glob("PROM-*.json")):
+            try:
+                p = load_json(fp)
+            except (json.JSONDecodeError, OSError):
+                continue
+            index.append({
+                "id": p.get("id", fp.stem),
+                "title": p.get("title", ""),
+                "status": p.get("status", subdir),
+                "category": p.get("category", ""),
+                "target_files": p.get("target_files", []),
+                "reject_reason": p.get("reject_reason"),
+            })
+    index.sort(key=lambda e: e["id"])
+    return index
+
+
+DUPLICATE_TITLE_RATIO = 0.75
+
+
+def find_duplicate(title: str, index: list[dict]) -> str | None:
+    """Return the ID of an existing proposal whose title fuzzy-matches."""
+    norm = (title or "").strip().lower()
+    if not norm:
+        return None
+    for entry in index:
+        existing = (entry.get("title") or "").strip().lower()
+        if not existing:
+            continue
+        if difflib.SequenceMatcher(None, norm, existing).ratio() > DUPLICATE_TITLE_RATIO:
+            return entry["id"]
+    return None
 
 
 # ── Validation ───────────────────────────────────────────────────────────────
@@ -388,6 +431,154 @@ def delegate_evolve(prompt: str, model: str = "sonnet", timeout: int = 300) -> s
         raise RuntimeError(f"Evolve timed out after {timeout}s")
 
 
+# ── Proposal persistence (shared by scan + ingest) ───────────────────────────
+
+def persist_scan_items(root: Path, dirs: dict[str, Path], category: str,
+                       items: list, dedupe: bool = False,
+                       dry_run: bool = False) -> int:
+    """Validate and persist raw proposal items through the full filter chain.
+
+    Shared by cmd_scan (legacy path, dedupe=False) and cmd_ingest
+    (workflow path, dedupe=True). Returns the number of proposals that
+    landed as pending. Each item is processed in its own try/except so a
+    single malformed item (e.g. non-numeric score) can't kill the batch.
+    """
+    persisted = 0
+    dedup_index = proposal_index(dirs) if dedupe else []
+
+    for item in items[:MAX_PROPOSALS_PER_CATEGORY]:
+        try:
+            if not isinstance(item, dict):
+                print(f"  SKIPPED: item is not an object: {str(item)[:80]}")
+                continue
+
+            target_files = item.get("target_files", [])
+            if not isinstance(target_files, list):
+                target_files = []
+            try:
+                impact = max(1, min(10, int(item.get("impact_score", 5))))
+            except (TypeError, ValueError):
+                impact = 5
+            try:
+                risk = max(1, min(10, int(item.get("risk_score", 5))))
+            except (TypeError, ValueError):
+                risk = 5
+            try:
+                effort = max(1, min(10, int(item.get("effort_score", 5))))
+            except (TypeError, ValueError):
+                effort = 5
+
+            title = sanitize_text_input(item.get("title", "Untitled"), max_length=200)
+
+            if dry_run:
+                verdict = "pending"
+                if is_self_protected(target_files):
+                    verdict = "human-review (self-protected)"
+                elif impact < 5 and effort > 7:
+                    verdict = f"rejected (low value: impact={impact} effort={effort})"
+                elif dedupe:
+                    dup = find_duplicate(title, dedup_index)
+                    if dup:
+                        verdict = f"rejected (duplicate of {dup})"
+                print(f"  [DRY RUN] {verdict}: {title}")
+                if verdict == "pending":
+                    persisted += 1
+                continue
+
+            prom_id = next_proposal_id(dirs)
+            proposal = {
+                "id": prom_id,
+                "title": title,
+                "category": category,
+                "source": sanitize_text_input(item.get("source", "unknown"), max_length=500),
+                "description": sanitize_text_input(item.get("description", ""), max_length=2000),
+                "impact_score": impact,
+                "risk_score": risk,
+                "effort_score": effort,
+                "target_files": target_files[:10],
+                "proposed_changes": sanitize_text_input(
+                    item.get("proposed_changes", ""), max_length=3000
+                ),
+                "status": "pending",
+                "created_at": now_iso(),
+                "applied_at": None,
+                "rollback_snapshot": None,
+            }
+
+            # Self-protection: route to needs-human instead of silent rejection,
+            # so engine fixes queue up for Elmo instead of dying in rejected/.
+            if is_self_protected(target_files):
+                proposal["status"] = "human-review"
+                save_json(dirs["needs_human"] / f"{prom_id}.json", proposal)
+                print(f"  {prom_id}: NEEDS HUMAN (self-protected) — {proposal['title']}")
+                append_ledger(root, {
+                    "timestamp": now_iso(),
+                    "proposal_id": prom_id,
+                    "action": "needs-human",
+                    "reason": "self-protection",
+                    "title": proposal["title"],
+                })
+                continue
+
+            # Auto-reject low-value proposals (impact < 5 AND effort > 7)
+            if impact < 5 and effort > 7:
+                proposal["status"] = "rejected"
+                proposal["reject_reason"] = f"Auto-rejected: low impact ({impact}) with high effort ({effort})"
+                save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+                print(f"  {prom_id}: REJECTED (low value) — {proposal['title']}")
+                append_ledger(root, {
+                    "timestamp": now_iso(),
+                    "proposal_id": prom_id,
+                    "action": "rejected",
+                    "reason": f"low-value (impact={impact}, effort={effort})",
+                })
+                continue
+
+            # Fuzzy-title dedup against full history (ingest path only)
+            if dedupe:
+                dup = find_duplicate(title, dedup_index)
+                if dup:
+                    proposal["status"] = "rejected"
+                    proposal["reject_reason"] = f"Duplicate of {dup}"
+                    save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+                    print(f"  {prom_id}: REJECTED (duplicate of {dup}) — {proposal['title']}")
+                    append_ledger(root, {
+                        "timestamp": now_iso(),
+                        "proposal_id": prom_id,
+                        "action": "rejected",
+                        "reason": f"duplicate of {dup}",
+                    })
+                    continue
+                dedup_index.append({"id": prom_id, "title": title})
+
+            # Save as pending
+            save_json(dirs["proposals"] / f"{prom_id}.json", proposal)
+            persisted += 1
+            print(f"  {prom_id}: {proposal['title']} (impact={impact} risk={risk} effort={effort})")
+
+            emit("cto.prometheus.proposal.created", {
+                "proposal_id": prom_id,
+                "title": proposal["title"],
+                "category": category,
+                "impact_score": impact,
+                "risk_score": risk,
+                "effort_score": effort,
+            }, role="rick")
+
+            append_ledger(root, {
+                "timestamp": now_iso(),
+                "proposal_id": prom_id,
+                "action": "created",
+                "title": proposal["title"],
+                "category": category,
+            })
+        except Exception as e:  # noqa: BLE001 — one bad item must not kill the batch
+            print(f"  SKIPPED item after error: {e}", file=sys.stderr)
+            continue
+
+    return persisted
+
+
 # ── Command: scan ────────────────────────────────────────────────────────────
 
 def cmd_scan(args):
@@ -459,84 +650,7 @@ def cmd_scan(args):
             print(f"  Invalid response for {category}: expected list")
             continue
 
-        # Limit proposals per category
-        proposals_raw = proposals_raw[:MAX_PROPOSALS_PER_CATEGORY]
-
-        for item in proposals_raw:
-            prom_id = next_proposal_id(dirs)
-            target_files = item.get("target_files", [])
-            impact = item.get("impact_score", 5)
-            risk = item.get("risk_score", 5)
-            effort = item.get("effort_score", 5)
-
-            proposal = {
-                "id": prom_id,
-                "title": sanitize_text_input(item.get("title", "Untitled"), max_length=200),
-                "category": category,
-                "source": sanitize_text_input(item.get("source", "unknown"), max_length=500),
-                "description": sanitize_text_input(item.get("description", ""), max_length=2000),
-                "impact_score": max(1, min(10, int(impact))),
-                "risk_score": max(1, min(10, int(risk))),
-                "effort_score": max(1, min(10, int(effort))),
-                "target_files": target_files[:10],
-                "proposed_changes": sanitize_text_input(
-                    item.get("proposed_changes", ""), max_length=3000
-                ),
-                "status": "pending",
-                "created_at": now_iso(),
-                "applied_at": None,
-                "rollback_snapshot": None,
-            }
-
-            # Self-protection: auto-reject proposals targeting prometheus.py
-            if is_self_protected(target_files):
-                proposal["status"] = "rejected"
-                proposal["reject_reason"] = "Self-protection: cannot modify Prometheus engine"
-                save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
-                print(f"  {prom_id}: REJECTED (self-protection) — {proposal['title']}")
-                append_ledger(root, {
-                    "timestamp": now_iso(),
-                    "proposal_id": prom_id,
-                    "action": "rejected",
-                    "reason": "self-protection",
-                })
-                continue
-
-            # Auto-reject low-value proposals (impact < 5 AND effort > 7)
-            if impact < 5 and effort > 7:
-                proposal["status"] = "rejected"
-                proposal["reject_reason"] = f"Auto-rejected: low impact ({impact}) with high effort ({effort})"
-                save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
-                print(f"  {prom_id}: REJECTED (low value) — {proposal['title']}")
-                append_ledger(root, {
-                    "timestamp": now_iso(),
-                    "proposal_id": prom_id,
-                    "action": "rejected",
-                    "reason": f"low-value (impact={impact}, effort={effort})",
-                })
-                continue
-
-            # Save as pending
-            save_json(dirs["proposals"] / f"{prom_id}.json", proposal)
-            total_proposals += 1
-            print(f"  {prom_id}: {proposal['title']} (impact={impact} risk={risk} effort={effort})")
-
-            emit("cto.prometheus.proposal.created", {
-                "proposal_id": prom_id,
-                "title": proposal["title"],
-                "category": category,
-                "impact_score": impact,
-                "risk_score": risk,
-                "effort_score": effort,
-            }, role="rick")
-
-            append_ledger(root, {
-                "timestamp": now_iso(),
-                "proposal_id": prom_id,
-                "action": "created",
-                "title": proposal["title"],
-                "category": category,
-            })
+        total_proposals += persist_scan_items(root, dirs, category, proposals_raw)
 
     emit("cto.prometheus.scan.completed", {
         "categories": categories,
@@ -566,14 +680,25 @@ def cmd_evolve(args):
     max_applies = args.max_applies or MAX_AUTO_APPLIES_PER_RUN
     model = args.model or "sonnet"
 
-    # Load pending proposals sorted by impact (highest first)
+    # Load pending proposals, ranked by impact discounted for risk
     pending = []
     for fp in dirs["proposals"].glob("PROM-*.json"):
         proposal = load_json(fp)
         if proposal.get("status") == "pending":
             pending.append(proposal)
 
-    pending.sort(key=lambda p: p.get("impact_score", 0), reverse=True)
+    pending.sort(key=lambda p: p.get("impact_score", 0) - p.get("risk_score", 0) / 2,
+                 reverse=True)
+
+    if args.only:
+        if not re.match(r'^PROM-\d{3,}$', args.only):
+            print(f"Error: Invalid proposal ID format: {args.only}", file=sys.stderr)
+            sys.exit(1)
+        pending = [p for p in pending if p.get("id") == args.only]
+        if not pending:
+            print(f"Error: {args.only} not found among pending proposals.", file=sys.stderr)
+            sys.exit(1)
+        max_applies = 1
 
     if not pending:
         print("No pending proposals. Run `python scripts/prometheus.py scan` first.")
@@ -601,16 +726,21 @@ def cmd_evolve(args):
             print(f"  [DRY RUN] Would apply {prom_id}")
             continue
 
-        # Double-check self-protection
+        # Double-check self-protection: park for human review, never auto-apply
         if is_self_protected(proposal.get("target_files", [])):
-            proposal["status"] = "rejected"
-            proposal["reject_reason"] = "Self-protection: cannot modify Prometheus engine"
-            save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+            proposal["status"] = "human-review"
+            save_json(dirs["needs_human"] / f"{prom_id}.json", proposal)
             # Remove from proposals
             prop_fp = dirs["proposals"] / f"{prom_id}.json"
             if prop_fp.exists():
                 prop_fp.unlink()
-            print(f"  REJECTED (self-protection)")
+            print(f"  NEEDS HUMAN (self-protected) — parked in needs-human/")
+            append_ledger(root, {
+                "timestamp": now_iso(),
+                "proposal_id": prom_id,
+                "action": "needs-human",
+                "reason": "self-protection",
+            })
             continue
 
         # Reject proposals with empty target_files BEFORE delegating. Without
@@ -706,16 +836,33 @@ End with:
             })
             continue
 
-        # Validate Python syntax for any .py target files
+        # Validate syntax for .py / .json / .sh target files
         syntax_ok = True
         for tf in target_files:
+            full_path = root / tf
+            if not full_path.exists() or full_path.is_dir():
+                continue
             if tf.endswith(".py"):
-                full_path = root / tf
-                if full_path.exists():
-                    if not validate_python_syntax(str(full_path)):
-                        syntax_ok = False
-                        print(f"  Syntax validation FAILED for {tf}")
-                        break
+                if not validate_python_syntax(str(full_path)):
+                    syntax_ok = False
+                    print(f"  Syntax validation FAILED for {tf}")
+                    break
+            elif tf.endswith(".json"):
+                try:
+                    json.loads(full_path.read_text())
+                except (json.JSONDecodeError, OSError) as e:
+                    syntax_ok = False
+                    print(f"  JSON validation FAILED for {tf}: {e}")
+                    break
+            elif tf.endswith(".sh"):
+                bash_check = subprocess.run(
+                    ["bash", "-n", str(full_path)],
+                    capture_output=True, text=True,
+                )
+                if bash_check.returncode != 0:
+                    syntax_ok = False
+                    print(f"  Shell validation FAILED for {tf}: {bash_check.stderr[:200]}")
+                    break
 
         if not syntax_ok:
             # Rollback on syntax error
@@ -809,6 +956,79 @@ End with:
     print(f"\nEvolution complete. {applied_count}/{min(len(pending), max_applies)} proposals applied.")
 
 
+# ── Command: prompt ──────────────────────────────────────────────────────────
+
+def cmd_prompt(args):
+    """Print the scan prompt for a category (single-sources prompt text for
+    in-session workflow scanners)."""
+    root = find_cto_root()
+    if args.category not in SCAN_CATEGORIES:
+        print(f"Error: Unknown category: {args.category}", file=sys.stderr)
+        print(f"Valid: {', '.join(SCAN_CATEGORIES.keys())}", file=sys.stderr)
+        sys.exit(1)
+    print(build_scan_prompt(args.category, root))
+
+
+# ── Command: ingest ──────────────────────────────────────────────────────────
+
+def cmd_ingest(args):
+    """Ingest externally generated proposals (e.g. from an in-session Workflow
+    scan) through the identical validation chain as cmd_scan, plus fuzzy-title
+    dedup against the full proposal history.
+
+    This is the ONLY sanctioned write path into .cto/prometheus/ for
+    workflow-generated proposals. Serial invocation keeps next_proposal_id
+    and ledger appends race-free.
+    """
+    root = find_cto_root()
+    dirs = ensure_prometheus_dirs(root)
+
+    if args.category not in SCAN_CATEGORIES and args.category != "self-diagnosed":
+        print(f"Error: Unknown category: {args.category}", file=sys.stderr)
+        print(f"Valid: {', '.join(SCAN_CATEGORIES.keys())}, self-diagnosed", file=sys.stderr)
+        sys.exit(1)
+
+    fp = Path(args.file)
+    if not fp.exists():
+        print(f"Error: File not found: {fp}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        items = json.loads(fp.read_text())
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in {fp}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(items, list):
+        print("Error: Expected a JSON array of proposals.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"*Burrrp* Prometheus ingesting {len(items)} item(s) for category '{args.category}'...")
+    count = persist_scan_items(root, dirs, args.category, items,
+                               dedupe=True, dry_run=args.dry_run)
+
+    if not args.dry_run:
+        append_log(root, {
+            "timestamp": now_iso(),
+            "ticket_id": None,
+            "agent": "prometheus",
+            "action": "ingest",
+            "message": f"Ingested {count} proposal(s) from {fp.name} ({args.category})",
+            "files_changed": [],
+        })
+    print(f"\nIngest complete. {count} proposal(s) pending.")
+
+
+# ── Command: history-index ───────────────────────────────────────────────────
+
+def cmd_history_index(args):
+    """Print a compact JSON digest of all proposals (for dedup-context
+    injection into workflow scanner prompts)."""
+    root = find_cto_root()
+    dirs = ensure_prometheus_dirs(root)
+    print(json.dumps(proposal_index(dirs), indent=2))
+
+
 # ── Command: rollback ────────────────────────────────────────────────────────
 
 def cmd_rollback(args):
@@ -826,7 +1046,7 @@ def cmd_rollback(args):
     # Find the proposal (check applied first, then rejected)
     proposal = None
     proposal_fp = None
-    for subdir in ("applied", "rejected", "proposals"):
+    for subdir in ("applied", "rejected", "proposals", "needs_human"):
         fp = dirs[subdir] / f"{prom_id}.json"
         if fp.exists():
             proposal = load_json(fp)
@@ -893,6 +1113,7 @@ def cmd_status(args):
     pending = list(dirs["proposals"].glob("PROM-*.json"))
     applied = list(dirs["applied"].glob("PROM-*.json"))
     rejected = list(dirs["rejected"].glob("PROM-*.json"))
+    needs_human = list(dirs["needs_human"].glob("PROM-*.json"))
 
     # Count rolled back from applied
     rolled_back = 0
@@ -921,9 +1142,16 @@ def cmd_status(args):
 +====================================================+
 |  Pending:     {len(pending):<5} | Applied:    {len(applied):<5}        |
 |  Rejected:    {len(rejected):<5} | Rolled Back: {rolled_back:<4}       |
+|  Needs Human: {len(needs_human):<5} |                          |
 +----------------------------------------------------+
 |  Last: {last_activity:<43}|
 +====================================================+""")
+
+    if needs_human:
+        print("\n  Awaiting human review (self-protected targets):")
+        for fp in sorted(needs_human):
+            p = load_json(fp)
+            print(f"    {p['id']}: {p.get('title', 'untitled')[:60]}")
 
     if cat_counts:
         print("\n  Pending by category:")
@@ -1060,17 +1288,17 @@ def cmd_self_report(args):
         "rollback_snapshot": None,
     }
 
-    # Self-protection still applies
+    # Self-protection still applies — park engine fixes for human review
     if is_self_protected(target_files):
-        proposal["status"] = "rejected"
-        proposal["reject_reason"] = "Self-protection: cannot modify Prometheus engine"
-        save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
-        print(f"  {prom_id}: REJECTED (self-protection) — {proposal['title']}")
+        proposal["status"] = "human-review"
+        save_json(dirs["needs_human"] / f"{prom_id}.json", proposal)
+        print(f"  {prom_id}: NEEDS HUMAN (self-protected) — {proposal['title']}")
         append_ledger(root, {
             "timestamp": now_iso(),
             "proposal_id": prom_id,
-            "action": "rejected",
+            "action": "needs-human",
             "reason": "self-protection",
+            "title": proposal["title"],
         })
         return
 
@@ -1146,6 +1374,23 @@ def build_parser():
                     help="Model for applying (default: sonnet)")
     ev.add_argument("--dry-run", action="store_true", help="Preview without applying")
     ev.add_argument("--timeout", type=int, default=300, help="Timeout per apply (default: 300s)")
+    ev.add_argument("--only", default=None, metavar="PROM-NNN",
+                    help="Apply exactly one named pending proposal")
+
+    # prompt
+    pr = sub.add_parser("prompt", help="Print the scan prompt for a category")
+    pr.add_argument("--category", required=True,
+                    help=f"Category ({', '.join(SCAN_CATEGORIES.keys())})")
+
+    # ingest
+    ig = sub.add_parser("ingest", help="Ingest externally generated proposal JSON (workflow path)")
+    ig.add_argument("file", help="Path to a JSON array of proposal items")
+    ig.add_argument("--category", required=True,
+                    help=f"Category ({', '.join(SCAN_CATEGORIES.keys())}, self-diagnosed)")
+    ig.add_argument("--dry-run", action="store_true", help="Validate without persisting")
+
+    # history-index
+    sub.add_parser("history-index", help="Compact JSON digest of all proposals (dedup context)")
 
     # status
     sub.add_parser("status", help="Prometheus dashboard")
@@ -1186,6 +1431,9 @@ def main():
     dispatch = {
         "scan": cmd_scan,
         "evolve": cmd_evolve,
+        "prompt": cmd_prompt,
+        "ingest": cmd_ingest,
+        "history-index": cmd_history_index,
         "status": cmd_status,
         "history": cmd_history,
         "rollback": cmd_rollback,

@@ -250,6 +250,23 @@ Inspired by [Stein's sleepy](https://github.com/STEIN64-BIT/sleepy) (MIT), adapt
 | `python scripts/prometheus.py rollback PROM-001` | Restore files from pre-upgrade snapshot |
 | `python scripts/prometheus.py self-report "title" --severity high` | Report a bug in Rick's own tooling |
 | `python scripts/prometheus.py self-report "title" --script delegate.py --fix-hint "..."` | Report with target file + fix hint |
+| `python scripts/prometheus.py evolve --only PROM-NNN` | Apply exactly one named proposal |
+| `python scripts/prometheus.py prompt --category tooling` | Print the scan prompt (single source for workflow scanners) |
+| `python scripts/prometheus.py ingest file.json --category tooling` | Ingest workflow-generated proposals (validation + dedup) |
+| `python scripts/prometheus.py history-index` | Compact JSON digest of all proposals (dedup context) |
+
+**Workflow-tool routing (IMPORTANT)**: When running in a Claude Code session
+that has the **Workflow tool** (dynamic workflows / "ultracode"), route
+`Rick evolve` and `prometheus scan` through the in-session playbook in
+[references/prometheus-workflow.md](references/prometheus-workflow.md):
+parallel category scanners with structured output → one independent verifier
+per candidate (re-scores; scanner self-scores discarded) → serial
+`prometheus.py ingest` (the ONLY sanctioned write path into
+`.cto/prometheus/`) → evolve via ranked `evolve --only PROM-NNN` with a
+demote-only post-apply diff reviewer. The plain CLI (`scan`/`evolve`) remains
+the mandatory fallback for headless contexts (sleepy, cron); never nest
+`claude -p "ultracode"`. Proposals targeting self-protected files land in
+`.cto/prometheus/needs-human/` — surface these to Elmo, never auto-apply.
 
 ## Self-Healing Protocol — Rick Fixes Himself
 

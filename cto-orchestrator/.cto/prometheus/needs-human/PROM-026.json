@@ -12,11 +12,11 @@
     "scripts/prometheus.py"
   ],
   "proposed_changes": "After delegate_evolve returns, compare file checksums of target_files before and after. If no files changed, mark as failed not applied.",
-  "status": "rejected",
+  "status": "human-review",
   "severity": "high",
   "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
   "created_at": "2026-03-21T14:02:47.214137+00:00",
   "applied_at": null,
   "rollback_snapshot": null,
-  "reject_reason": "Self-protection: cannot modify Prometheus engine"
+  "previous_reject_reason": "Self-protection: cannot modify Prometheus engine"
 }

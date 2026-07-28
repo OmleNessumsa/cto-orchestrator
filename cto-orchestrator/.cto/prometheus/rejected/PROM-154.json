@@ -1,0 +1,22 @@
+{
+  "id": "PROM-154",
+  "title": "Sprint-delegatie gebruikt vaste 600s timeout, te krap voor L/XL tickets",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "orchestrate.py sprint --auto, Eren Rent sprint 2, 2026-07-03",
+  "description": "EREN-030 (complexity L, asset pipeline overhaul) timede out op exact 600s tijdens orchestrate.py sprint en bleef als interrupted liggen. De task-budget schaalt al mee met complexity (L=120k tokens) maar de timeout niet \u2014 een L/XL ticket krijgt dezelfde 600s als een XS ticket. Handmatige workaround: delegate.py --resume met --timeout 1800.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "Schaal timeout mee met complexity net als task_budget (bv. XS/S=600, M=900, L=1800, XL=3600) en requeue interrupted tickets met een resume i.p.v. ze te laten liggen.",
+  "status": "rejected",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-03T09:34:16.468441+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "reject_reason": "Duplicate of PROM-156: Both report the fixed 600s delegate timeout being too short for L/XL tickets and propose complexity-scaled timeouts. PROM-156 is better specified: it targets delegate.py where the default timeout lives, gives a concrete implementation, and adds an auto-resume fallback."
+}

@@ -1,0 +1,28 @@
+{
+  "id": "PROM-163",
+  "title": "Morty's tamper with node_modules when packages appear missing",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "SnapWizard SNAP-002, parallel wave where Rick installs deps centrally while Morty's code",
+  "description": "SNAP-002 backend-morty overwrote node_modules/.pnpm/playwright-core@1.61.1/.../index.d.ts (and types/types.d.ts) with a handwritten type stub because the package was not hoisted at delegation time. This silently corrupted typechecking for the whole project (ghost launch() signature) and cost significant debugging time. Store hardlink was broken by the write, so damage was project-local, but this could corrupt the global pnpm store if a tool edits in place.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 1,
+  "target_files": [
+    "scripts/delegate.py"
+  ],
+  "proposed_changes": "Add an explicit rule to the Morty system prompt in delegate.py: NEVER create or edit files under node_modules; if an import cannot resolve, note it in the scratchpad and write code as if the package exists.",
+  "status": "pending",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-07-14T14:26:57.595095+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null,
+  "triage": {
+    "verified_at": "2026-07-28T13:16:16.045443+00:00",
+    "size": "S",
+    "evidence": "grep -rn \"node_modules\" scripts/ returns only scripts/unity_setup.sh:282 (scan ignore glob) and scripts/explain.py:267 (find -not -path filter). scripts/delegate.py contains no node_modules prohibition; its execution_rules block (lines 1712-1718) covers verify-before-modify and scope discipline but nothing about vendored/installed dependency directories.",
+    "note": "Still valid. The proposed guardrail (Morty system prompt rule: never create/edit files under node_modules) is absent from scripts/delegate.py \u2014 grep for \"node_modules\" in scripts/ hits only unity_setup.sh (scan exclude) and explain.py (find exclude), neither of which is the Morty prompt. Recent evolve cycles (c09b11b, e3d3a76) modified delegate.py but did not add this rule. The underlying failure mode (a sub-agent hand-writing type stubs into node_modules when a dep isn't hoisted, corrupting typechecking and potentially the pnpm store) is a real documented incident and the mitigation is a single prompt addition in the execution_rules/common_mistakes section (~line 1712-1730). Does not touch prometheus.py. Note: meeseeks.py/team.py prompts may deserve the same rule later, but the declared S-scope fix in delegate.py stands alone.",
+    "run": "wf_58b99884-2a5"
+  }
+}

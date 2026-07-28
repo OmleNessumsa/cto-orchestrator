@@ -1,0 +1,19 @@
+{
+  "id": "PROM-167",
+  "title": "mcp_server.py: interactive orchestrator session blocked by agent capability token guard",
+  "category": "tooling",
+  "source": "Triage run wf_58b99884-2a5 (2026-07-28) \u2014 corrected re-file of PROM-155, which was reject-invalid for empty target_files",
+  "description": "update_ticket_status and close_ticket are decorated with @_require_agent_token (mcp_server.py:158, 654) while create_ticket is unguarded (:592). verify_agent_token (security_utils.py:646) has no exemption for the interactive Rick/orchestrator session, so Rick's own MCP calls fail with 'unauthorized: missing or invalid agent capability token'. Fix must add an orchestrator exemption WITHOUT reopening the role-spoofing hole the HMAC guard was added to close (e.g. explicit orchestrator token issued at session start, not a blanket empty-token bypass).",
+  "impact_score": 6,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/mcp_server.py",
+    "scripts/security_utils.py"
+  ],
+  "proposed_changes": "Issue an orchestrator-scoped capability token when mcp_server starts (or when the interactive session registers), teach verify_agent_token to accept it for rick-role calls, keep worker-Morty token requirements unchanged. Add a regression test that a spoofed role without token is still rejected. Security-sensitive: needs careful review, do not blanket-exempt empty tokens.",
+  "status": "pending",
+  "created_at": "2026-07-28T13:16:31.437898+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}
