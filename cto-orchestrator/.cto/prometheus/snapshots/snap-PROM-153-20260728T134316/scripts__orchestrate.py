@@ -503,75 +503,15 @@ def compose_team_from_dag(root: Path, tickets: list[dict]) -> dict:
     return {"phases": phases, "roles": unique_roles}
 
 
-# Ticket statuses that mean the agent actually left the ticket in a
-# reviewable/terminal state. Anything else after a delegation attempt means
-# the run didn't land cleanly (crashed, got killed, hung) and the ticket
-# should be requeued rather than reported as completed.
-_DAG_TERMINAL_STATUSES = {"in_review", "done", "blocked", "needs_review", "completed"}
-
-
-# Max automatic requeues per ticket. A ticket that keeps ending without a
-# terminal status is failing structurally, not transiently — retrying it every
-# sprint iteration burns a full delegation timeout per loop (root cause of the
-# 2026-07-07..13 sleepy failure-loop incident). After the cap it goes to
-# blocked for human attention.
-_MAX_AUTO_REQUEUES = 2
-
-
-def _requeue_interrupted_ticket(root: Path, ticket_id: str) -> None:
-    """Reset a ticket stuck in interrupted/unknown status back to todo.
-
-    Used when a DAG delegation process exits without leaving the ticket in a
-    terminal status — otherwise the ticket stays stranded until a human
-    manually flips it back to todo (see EREN-033 incident: sprint reported
-    'completed' while the ticket sat on 'interrupted' with half-finished work).
-    Capped at _MAX_AUTO_REQUEUES; after that the ticket is blocked instead.
-    """
-    try:
-        ticket = load_ticket(root, ticket_id)
-    except Exception:
-        return
-    requeues = int(ticket.get("requeue_count", 0))
-    if requeues >= _MAX_AUTO_REQUEUES:
-        ticket["status"] = "blocked"
-        note = (f" AUTO-BLOCKED: exceeded {_MAX_AUTO_REQUEUES} automatic "
-                "requeues without reaching a terminal status; needs human attention.")
-    else:
-        ticket["status"] = "todo"
-        note = " AUTO-REQUEUED: DAG delegation ended without a terminal status; requeued for retry."
-    ticket["requeue_count"] = requeues + 1
-    ticket["updated_at"] = now_iso()
-    ticket["review_notes"] = ((ticket.get("review_notes") or "") + note).strip()
-    save_ticket(root, ticket)
-
-
 def _dag_delegate(root: Path, ticket_id: str, agent: str, timeout: int = 600) -> dict:
-    """Delegate a single ticket to an agent (used in DAG phase execution).
-
-    Status is read back from the ticket JSON after the delegation subprocess
-    returns, rather than assumed — the subprocess can exit cleanly even when
-    the agent's run was interrupted or crashed mid-way, leaving the ticket in
-    a non-terminal status. Tickets found in that state are auto-requeued.
-    """
+    """Delegate a single ticket to an agent (used in DAG phase execution)."""
     try:
         output = run_delegate(root, ticket_id, agent=agent, timeout=timeout)
+        return {"ticket_id": ticket_id, "agent": agent, "status": "completed", "output": output[-500:]}
     except subprocess.TimeoutExpired:
-        _requeue_interrupted_ticket(root, ticket_id)
-        return {"ticket_id": ticket_id, "agent": agent, "status": "requeued", "output": f"Timed out after {timeout}s"}
+        return {"ticket_id": ticket_id, "agent": agent, "status": "timeout", "output": f"Timed out after {timeout}s"}
     except Exception as e:
         return {"ticket_id": ticket_id, "agent": agent, "status": "error", "output": str(e)[:500]}
-
-    try:
-        ticket = load_ticket(root, ticket_id)
-        real_status = ticket.get("status", "unknown")
-    except Exception:
-        real_status = "unknown"
-
-    if real_status not in _DAG_TERMINAL_STATUSES:
-        _requeue_interrupted_ticket(root, ticket_id)
-        real_status = "requeued"
-
-    return {"ticket_id": ticket_id, "agent": agent, "status": real_status, "output": output[-500:]}
 
 
 def _run_dag_phases(root: Path, execution_plan: dict, timeout: int = 600) -> dict:
@@ -1473,13 +1413,8 @@ def cmd_sprint(args):
 
             dag_results = run_team_sprint(root, None, None, timeout=600, execution_plan=execution_plan)
 
-            completed_count = sum(1 for r in dag_results.values() if r["status"] in _DAG_TERMINAL_STATUSES)
-            requeued_count = sum(1 for r in dag_results.values() if r["status"] == "requeued")
+            completed_count = sum(1 for r in dag_results.values() if r["status"] == "completed")
             console.print(f"    [cyan]DAG sprint results: {completed_count}/{len(dag_results)} completed[/cyan]")
-            if requeued_count:
-                console.print(
-                    f"    [yellow]{requeued_count} ticket(s) ended interrupted/unknown — auto-requeued to todo[/yellow]"
-                )
 
             for tid, result in dag_results.items():
                 try:
@@ -1516,10 +1451,7 @@ def cmd_sprint(args):
                 "ticket_id": None,
                 "agent": "rick",
                 "action": "dag_sprint",
-                "message": (
-                    f"DAG sprint: {completed_count}/{len(dag_results)} tickets completed across {n_phases} phase(s)"
-                    + (f", {requeued_count} requeued" if requeued_count else "")
-                ),
+                "message": f"DAG sprint: {completed_count}/{len(dag_results)} tickets completed across {n_phases} phase(s)",
                 "files_changed": [],
             })
             continue

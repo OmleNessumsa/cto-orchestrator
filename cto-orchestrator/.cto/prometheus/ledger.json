@@ -2681,5 +2681,14 @@
     "target_files": [
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-07-28T13:45:26.622825+00:00",
+    "proposal_id": "PROM-153",
+    "action": "applied",
+    "title": "DAG sprint rapporteert 'completed' terwijl ticket op 'interrupted' eindigt",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
   }
 ]
