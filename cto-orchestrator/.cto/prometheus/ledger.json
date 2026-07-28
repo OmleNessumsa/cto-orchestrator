@@ -2672,5 +2672,14 @@
     "action": "applied-manual",
     "title": "Backlog triage run: dedup and verify the 12 stale pending proposals, seed needs-human queue",
     "note": "Triage run wf_58b99884-2a5: 12 verified, 9 kept+re-scored, 3 rejected (1 dup, 1 stale, 1 invalid->refiled), PROM-026/150 moved to needs-human"
+  },
+  {
+    "timestamp": "2026-07-28T13:42:26.569999+00:00",
+    "proposal_id": "PROM-162",
+    "action": "applied",
+    "title": "orchestrate.py plan crashes with ENAMETOOLONG on MCP config",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
   }
 ]

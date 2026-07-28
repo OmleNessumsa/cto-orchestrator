@@ -785,12 +785,6 @@ def claude_prompt(prompt: str, model: str = "opus-4-7", thinking_budget: int = N
         })
         cmd.extend(["--mcp-config", mcp_config])
 
-    # NOTE: --mcp-config is a variadic option (<configs...>) in the claude
-    # CLI, so without a "--" separator it greedily swallows the trailing
-    # prompt positional as another (invalid) config value, which the CLI
-    # then tries to open as a file — ENAMETOOLONG for long prompts.
-    cmd.append("--")
-
     # --thinking-budget was removed from Claude CLI; inject extended-thinking
     # intent via the prompt prefix instead so the model still prioritises
     # deep step-by-step reasoning when a budget was requested.
