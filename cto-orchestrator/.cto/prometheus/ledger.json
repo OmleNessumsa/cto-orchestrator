@@ -2690,5 +2690,14 @@
     "target_files": [
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-07-28T13:50:17.757149+00:00",
+    "proposal_id": "PROM-157",
+    "action": "applied",
+    "title": "Sprint-loop deadlockt: busy-wait op in_progress epic, interrupted tickets nooit gerequeued",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
   }
 ]

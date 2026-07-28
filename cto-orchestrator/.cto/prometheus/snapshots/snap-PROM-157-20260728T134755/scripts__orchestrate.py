@@ -1320,15 +1320,6 @@ def cmd_sprint(args):
     review_fail_counts: dict[str, int] = {}
     MAX_REVIEW_FAILURES = 3
 
-    # Track the ticket status distribution across iterations to detect a
-    # stalled sprint (e.g. only an in_progress epic + interrupted tickets left,
-    # so every iteration just "continues" without changing anything). Without
-    # this the loop burns every remaining iteration and exits 0 as if the
-    # sprint succeeded (EREN-028 incident).
-    _STALL_ITERATION_LIMIT = 3
-    _stall_signature: Optional[str] = None
-    _stall_count = 0
-
     while iteration < max_iterations:
         iteration += 1
         console.print(f"\n[cyan]{'═' * 60}[/cyan]")
@@ -1357,21 +1348,6 @@ def cmd_sprint(args):
 
         # Show current status
         tickets = all_tickets(root)
-
-        # Auto-requeue tickets left "interrupted" by a crashed/killed solo
-        # delegation. Solo delegate() runs don't go through _dag_delegate's
-        # requeue path, so a ticket left "interrupted" is neither actionable
-        # (not todo/backlog) nor counted as real in-progress work — it just
-        # sits stuck forever unless a human notices and flips it back.
-        interrupted = [t for t in tickets if t["status"] == "interrupted"]
-        if interrupted:
-            for it in interrupted:
-                _requeue_interrupted_ticket(root, it["id"])
-            console.print(
-                f"  [yellow]{len(interrupted)} interrupted ticket(s) auto-requeued to todo[/yellow]"
-            )
-            tickets = all_tickets(root)
-
         status_counts: dict[str, int] = {}
         for t in tickets:
             s = t["status"]
@@ -1380,41 +1356,6 @@ def cmd_sprint(args):
         done = status_counts.get("done", 0)
         console.print(f"  [cyan]Progress:[/cyan] {done}/{total} done ({(done/total*100) if total else 0:.0f}%)")
         console.print(f"  [dim]Statuses:[/dim] {json.dumps(status_counts)}")
-
-        # Stall detection: if the status distribution hasn't budged in
-        # _STALL_ITERATION_LIMIT iterations, the sprint isn't making progress
-        # and won't on its own — abort loudly instead of silently spinning to
-        # max_iterations and exiting 0.
-        _signature = json.dumps(sorted(status_counts.items()))
-        if _signature == _stall_signature:
-            _stall_count += 1
-        else:
-            _stall_signature = _signature
-            _stall_count = 0
-        if _stall_count >= _STALL_ITERATION_LIMIT:
-            console.print(
-                f"\n  [red]Sprint stalled: ticket status distribution unchanged for "
-                f"{_STALL_ITERATION_LIMIT} iterations ({json.dumps(status_counts)}). "
-                f"Aborting instead of burning the remaining {max_iterations - iteration} adventures.[/red]"
-            )
-            emit("cto.sprint.stalled", {
-                "sprint_number": cfg.get("current_sprint", 1),
-                "iteration": iteration,
-                "status_counts": status_counts,
-            }, role="rick")
-            append_log(root, {
-                "timestamp": now_iso(),
-                "ticket_id": None,
-                "agent": "rick",
-                "action": "stalled",
-                "message": (
-                    f"Sprint aborted: status distribution unchanged for "
-                    f"{_STALL_ITERATION_LIMIT} iterations ({json.dumps(status_counts)})"
-                ),
-                "files_changed": [],
-            })
-            flush_events()
-            sys.exit(1)
 
         # Show active teams
         active_teams = [t for t in all_teams(root) if t["status"] == "active"]
@@ -1498,12 +1439,7 @@ def cmd_sprint(args):
 
             # Check blocked
             blocked = [t for t in tickets if t["status"] == "blocked"]
-            # Epics track sub-ticket progress and go "in_progress" the moment a
-            # child starts (see update_epic_status) — nobody ever delegates to
-            # the epic itself, so counting it here just busy-waits forever
-            # (EREN-028 incident: sprint hung 44 iterations on an in_progress
-            # epic with no real in-progress work left).
-            in_progress = [t for t in tickets if t["status"] == "in_progress" and t["type"] != "epic"]
+            in_progress = [t for t in tickets if t["status"] == "in_progress"]
             if blocked and not in_progress:
                 console.print(f"\n  [red]Every Morty is stuck. This is what I get for relying on Morty's. ({len(blocked)} blocked)[/red]")
                 for bt in blocked:
