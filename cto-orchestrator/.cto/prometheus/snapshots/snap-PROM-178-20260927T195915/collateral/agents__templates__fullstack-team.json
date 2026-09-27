@@ -1,0 +1,22 @@
+{
+  "id": "fullstack-team",
+  "description": "Full-stack feature development team",
+  "roles": [
+    {
+      "role": "architect-morty",
+      "focus": "architecture and interfaces"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "backend implementation"
+    },
+    {
+      "role": "frontend-morty",
+      "focus": "frontend implementation"
+    }
+  ],
+  "coordination": {
+    "mode": "mixed",
+    "lead": "architect-morty"
+  }
+}

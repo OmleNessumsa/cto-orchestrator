@@ -1,0 +1,27 @@
+{
+  "id": "PROM-178",
+  "title": "Isolate Morty MCP surface with --strict-mcp-config",
+  "category": "tooling",
+  "source": "https://code.claude.com/docs/en/cli-reference \u2014 --strict-mcp-config / --mcp-config (with -p waits up to 30s for pending servers, v2.1.221+); https://www.anthropic.com/engineering/advanced-tool-use (tool-definition token overhead: ~55K tokens for 58 tools across 5 servers)",
+  "description": "delegate.py:2694 and orchestrate.py:861 pass --mcp-config with only the cto-orchestrator server, but without --strict-mcp-config the Claude CLI ALSO loads every user-scope and project-scope MCP server from the operator's own config (Figma, Higgsfield, Insider x6, Slack, Vercel, pixel-plugin, ...). Every Morty subprocess therefore pays tens of thousands of tokens of irrelevant tool definitions before reading its ticket, inherits tools its role allowlist never intended (e.g. Slack send, Figma write), and can hang on a broken third-party server handshake \u2014 the exact CONNECTION_CLOSED class of failure. --strict-mcp-config makes the passed config the ONLY config, which is both a token-budget win and a least-agency win.",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "1) Add `_check_claude_flag_support('--strict-mcp-config')` alongside the existing `_check_claude_output_format_json_support()` / `_check_claude_effort_support()` probes in delegate.py (parse `claude --help` output, cache in a module global). 2) In delegate.py where `cmd.extend([\"--mcp-config\", mcp_config])` is built (~line 2694), append `--strict-mcp-config` when supported and when env `CTO_MCP_STRICT` is not set to 'false'. 3) Mirror the same in orchestrate.py (~line 861), keeping the existing variadic-option `--` terminator ordering from PROM-162 so the prompt is not swallowed. 4) Write the MCP config to a temp file under .cto/session/ and pass the path instead of inline JSON, to keep argv small (defence-in-depth for the ENAMETOOLONG class of bug). 5) Document CTO_MCP_STRICT=false as the escape hatch in SKILL.md for tickets that genuinely need an external MCP server.",
+  "status": "applied",
+  "created_at": "2026-09-27T19:32:07.403769+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-178-20260927T195915",
+  "timeout_retries": 1,
+  "last_error": "Evolve timed out after 300s (flat default, pre-fix)",
+  "last_failed_at": "2026-09-27T19:55:19.383878+00:00",
+  "applied_at": "2026-09-27T20:02:18.969785+00:00",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/orchestrate.py"
+  ],
+  "collateral_changed": []
+}

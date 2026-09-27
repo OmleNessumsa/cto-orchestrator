@@ -1,0 +1,29 @@
+{
+  "id": "PROM-176",
+  "title": "Derive the MCP tool block from the role's real allowlist instead of hardcoding six tools",
+  "category": "prompt-engineering",
+  "source": "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents and https://sourcegraph.com/blog/context-engineering \u2014 2026 guidance: curate a small set of high-signal tools per agent; bloated/ambiguous tool sets are a top agent failure mode",
+  "description": "build_prompt emits an `<available_tools>` block from the agent card's `allowed_tools`, but the '### Context available via MCP tools' section (delegate.py ~line 1860) hardcodes the same six MCP tools for every role and every delegation. For a solo delegation (team_id is None) the prompt still advertises `get_team_context`, `reserve_files`, and `send_team_message` \u2014 and even prints '(solo delegation \u2014 no team)' right next to them \u2014 so the model is invited to call tools that cannot succeed. Meanwhile mcp_server.py exposes ~30 tools, and the two blocks can contradict each other because they're built from different sources. That's both wasted stable-prefix tokens and an ambiguous decision point at exactly the place the 2026 guidance says to curate.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "agents/fullstack-morty.json",
+    "scripts/persona.py"
+  ],
+  "proposed_changes": "1) Add a module-level `MCP_TOOL_DOCS: dict[str, str]` in persona.py mapping each MCP tool name to its one-line prompt description (the strings currently inlined in build_prompt). 2) Add an optional `mcp_tools` array to agents/*.json (start with fullstack-morty.json, then the rest); when absent, default to a conservative core set of `get_ticket`, `read_adr`, `update_ticket_status`. 3) Rewrite the 'Context available via MCP tools' section to render only `card.mcp_tools \u2229 MCP_TOOL_DOCS`, and to drop `get_team_context` / `reserve_files` / `send_team_message` when `team_id is None` (add them back only in team mode, where `team_delegation_note` already fires). 4) Keep the dynamic `adr_list` and `related_summary` values \u2014 they're the just-in-time retrieval pointers and belong in the volatile suffix. 5) Add a build-time consistency check: every tool named in the rendered block must appear in the role's `--allowedTools` set (or the `--agents` profile); on mismatch, log a `prompt_tool_mismatch` entry via the existing log helper rather than silently advertising an unavailable tool. 6) Pass the intersection through the existing `--allowedTools` construction (~line 2479) so unused MCP tool definitions stop entering the subprocess context window.",
+  "status": "applied",
+  "created_at": "2026-09-27T18:43:21.740216+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-176-20260927T201717",
+  "timeout_retries": 1,
+  "last_error": "Evolve timed out after 300s (flat default, pre-fix)",
+  "last_failed_at": "2026-09-27T19:55:19.379347+00:00",
+  "applied_at": "2026-09-27T20:37:52.246608+00:00",
+  "files_actually_changed": [
+    "scripts/persona.py",
+    "agents/fullstack-morty.json",
+    "scripts/delegate.py"
+  ],
+  "collateral_changed": []
+}

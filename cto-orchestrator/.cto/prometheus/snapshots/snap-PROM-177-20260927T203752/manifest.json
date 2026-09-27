@@ -1,0 +1,273 @@
+{
+  "proposal_id": "PROM-177",
+  "created_at": "2026-09-27T20:37:52.347522+00:00",
+  "files": {
+    "scripts/delegate.py": {
+      "snapshot_name": "scripts__delegate.py",
+      "original_size": 166991
+    },
+    "scripts/persona.py": {
+      "snapshot_name": "scripts__persona.py",
+      "original_size": 31329
+    }
+  },
+  "collateral": {
+    ".claude-plugin/marketplace.json": {
+      "snapshot_name": ".claude-plugin__marketplace.json",
+      "sha256": "ba14495030d341216f902e9ac7718251ef432738d4bb2e19c75b832323b01947"
+    },
+    ".claude-plugin/plugin.json": {
+      "snapshot_name": ".claude-plugin__plugin.json",
+      "sha256": "9c5d182fc8e1979a47d6f2a0b3943dff0a925b0e739b270b4613e36cd16286bf"
+    },
+    ".claude/agents/architect-morty.md": {
+      "snapshot_name": ".claude__agents__architect-morty.md",
+      "sha256": "2eddb3a4c7a236dbf7d938a84ef0ab24e11b2daee9a3ca1054788e4a50cb06ee"
+    },
+    ".claude/agents/backend-morty.md": {
+      "snapshot_name": ".claude__agents__backend-morty.md",
+      "sha256": "126b6028399d5114d5ab92aac0a0e1de66e4b9008fb283787558b974ef21b4c9"
+    },
+    ".claude/agents/devops-morty.md": {
+      "snapshot_name": ".claude__agents__devops-morty.md",
+      "sha256": "d27bd0c982a7de2288e749ad2df43729dfa639ca8bc4f01dcb89ef6a32c778ba"
+    },
+    ".claude/agents/frontend-morty.md": {
+      "snapshot_name": ".claude__agents__frontend-morty.md",
+      "sha256": "924fd54600951b2769bd493fda4b60b2fa83bef3b382b201328fa19589300fad"
+    },
+    ".claude/agents/fullstack-morty.md": {
+      "snapshot_name": ".claude__agents__fullstack-morty.md",
+      "sha256": "0f62bc74c677d970e286e22c0938be52d753da4f7216a3adf5aa4a0d70f1fc38"
+    },
+    ".claude/agents/planner-morty.md": {
+      "snapshot_name": ".claude__agents__planner-morty.md",
+      "sha256": "ed415929ffa4fa6fbc8e05373a974a8b53acb54db940ad8d6f24cbe30eab6244"
+    },
+    ".claude/agents/reviewer-morty.md": {
+      "snapshot_name": ".claude__agents__reviewer-morty.md",
+      "sha256": "489aa1ec2f4466f5eeb7859053ce33593648691fad067b49a97bfe131298c210"
+    },
+    ".claude/agents/security-morty.md": {
+      "snapshot_name": ".claude__agents__security-morty.md",
+      "sha256": "d449fd17ea14b3f7b9b778e7be62130fd2deb91e204bfacea4fa38a5895899ed"
+    },
+    ".claude/agents/tester-morty.md": {
+      "snapshot_name": ".claude__agents__tester-morty.md",
+      "sha256": "d2588a6eb83c652343562a294bd4a49610df60512d30bcee036828585ae79b76"
+    },
+    ".claude/agents/unity.md": {
+      "snapshot_name": ".claude__agents__unity.md",
+      "sha256": "1a961d270d82e8352333de4e9d4b583b81100c0a1bbef1960e9d7af3519f1365"
+    },
+    ".github/workflows/security.yml": {
+      "snapshot_name": ".github__workflows__security.yml",
+      "sha256": "0a69525042b10ffcafd988f979f59bbfe1eca9896ce7c5b2754b5a2b32d82a46"
+    },
+    "README.md": {
+      "snapshot_name": "README.md",
+      "sha256": "b70bcdb9f8597c2f9854dedde30bd76d15bb9975a0cb30ab572ae03388a89032"
+    },
+    "RICK_TERMINAL_INTEGRATION.md": {
+      "snapshot_name": "RICK_TERMINAL_INTEGRATION.md",
+      "sha256": "60d82dae95dee81c211e71813910bd420e2c223bb46c264c57e81aa58d5f4d67"
+    },
+    "SESSION_LOG.md": {
+      "snapshot_name": "SESSION_LOG.md",
+      "sha256": "ae49601fe5e70dc00a1c69152fcdc3fefded04797d69f053d5ced1fd1eb515dd"
+    },
+    "SKILL.md": {
+      "snapshot_name": "SKILL.md",
+      "sha256": "2e79b1390fb4730067927e3d5a8a1cd739e3764afcb28be4840b3f17d3b9d645"
+    },
+    "agents/architect-morty.json": {
+      "snapshot_name": "agents__architect-morty.json",
+      "sha256": "3082b90f5c0334cb61d86f5ee8c224c5c017de35c9298d1bcce7712c9f8e2c94"
+    },
+    "agents/backend-morty.json": {
+      "snapshot_name": "agents__backend-morty.json",
+      "sha256": "092db43b6adc5f15f0bc7d4924342a4d052e0f69d6afaa3b55a701796c97b889"
+    },
+    "agents/devops-morty.json": {
+      "snapshot_name": "agents__devops-morty.json",
+      "sha256": "463277084fc41a13eb7da9e2c579698783ca1facada21aab2bd811882b05d58c"
+    },
+    "agents/frontend-morty.json": {
+      "snapshot_name": "agents__frontend-morty.json",
+      "sha256": "aae5872fc2cb550b7e212f12e092c468eaeedcf4d7c36618daf4031dc540e00f"
+    },
+    "agents/fullstack-morty.json": {
+      "snapshot_name": "agents__fullstack-morty.json",
+      "sha256": "59e7911e60405d333c6ad8b27693c793680ca152621c35c031316c714a9eff92"
+    },
+    "agents/reviewer-morty.json": {
+      "snapshot_name": "agents__reviewer-morty.json",
+      "sha256": "03dc82bc36f38e29e86ba946af59e7214ea785a372a9cc5bc191a672b10240de"
+    },
+    "agents/security-morty.json": {
+      "snapshot_name": "agents__security-morty.json",
+      "sha256": "841ac3a918593878c804f877a00e5bd2f2b7a9efc5a564e80533eb488b946c22"
+    },
+    "agents/templates/api-team.json": {
+      "snapshot_name": "agents__templates__api-team.json",
+      "sha256": "8160ebfdf488f5403b6fd248e3176d056b98fe9a522bfe668dfe0733839ea3fd"
+    },
+    "agents/templates/devops-team.json": {
+      "snapshot_name": "agents__templates__devops-team.json",
+      "sha256": "d5df32898f6593d9c5204d50511ab4b3d602a82861eb8e54f4b1c16532173c2f"
+    },
+    "agents/templates/fullstack-team.json": {
+      "snapshot_name": "agents__templates__fullstack-team.json",
+      "sha256": "1bc8585289ef73d12fc62da0c526a61aa5523e3b915e4e3b97b4ea1edee0d503"
+    },
+    "agents/templates/security-team.json": {
+      "snapshot_name": "agents__templates__security-team.json",
+      "sha256": "1acc24cccd750204193dc099accfa5c71073f6247678733521410209afaeab92"
+    },
+    "agents/tester-morty.json": {
+      "snapshot_name": "agents__tester-morty.json",
+      "sha256": "cd8d72ec19f77bee1a78b652a0800dc6860a39e579f472ebcf3d435e9a2ee562"
+    },
+    "agents/unity.json": {
+      "snapshot_name": "agents__unity.json",
+      "sha256": "f5a313a160dc7b02db3be70f5e1c767b2455b982b82ad0e1473963f6c39f1987"
+    },
+    "agents/unity/config-template.yaml": {
+      "snapshot_name": "agents__unity__config-template.yaml",
+      "sha256": "72d48db9a7f5db2df86d8e5eba9ee010f71725b3f9bfc320586fdfa05f632344"
+    },
+    "assets/project-template/.cto/config.json": {
+      "snapshot_name": "assets__project-template__.cto__config.json",
+      "sha256": "d07081ad659371120ec2334d8d648f43559cca96e10290ba880c4a4ac697b34b"
+    },
+    "assets/project-template/README.md": {
+      "snapshot_name": "assets__project-template__README.md",
+      "sha256": "dc3af579ecac6973201f5c8960ecc1b8baf622c3ab6f91b590460bf3100e627b"
+    },
+    "references/agent-roles.md": {
+      "snapshot_name": "references__agent-roles.md",
+      "sha256": "215e87898639bf9a1fd58839a5473a05d0e1c23fc29e198278c9c6949d663acc"
+    },
+    "references/explain-modes.md": {
+      "snapshot_name": "references__explain-modes.md",
+      "sha256": "0bf379cc86656bc3e44b508a7c2c1d22e3209e77dcbb8cc18fac6ad6f64a98ca"
+    },
+    "references/prometheus-workflow.md": {
+      "snapshot_name": "references__prometheus-workflow.md",
+      "sha256": "a14e06c3cdacc73ffced70a73f41d42ab972ce671d76bcb27b6d147bf4ba4ae1"
+    },
+    "references/prompts.md": {
+      "snapshot_name": "references__prompts.md",
+      "sha256": "20303b77c27de4fa7163f34bdd24218313d07e18e8841c0097b3b5571184e015"
+    },
+    "references/rick-terminal-integration.md": {
+      "snapshot_name": "references__rick-terminal-integration.md",
+      "sha256": "60d82dae95dee81c211e71813910bd420e2c223bb46c264c57e81aa58d5f4d67"
+    },
+    "references/team-templates.md": {
+      "snapshot_name": "references__team-templates.md",
+      "sha256": "47d269ff83c0bd9136ba685dcf899d9dc7dab049b4f3e672da719ce907cebdc0"
+    },
+    "references/ticket-schema.md": {
+      "snapshot_name": "references__ticket-schema.md",
+      "sha256": "db7f8edf0ea76479241cd13fc14300cbab5ea5b7de66c4bb8537d9a6fb9b048e"
+    },
+    "references/workflow.md": {
+      "snapshot_name": "references__workflow.md",
+      "sha256": "fa60b9aa1cf332973dec0011cd2e41dbabbd35ccb5ed658b9f0be6c34d6094c5"
+    },
+    "requirements.in": {
+      "snapshot_name": "requirements.in",
+      "sha256": "5c53b59133711135105847e0fe4577c6741b4182656904da04e1acd1dcae5503"
+    },
+    "requirements.lock": {
+      "snapshot_name": "requirements.lock",
+      "sha256": "6fcff254451c089144a7e3c420edf8a630802f2bc52eaafe883108bdc550d92b"
+    },
+    "scripts/explain.py": {
+      "snapshot_name": "scripts__explain.py",
+      "sha256": "9996767895749457357c6bca638a8cf1ac9d8c8b8bec3d5b2a3a464ce5101deb"
+    },
+    "scripts/hooks.py": {
+      "snapshot_name": "scripts__hooks.py",
+      "sha256": "cc3d9a7dcda46295cc639f25a2f2ee4c4b7bc3647bafbe0daad6a73dab994c69"
+    },
+    "scripts/init_project.sh": {
+      "snapshot_name": "scripts__init_project.sh",
+      "sha256": "7e66fcd8faf00bdbba9a98039cc7022d9c665e8fb8488a0c578ba2a825906420"
+    },
+    "scripts/install_mcp.sh": {
+      "snapshot_name": "scripts__install_mcp.sh",
+      "sha256": "61e06265dd7ca96ff5f629bc2be25bc2641989a553c0a100d4ef11b063df9df8"
+    },
+    "scripts/mcp_server.py": {
+      "snapshot_name": "scripts__mcp_server.py",
+      "sha256": "f9618aa1e5253afd6ec8d59b0642f0cb7841d4702325d5a018a0be6fe24c9848"
+    },
+    "scripts/meeseeks.py": {
+      "snapshot_name": "scripts__meeseeks.py",
+      "sha256": "97432d6a7ed488411dc2cc41caf7ed07035a3c9cb18696c86198605c0ebba9ba"
+    },
+    "scripts/orchestrate.py": {
+      "snapshot_name": "scripts__orchestrate.py",
+      "sha256": "78cbf79bee8c88137b8cfdcb2d60b9f303344564744bcde570c693f487f7dd01"
+    },
+    "scripts/progress.py": {
+      "snapshot_name": "scripts__progress.py",
+      "sha256": "a1c2d82a0f551c18451d998ae2b2390e6cb193db043a59b72a073318d282c660"
+    },
+    "scripts/prometheus.py": {
+      "snapshot_name": "scripts__prometheus.py",
+      "sha256": "43009b24c6b8cf596f4e7d107da45d07ba51a3c3fcbd57b12996545032daa6d7"
+    },
+    "scripts/roro_events.py": {
+      "snapshot_name": "scripts__roro_events.py",
+      "sha256": "6a7fff996fb8b5b293b88cf5803f139150c23d1dbdd096cd64e5247882d540f8"
+    },
+    "scripts/schemas.py": {
+      "snapshot_name": "scripts__schemas.py",
+      "sha256": "3e3318051cd67c94e5af6e85804fc609e9fff8c96ab243cf7e9a7addc51245e8"
+    },
+    "scripts/security_utils.py": {
+      "snapshot_name": "scripts__security_utils.py",
+      "sha256": "2b9cbd1466d0be3efd97896bf21c0bcddc706a811b9777b0e67d8116c2c8ad55"
+    },
+    "scripts/session.py": {
+      "snapshot_name": "scripts__session.py",
+      "sha256": "1b8bc81f5067614fff20a13d9364a3c088b45c06331acfc16a7b6d96322027f3"
+    },
+    "scripts/sleepy.py": {
+      "snapshot_name": "scripts__sleepy.py",
+      "sha256": "eab997192a0489b0f45077abd470b1339ff18fb46f8ef5f9ed585b87fde7a472"
+    },
+    "scripts/team.py": {
+      "snapshot_name": "scripts__team.py",
+      "sha256": "0de898b406a787b42a47c2f01a15e32abe74455f1bc6a5d29e75766d1c1459ac"
+    },
+    "scripts/ticket.py": {
+      "snapshot_name": "scripts__ticket.py",
+      "sha256": "7f0c1c8f9d02b3529ae3247188614b97697c7da427b10b2d1fa94f7a21809c4a"
+    },
+    "scripts/unity.py": {
+      "snapshot_name": "scripts__unity.py",
+      "sha256": "dffea19b7fc3ec2f16461619191e8bac593741d06aa115bcad61d5cf1de99bb4"
+    },
+    "scripts/unity_setup.sh": {
+      "snapshot_name": "scripts__unity_setup.sh",
+      "sha256": "d425564273ad747b7c64d31ea7b40e1758c3abcd2e927593ac617b8e77b81624"
+    },
+    "scripts/visual.py": {
+      "snapshot_name": "scripts__visual.py",
+      "sha256": "7f7ba811aaf95e9f9f8a0d36dce948295da17a8f719bb62c964f0b7cb994400a"
+    },
+    "scripts/workers.py": {
+      "snapshot_name": "scripts__workers.py",
+      "sha256": "fb324b16731de01df2b3d0fdaffe4828b56ab10eb350bc84b89f7c8bfeeaf0f5"
+    }
+  },
+  "untracked_before": [
+    "references/ibox-guide.md",
+    "references/supabase-guide.md",
+    "scripts/test_subagent_guardrails.py"
+  ]
+}

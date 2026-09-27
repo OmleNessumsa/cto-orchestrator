@@ -1,0 +1,20 @@
+{
+  "id": "PROM-179",
+  "title": "Add --fallback-model so overload does not kill unattended runs",
+  "category": "tooling",
+  "source": "https://code.claude.com/docs/en/cli-reference \u2014 `--fallback-model sonnet,haiku`: automatic fallback when the primary model is overloaded, comma-separated list tried in order",
+  "description": "Every delegation (delegate.py:2697), Prometheus scan/evolve call (prometheus.py:393/415) and orchestrate plan call (orchestrate.py:843) pins a single --model. When Opus is overloaded the subprocess dies and the ticket lands in 'interrupted' / the sleepy iteration burns as a no-op \u2014 the failure mode behind several of the self-diagnosed proposals in the backlog. The CLI now supports an ordered fallback chain, which converts a hard failure into a silent, cheaper completion. This is the single lowest-effort durability win available for long unattended sleepy and Prometheus runs.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 2,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/prometheus.py",
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "1) Add a FALLBACK_CHAINS dict in delegate.py mapping primary alias -> fallback list (opus -> 'sonnet', sonnet -> 'haiku', haiku -> none), overridable via env CTO_FALLBACK_MODELS. 2) In delegate_to_agent(), right after `cmd.extend([\"--model\", _resolve_model_for_cli(model)])`, add `cmd.extend([\"--fallback-model\", chain])` when the chain is non-empty and a capability probe confirms the flag exists. 3) Do the same for prometheus.py:393 and :415 and orchestrate.py:843. 4) Detect actual fallback in the stream-json 'result'/'system' events (the reported model differs from the requested one) and record `model_used` on the ticket plus a roro event so cost accounting in _last_stream_usage stays truthful about which model actually ran. 5) Skip the flag for reviewer-morty gates where a weaker model would undermine the two-gate review (PROM-174) \u2014 keep those strict-fail.",
+  "status": "human-review",
+  "created_at": "2026-09-27T19:32:07.412237+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

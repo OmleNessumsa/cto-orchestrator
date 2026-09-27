@@ -1,0 +1,9 @@
+{
+  "project_name": "TEMPLATE",
+  "ticket_prefix": "TMPL",
+  "next_ticket_number": 1,
+  "created_at": "",
+  "agents_used": [],
+  "current_sprint": 1,
+  "default_model": "sonnet"
+}

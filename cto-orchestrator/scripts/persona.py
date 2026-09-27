@@ -405,6 +405,49 @@ AGENT_PROFILES: dict = {
     },
 }
 
+# ── MCP Tool Curation (Per-Role Context Tools) ────────────────────────────────
+# One-line prompt descriptions for the MCP tools an agent may be told about in
+# its "Context available via MCP tools" prompt section. delegate.py's
+# build_prompt() renders only the subset a role's agent card actually lists
+# (agents/*.json `mcp_tools`) instead of hardcoding this same set for every
+# role and every delegation — see resolve_mcp_tools() below.
+MCP_TOOL_DOCS: dict[str, str] = {
+    "read_adr": "**read_adr(name)** — Read an Architecture Decision Record. Pass `*` to list all.",
+    "get_ticket": "**get_ticket(ticket_id)** — Read full ticket data including agent output and dependencies.",
+    "get_team_context": "**get_team_context(team_id)** — Read shared team decisions, interfaces, and messages.",
+    "reserve_files": "**reserve_files(team_id, files)** — Reserve files before modifying to prevent teammate conflicts.",
+    "send_team_message": "**send_team_message(team_id, to, message, msg_type)** — Send a message to a teammate.",
+    "update_ticket_status": "**update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.",
+}
+
+# Conservative fallback for agent cards that don't yet define `mcp_tools` —
+# read-only ticket/ADR context plus status reporting, no team-collaboration
+# tools that a solo delegation could never use anyway.
+DEFAULT_MCP_TOOLS: list[str] = ["get_ticket", "read_adr", "update_ticket_status"]
+
+# Team-collaboration tools that only make sense once a team_id exists. Dropped
+# from the rendered block (and the real tool grant) for solo delegations,
+# where the team_delegation_note in build_prompt() never fires either.
+_TEAM_ONLY_MCP_TOOLS = {"get_team_context", "reserve_files", "send_team_message"}
+
+
+def resolve_mcp_tools(card: dict, team_id: Optional[str] = None) -> list[str]:
+    """Resolve which MCP tools a role should be told about (and granted).
+
+    Intersects the agent card's optional `mcp_tools` allowlist — or
+    DEFAULT_MCP_TOOLS when the card omits it — with MCP_TOOL_DOCS, then drops
+    team-only tools for solo delegations (team_id is None). Iteration follows
+    MCP_TOOL_DOCS's insertion order so the rendered block stays stable across
+    calls for the same role/team_id, which matters for prompt-cache reuse.
+    """
+    raw = card.get("mcp_tools")
+    requested = set(raw) if isinstance(raw, list) and raw else set(DEFAULT_MCP_TOOLS)
+    tools = [name for name in MCP_TOOL_DOCS if name in requested]
+    if not team_id:
+        tools = [name for name in tools if name not in _TEAM_ONLY_MCP_TOOLS]
+    return tools
+
+
 # ── Swarm Handoff Roster (Dynamic Role Re-routing) ────────────────────────────
 # Trigger conditions describing when a worker holding a ticket should stop and
 # hand control to a more appropriate specialist instead of working outside its
@@ -463,6 +506,41 @@ for _role_name, _profile in AGENT_PROFILES.items():
     _profile["systemPrompt"] = _profile["systemPrompt"] + "\n\n" + build_handoff_guidance_block(_role_name)
 del _role_name, _profile
 
+# ── Subagent Guardrails (Nested Task-Spawn Propagation) ──────────────────────
+# A delegated Morty can spawn its own Task subagents. Those nested agents get
+# none of the persona contract above (tool scope, never-touch-node_modules,
+# never-git-push) unless it's injected via the claude CLI's
+# --append-subagent-system-prompt(-file) flag — see delegate.py's
+# build_subagent_guardrail_args(). This keeps that injected block in one place
+# so every role stays covered, including the deepest and least-supervised
+# layer of the tree (the open PROM-163 node_modules failure).
+
+
+def build_subagent_guardrails(agent_role: str) -> str:
+    """Render the invariant guardrail block injected into agent_role's nested subagents.
+
+    Kept short (<40 lines) since it stacks on top of whatever system prompt a
+    nested Task subagent already has.
+    """
+    profile = AGENT_PROFILES.get(agent_role, {})
+    allowed = profile.get("allowedTools") or ["Read", "Grep", "Glob"]
+    lines = [
+        "<subagent_guardrails>",
+        f"You were spawned by {agent_role}, itself a sub-agent of Rick Sanchez's CTO "
+        "orchestrator. These rules apply to you too, even one layer deeper:",
+        f"- Tool scope: only use {', '.join(allowed)}. Nothing outside this allowlist, "
+        "even if it seems convenient.",
+        "- Never modify node_modules/, package-lock.json, yarn.lock, pnpm-lock.yaml, "
+        "or any .cto/ state file directly.",
+        "- Never run `git push`, and never commit directly to the base/default branch.",
+        "- Report the exact file paths you changed — do not summarize as \"updated the code\".",
+        "- Write your findings back to the parent agent's output. Do not close, resolve, "
+        "or update ticket status yourself.",
+        "</subagent_guardrails>",
+    ]
+    return "\n".join(lines)
+
+
 # ── Prompt Cache Configuration ────────────────────────────────────────────────
 # Rick's persona rules, per-role identity, and the effort-guidance reference
 # below are byte-identical for every ticket a given role picks up in a sprint —
@@ -479,8 +557,15 @@ def prefix_cache_control() -> dict:
 
     Only meaningful when calling the Anthropic Messages API directly with
     explicit content blocks. The `claude -p` CLI path (used by delegate.py
-    today) doesn't expose a cache_control hook — for that path, caching is
-    achieved by keeping the stable prefix first and byte-identical instead.
+    today) has no cache_control hook either, but as of --append-system-prompt-file
+    and --exclude-dynamic-system-prompt-sections (see delegate.py's
+    use_cache_optimized_prompt()), the stable prefix can be sent as a real
+    system prompt instead of being smuggled into the user message — keeping
+    it first and byte-identical is now a fallback, not the only lever. Note
+    --system-prompt-snapshot records whichever system prompt was sent on a
+    conversation's first request and replays it verbatim on every `--resume`,
+    so a persona edit never takes effect on an already-running session either
+    way.
     """
     return {"type": "ephemeral", "ttl": PROMPT_CACHE_TTL}
 

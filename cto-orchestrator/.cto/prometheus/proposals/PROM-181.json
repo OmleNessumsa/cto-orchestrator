@@ -1,0 +1,19 @@
+{
+  "id": "PROM-181",
+  "title": "Surface nested subagent and hook activity in the roro event stream",
+  "category": "tooling",
+  "source": "https://code.claude.com/docs/en/cli-reference \u2014 `--forward-subagent-text` (emit subagent text/thinking as stream events, v2.1.211+) and `--include-hook-events` (hook lifecycle events in stream-json)",
+  "description": "delegate.py:2711 already streams with --output-format stream-json --verbose --include-partial-messages, so Rick Terminal sees the top-level Morty. Work a Morty delegates to its own subagents is invisible \u2014 the UI shows a long silence and the orchestrator cannot tell 'thinking hard' from 'stuck in a nested loop', which is what the sleepy stagnation detector keeps guessing at. The same applies to the hooks added in PROM-113: they fire blind today. Two flags turn both into first-class events we can render and use as liveness signals.",
+  "impact_score": 6,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/roro_events.py"
+  ],
+  "proposed_changes": "1) Extend the stream flag list in delegate.py (~line 2711) with `--forward-subagent-text` and `--include-hook-events`, each behind a capability probe and each disableable via env (CTO_STREAM_SUBAGENTS / CTO_STREAM_HOOKS) since they increase stream volume. 2) In the stream-json event loop (~lines 2840-2880), branch on the new event shapes: emit a versioned roro event `subagent.progress` (parent ticket id, subagent label, truncated text) and `hook.fired` (hook name, matcher, decision) using the existing schema-stable envelope from PROM-102. 3) Bound them \u2014 cap subagent text at ~200 chars and rate-limit to N events/sec so the PROM-065 output-bounding guarantee holds. 4) Reset the sleepy/stagnation liveness timer on subagent.progress so deep-but-active runs are no longer misread as hung. 5) Add the two new event types to the roro schema docs and the SwiftUI terminal's decoder.",
+  "status": "pending",
+  "created_at": "2026-09-27T19:32:07.419171+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

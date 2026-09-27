@@ -1,0 +1,23 @@
+{
+  "id": "PROM-175",
+  "title": "Mid-run structured note-taking so interrupted tickets resume from a checkpoint",
+  "category": "prompt-engineering",
+  "source": "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents and https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools \u2014 structured note-taking + compaction as the two mechanisms for long-horizon agents; context rot degrades recall well before the hard token limit",
+  "description": "The memory design is end-loaded: `_build_memory_section()` (scripts/delegate.py:1004) tells the Morty to read the role scratchpad at task START and append 'WHAT I LEARNED' at task END. Nothing is persisted mid-run, so when a long ticket is killed by the subprocess timeout, auto-compacted, or requeued by prometheus's interrupted-ticket logic (commits b8734ad / e261888), the next attempt starts from zero context and re-does the same file reads \u2014 the exact long-horizon failure mode Anthropic's context-engineering guidance addresses with per-task progress notes. The role-level scratchpad is also the wrong granularity: it mixes lessons from unrelated tickets into every prompt instead of carrying the current ticket's state.",
+  "impact_score": 7,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/ticket.py"
+  ],
+  "proposed_changes": "1) Add `_ticket_progress_path(root, ticket_id)` \u2192 `.cto/scratchpad/progress/{ticket_id}.md` next to `_ensure_scratchpad()` (delegate.py:978). 2) Add a `<progress_protocol>` block to the STABLE PREFIX in build_prompt (after `<reasoning_protocol>`, delegate.py:1688): instruct the agent to OVERWRITE (never append) a \u226430-line checkpoint at that path after each of ANALYZE / PLAN / EXECUTE / SELF_CRITIQUE, with exactly four sections \u2014 `PHASE:`, `DONE:` (files already changed, with what changed), `NEXT:` (the single next action), `UNKNOWNS:` \u2014 and to treat the file as the source of truth over its own recollection. Overwrite-not-append keeps the injected context bounded. 3) In the VOLATILE SUFFIX, when the progress file exists and is non-empty, inject it as `<resumed_progress>` (truncate to ~2000 chars) immediately before the mission block with the directive 'A previous attempt at THIS ticket was interrupted. Verify each DONE item with Read/Grep before trusting it, then continue from NEXT \u2014 do not restart from scratch.' 4) Wire cleanup: delete the progress file when a ticket reaches a terminal status in scripts/ticket.py's status-update path, so a reopened ticket never inherits stale state. 5) Do not inject `<resumed_progress>` on first attempt (attempt counter / retry_count == 0) to keep the cold-start prompt unchanged.",
+  "status": "applied",
+  "created_at": "2026-09-27T18:43:21.737553+00:00",
+  "applied_at": "2026-09-27T18:57:29.258957+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-175-20260927T185306",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/ticket.py"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "PROM-172",
+  "title": "Delegate-timeout hardcoded op 600s, niet complexity-aware",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Doppel sprint-2: DOP-007 XL 2x timeout op 600s",
+  "description": "orchestrate.py gebruikt overal timeout=600 (run_delegate, _dag_delegate, run_team_sprint). L/XL-tickets timeouten daardoor structureel (zie DOP-007: 2x timeout, auto-blocked, moest handmatig gesplitst). Voorstel: timeout schalen op estimated_complexity (XS/S 600, M 900, L 1200, XL 1800) en overridebaar maken via .cto/config.json.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/orchestrate.py"
+  ],
+  "proposed_changes": "COMPLEXITY_TIMEOUTS dict + cfg.get('delegate_timeouts', {}) merge; doorgeven op alle vier call-sites",
+  "status": "applied",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-08-20T15:55:44.198747+00:00",
+  "applied_at": "2026-09-27T19:35:46.600507+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-172-20260927T193338",
+  "files_actually_changed": [
+    "scripts/orchestrate.py"
+  ]
+}

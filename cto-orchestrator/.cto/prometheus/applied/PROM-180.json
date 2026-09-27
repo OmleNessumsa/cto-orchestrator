@@ -1,0 +1,27 @@
+{
+  "id": "PROM-180",
+  "title": "Propagate Morty guardrails into nested subagents via --append-subagent-system-prompt-file",
+  "category": "tooling",
+  "source": "https://code.claude.com/docs/en/cli-reference \u2014 `--append-subagent-system-prompt` / `--append-subagent-system-prompt-file` (appends to every subagent's system prompt, -p only, file variant v2.1.261+)",
+  "description": "A delegated Morty can spawn its own Task subagents. Those nested agents get none of the persona contract we spent PROM-012/016/066/175 building: no tool-scope reminder, no checkpoint-writing rule, no 'never touch node_modules' rule (the open PROM-163 failure), no 'never git push' rule. Guardrails today live only in the top-level prompt text, so the deepest and least supervised layer of the tree is the least constrained. The CLI now lets us inject a system-prompt suffix into every subagent of a run, which closes that gap once for all roles.",
+  "impact_score": 7,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ],
+  "proposed_changes": "1) Add `build_subagent_guardrails(agent_role) -> str` to persona.py returning a short (<40 line) invariant block: the role's allowed tool scope, 'never modify node_modules/lockfiles/.cto state', 'never git push or commit to the base branch', 'report file paths you changed', 'write your findings back to the parent, do not close tickets yourself'. 2) In delegate.py delegate_to_agent(), write that block to `.cto/session/subagent_prompt_<role>.txt` and add `cmd.extend([\"--append-subagent-system-prompt-file\", path])` behind a capability probe, falling back to `--append-subagent-system-prompt` with the inline string on older CLIs and to no-op if neither exists. 3) Reuse the same builder in meeseeks.py and prometheus.py evolve calls. 4) Add a unit test asserting the flag is present in the built argv for each role and that the guardrail text contains the role's allowlist.",
+  "status": "applied",
+  "created_at": "2026-09-27T19:32:07.415841+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-180-20260927T201007",
+  "timeout_retries": 1,
+  "last_error": "Evolve timed out after 300s (flat default, pre-fix)",
+  "last_failed_at": "2026-09-27T19:55:19.386005+00:00",
+  "applied_at": "2026-09-27T20:17:17.821790+00:00",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ],
+  "collateral_changed": []
+}

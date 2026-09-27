@@ -1,0 +1,22 @@
+{
+  "id": "api-team",
+  "description": "API development and testing team",
+  "roles": [
+    {
+      "role": "architect-morty",
+      "focus": "API design and interfaces"
+    },
+    {
+      "role": "backend-morty",
+      "focus": "API implementation"
+    },
+    {
+      "role": "tester-morty",
+      "focus": "API testing and validation"
+    }
+  ],
+  "coordination": {
+    "mode": "sequential",
+    "lead": "architect-morty"
+  }
+}

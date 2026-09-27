@@ -1,0 +1,27 @@
+{
+  "id": "PROM-173",
+  "title": "Use the CLI's native --json-schema for all helper JSON calls",
+  "category": "prompt-engineering",
+  "source": "https://code.claude.com/docs/en/agent-sdk/structured-outputs + https://platform.claude.com/docs/en/build-with-claude/structured-outputs \u2014 verified locally: `claude --help` on installed CLI 2.1.267 lists `--json-schema <schema>` (\"JSON Schema for structured output validation\")",
+  "description": "`_call_helper_json()` (scripts/delegate.py:1463) still uses 2024-era prompt-engineering for structure: it appends a prose instruction ('Respond with ONLY valid JSON \u2014 no prose, no markdown'), then regex-scrapes `\\{.*\\}` out of stdout, and on a parse miss re-runs the ENTIRE subprocess a second time (doubling latency and cost). The installed CLI supports grammar-level `--json-schema`, and scripts/schemas.py already defines the exact schemas (ROUTING_DECISION_SCHEMA, SPRINT_PLAN_SCHEMA, DELEGATE_OUTPUT_SCHEMA, MEESEEKS_OUTPUT_SCHEMA). Moving from 'ask nicely + regex' to schema-constrained decoding removes the most common silent failure in the orchestrator: a helper returning None, which currently degrades to fail-open defaults (routing falls back, review auto-approves).",
+  "impact_score": 8,
+  "risk_score": 3,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py"
+  ],
+  "proposed_changes": "1) Add `_check_claude_json_schema_support()` mirroring the existing `_check_claude_output_format_json_support()` probe (grep `--json-schema` in `claude --help`), cached in a module global. 2) Give `_call_helper_json(prompt, model, timeout, schema: Optional[dict] = None)` a schema param; when a schema is passed AND supported, invoke `['claude','-p','--model',m,'--output-format','json','--json-schema',json.dumps(schema),'--',prompt]` and read the `result` field, skipping the prose json_suffix and the blind second `_run()` retry. Keep the current prose+regex path as the fallback for older CLIs. 3) Pass schemas at every call site: ROUTING_DECISION_SCHEMA (delegate.py ~line 893), a new AGENT_SCORING_SCHEMA (~line 963), SPRINT_PLAN_SCHEMA (~line 2190), and a new REVIEW_VERDICT_SCHEMA in schemas.py (`{approved: bool, issues: [str]}`, `additionalProperties: false`) for review_ticket (~line 2311). 4) Add `additionalProperties: false` to the existing schema dicts in schemas.py \u2014 the docs require it for strict validation \u2014 and keep `validate_schema()` as the post-parse guard for constraints the grammar can't express (enum ranges, string length). 5) Follow-up (separate ticket, do not bundle): apply DELEGATE_OUTPUT_SCHEMA to the worker subprocess so `<result_json>` regex extraction and `_reformat_retry_haiku()` become dead code.",
+  "status": "applied",
+  "created_at": "2026-09-27T18:43:21.729637+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-173-20260927T200219",
+  "timeout_retries": 1,
+  "last_error": "Evolve timed out after 300s (flat default, pre-fix)",
+  "last_failed_at": "2026-09-27T19:55:19.376754+00:00",
+  "applied_at": "2026-09-27T20:10:07.474799+00:00",
+  "files_actually_changed": [
+    "scripts/schemas.py",
+    "scripts/delegate.py"
+  ],
+  "collateral_changed": []
+}

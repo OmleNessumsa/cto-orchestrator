@@ -1,0 +1,21 @@
+{
+  "id": "PROM-170",
+  "title": "team create: template-registry leeg vanuit sprint-context",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Doppel sprint-2, DOP-013 team-dispatch",
+  "description": "orchestrate.py sprint activeert team mode voor een L/XL-ticket en roept team.py create --template fullstack-team aan, maar de choices-lijst is dan leeg: error: invalid choice: 'fullstack-team' (choose from ). Templates worden vermoedelijk relatief aan cwd geladen (project-dir ipv skill-dir), waardoor team mode in elke echte projectrun stuk is en sprint terugvalt op solo.",
+  "impact_score": 8,
+  "risk_score": 6,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/team.py"
+  ],
+  "proposed_changes": "Template-lookup verankeren aan Path(__file__).parent/references of de skill-root, niet aan cwd",
+  "status": "pending",
+  "severity": "high",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-08-20T15:52:55.790371+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

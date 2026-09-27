@@ -1,0 +1,20 @@
+{
+  "id": "PROM-182",
+  "title": "Run throwaway helper calls with --bare and --no-session-persistence",
+  "category": "tooling",
+  "source": "https://code.claude.com/docs/en/cli-reference \u2014 `--bare` (skip auto-discovery of hooks, skills, commands, subagents, plugins, MCP, auto memory, CLAUDE.md) and `--no-session-persistence` (print mode, non-resumable)",
+  "description": "The small Haiku helper calls \u2014 _call_helper_json (delegate.py:1498/1508), the routing/triage call (delegate.py:2042), the session summariser (session.py:335) and explain.py:341 \u2014 are one-shot classifiers. Today each one boots a full Claude Code session: it discovers and loads the operator's global CLAUDE.md, every skill and plugin, every user-scope MCP server, and auto-memory, then persists a session record. That is seconds of startup and a large multiple of the actual task's tokens per call, on calls that run many times per sprint, and it makes classifier output sensitive to unrelated global config. --bare plus --no-session-persistence makes them hermetic, fast and reproducible.",
+  "impact_score": 6,
+  "risk_score": 2,
+  "effort_score": 3,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/session.py",
+    "scripts/explain.py"
+  ],
+  "proposed_changes": "1) Add `_helper_cmd(model, prompt, *, json_out=True) -> list[str]` in delegate.py that builds `[claude, -p, --model, <resolved>, --bare, --no-session-persistence, (--output-format json), --, prompt]`, gating --bare and --no-session-persistence on capability probes so older CLIs degrade to today's argv. 2) Replace the four hand-built argv lists (delegate.py:1498, :1508, :2042, session.py:335, explain.py:341) with calls to it. 3) IMPORTANT: do not use --bare for real delegations \u2014 Morty runs need MCP, subagents and skills; keep it strictly on the helper path, and add a comment saying so. 4) Log the wall-clock of helper calls to the daily jsonl before/after so the latency win is measurable. 5) Add a regression test asserting no helper argv contains --mcp-config and every delegation argv still does.",
+  "status": "pending",
+  "created_at": "2026-09-27T19:32:07.423491+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

@@ -1,0 +1,25 @@
+{
+  "id": "PROM-174",
+  "title": "Two-gate refute-or-promote reviewer with cold-start context asymmetry",
+  "category": "prompt-engineering",
+  "source": "https://arxiv.org/abs/2604.19049 (Refute-or-Promote: adversarial stage-gated multi-agent review; ~79\u201383% of candidate defects killed before promotion via kill mandates, cold-start reviewers, cross-model critic) + https://futureagi.com/blog/llm-judge-prompt-engineering-guide-2026/ (judge prompts need tight criteria, calibrated examples, structured output, severity thresholds)",
+  "description": "`review_ticket()` (scripts/delegate.py:2270) is a single-pass judge with three known-bad prompt properties: (a) it feeds the worker's own `description` into the reviewer prompt, which anchors the judge on the implementer's framing \u2014 the paper's 'context asymmetry / cold-start' finding says the detector must NOT see the author's summary; (b) issues are unstructured strings with no severity, evidence pointer, or confidence, so a nit and a blocker both trigger a full rework loop through `review_feedback_block`; (c) there is no adversarial kill gate, so plausible-but-wrong findings propagate into `ticket['review_issues']` and burn a whole re-delegation. False-positive rejections are the expensive failure here, not missed bugs \u2014 the retry cap is 2, so two bad reviews wedge a ticket.",
+  "impact_score": 8,
+  "risk_score": 4,
+  "effort_score": 6,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/schemas.py",
+    "agents/reviewer-morty.json"
+  ],
+  "proposed_changes": "Restructure review_ticket into two gates. GATE 1 (detect, cold-start): build the prompt from acceptance criteria + git diff ONLY \u2014 remove the `Worker's summary: ...` line entirely. Require structured candidates via the new REVIEW_CANDIDATE_SCHEMA in schemas.py: `{candidates: [{criterion, claim, severity: 'blocker'|'major'|'nit', evidence: 'file:line', confidence: number}]}`. Embed 2 calibrated few-shot examples in the prompt \u2014 one confirmed blocker (criterion unmet, diff shows the missing branch) and one plausible-but-wrong false positive (reviewer alleges a missing null check that the diff handles two lines up) \u2014 labelled PROMOTE / KILL, per LLM-judge calibration guidance. GATE 2 (refute, cross-model): for each candidate, run a second `_call_helper_json` call with an explicit kill mandate ('Your job is to DISPROVE this finding using the diff. Default verdict is KILL. Only PROMOTE if you can quote the exact diff line proving the criterion is unmet.') using a different model than gate 1 (gate 1 on the configured reviewer model, gate 2 on a different family/size \u2014 e.g. haiku\u2194sonnet \u2014 exposed as a `cross_model_critic` config key). Only candidates that survive gate 2 with severity in {blocker, major} and confidence >= 0.7 are returned in `issues`. Keep the fail-open `approved=True` default when the helper returns nothing, but log killed candidates plus their kill reasons to `.cto/logs/{date}.jsonl` under event `review_candidate_killed` so the rubric can be calibrated against real outcomes later. Mirror the severity/evidence rubric into agents/reviewer-morty.json so interactive reviewer-morty runs use the same criteria.",
+  "status": "applied",
+  "created_at": "2026-09-27T18:43:21.734748+00:00",
+  "applied_at": "2026-09-27T18:53:06.447852+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-174-20260927T184852",
+  "files_actually_changed": [
+    "scripts/schemas.py",
+    "scripts/delegate.py",
+    "agents/reviewer-morty.json"
+  ]
+}

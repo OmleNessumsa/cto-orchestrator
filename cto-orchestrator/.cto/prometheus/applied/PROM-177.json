@@ -1,0 +1,27 @@
+{
+  "id": "PROM-177",
+  "title": "Move the stable persona prefix into the system prompt via --append-system-prompt-file",
+  "category": "prompt-engineering",
+  "source": "Verified locally against installed CLI 2.1.267 `claude --help`: `--append-system-prompt-file` and `--exclude-dynamic-system-prompt-sections` (\"Move per-machine sections (cwd, env info, memory paths, git status) from the system prompt into the first user message. Improves cross-user prompt-cache reuse\") \u2014 plus https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents on system-prompt structuring",
+  "description": "build_prompt's own docstring (delegate.py:1679) says 'The `claude -p` CLI path has no cache_control hook, so consistent prefix ordering is the only lever available here.' That is no longer true: the installed CLI exposes `--append-system-prompt-file` (put the role persona where a system prompt belongs, ahead of the user turn) and `--exclude-dynamic-system-prompt-sections` (evict cwd / env info / memory paths / git status \u2014 which change every run and currently sit in front of everything, poisoning the cache prefix). Today the whole ~4KB stable prefix is re-sent as part of the user message on every delegation, behind per-machine sections that shift between runs, so the cache prefix breaks on content the orchestrator never intended to vary.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 4,
+  "target_files": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ],
+  "proposed_changes": "1) Split build_prompt into `build_system_prefix(root, agent_role)` (role prompt, available_tools, effort guidance table, reasoning_protocol, self_critique, execution_rules, common_mistakes, output_format) and `build_task_prompt(...)` (everything currently in the volatile suffix). Keep build_prompt as a thin wrapper that concatenates both, so every existing caller and test keeps working. 2) Write the system prefix to `.cto/cache/system-{agent_role}-{sha1[:8]}.md` (content-addressed so a persona edit produces a new file rather than a stale hit) and pass `--append-system-prompt-file <path>` on the worker cmd (~line 2458-2515), sending only the task prompt as the `-p` argument. 3) Add `--exclude-dynamic-system-prompt-sections` to the same cmd. 4) Gate both behind a `cache_optimized_prompt.enabled` key in .cto/config.json (default off) plus support probes modelled on `_check_claude_effort_support()` \u2014 same staged-rollout pattern as `native_subagents.enabled`. 5) Honour the documented resume caveat: `--append-system-prompt` is recorded on first launch and replayed verbatim by `--resume`, so skip both flags on the `claude --resume <session_id>` branch and never assume a mid-ticket persona edit takes effect. 6) Order the prefix per the 2026 system-prompt structure already half-followed here: identity/specialization \u2192 rules/conventions \u2192 protocols \u2192 output contract \u2192 anti-patterns (`common_mistakes`) LAST, which means moving the common_mistakes block after output_format.",
+  "status": "applied",
+  "created_at": "2026-09-27T18:43:21.742865+00:00",
+  "rollback_snapshot": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator/.cto/prometheus/snapshots/snap-PROM-177-20260927T203752",
+  "timeout_retries": 1,
+  "last_error": "Evolve timed out after 300s (flat default, pre-fix)",
+  "last_failed_at": "2026-09-27T19:55:19.381884+00:00",
+  "applied_at": "2026-09-27T20:58:11.918973+00:00",
+  "files_actually_changed": [
+    "scripts/delegate.py",
+    "scripts/persona.py"
+  ],
+  "collateral_changed": []
+}

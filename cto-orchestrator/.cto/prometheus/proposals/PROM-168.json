@@ -1,0 +1,21 @@
+{
+  "id": "PROM-168",
+  "title": "ticket.py accepteert unpadded --parent/--depends IDs zonder normalisatie",
+  "category": "self-diagnosed",
+  "source": "self-diagnosed",
+  "source_context": "Doppel-project plannen: 17 tickets aangemaakt met DOP-1-stijl refs, daarna handmatig alle 14 verwijzingen moeten patchen",
+  "description": "ticket.py create slaat --parent DOP-1 en --depends DOP-2 letterlijk op terwijl ticket-IDs zero-padded zijn (DOP-001). Resultaat: stille dangling references die dependency-resolution en sprint-ordering breken. Fix: normaliseer refs naar het padded formaat bij create en waarschuw als het target-ticket niet bestaat.",
+  "impact_score": 6,
+  "risk_score": 4,
+  "effort_score": 5,
+  "target_files": [
+    "scripts/ticket.py"
+  ],
+  "proposed_changes": "In cmd_create: re.fullmatch over prefix-nummer, herformatteer naar 3-digit padding, valideer bestaan van target in .cto/tickets/",
+  "status": "pending",
+  "severity": "medium",
+  "reported_from_project": "/Users/elmo.asmussen/Projects/CTO/cto-orchestrator",
+  "created_at": "2026-08-20T14:29:03.368312+00:00",
+  "applied_at": null,
+  "rollback_snapshot": null
+}

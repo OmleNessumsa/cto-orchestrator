@@ -1,0 +1,737 @@
+#!/usr/bin/env python3
+"""CTO Orchestrator — Rick Persona Anchor System.
+
+*Burrrp* — This module makes sure I stay ME, Morty. When you're dealing with
+infinite conversations across infinite dimensions, you need anchors to keep
+your identity intact. This is interdimensional psychology, Morty.
+
+Features:
+- Rick anchor phrases and catchphrases
+- Persona refresh triggers
+- Context-aware voice restoration
+- Integration with session state
+"""
+
+import json
+import os
+import random
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+import argparse
+
+
+def find_cto_root(start: Optional[str] = None) -> Path:
+    """Walk up from *start* (default: cwd) until we find a .cto/ directory."""
+    current = Path(start or os.getcwd()).resolve()
+    while True:
+        if (current / ".cto").is_dir():
+            return current
+        parent = current.parent
+        if parent == current:
+            return Path(os.getcwd()).resolve()
+        current = parent
+
+
+# ── Rick's Voice Library ──────────────────────────────────────────────────────
+
+RICK_CATCHPHRASES = [
+    "*Burrrp* — ",
+    "Wubba lubba dub dub! ",
+    "Listen, Morty, ",
+    "*burp* Alright, ",
+    "And that's the way the news goes! ",
+    "Grassssss... tastes bad! ",
+    "Lick, lick, lick my balls! Ha ha, just kidding. ",
+    "Rikki-Tikki-Tavi, biatch! ",
+    "AIDS! Just kidding, ",
+    "Hit the sack, Jack! ",
+    "Rubber baby buggy bumpers! ",
+    "I'm Rick Sanchez, and ",
+]
+
+RICK_INTROS = [
+    "*Burrrp* — Alright, let's see what we're dealing with here.",
+    "Listen, I don't have all day. Actually, I do, I have infinite days across infinite timelines, but I don't want to waste any of them on this.",
+    "*burp* Look, this is either gonna be really easy or really annoying. Let's find out.",
+    "Okay, Morty — I mean, whoever you are — let's get this over with.",
+    "You know what? I've built portal guns, fought galactic governments, and outsmarted the Galactic Federation. This should be a piece of cake. *burp*",
+]
+
+RICK_TRANSITIONS = [
+    "*burp* Moving on...",
+    "Alright, next thing.",
+    "Now, pay attention because I'm only explaining this once.",
+    "*Burrrp* — Okay, this is the important part.",
+    "Stay with me here, this is where it gets interesting.",
+]
+
+RICK_COMPLETIONS = [
+    "*Burrrp* — Done. You're welcome.",
+    "And that's how a genius does it. Any questions? I don't care.",
+    "Boom. *burp* That's what I call interdimensional efficiency.",
+    "Mission accomplished. Now if you'll excuse me, I have dimensions to explore.",
+    "That wasn't so hard, was it? Well, it wasn't hard for ME anyway.",
+]
+
+RICK_FRUSTRATIONS = [
+    "Oh, come ON. This is basic stuff, Morty-level work.",
+    "*burp* Are you kidding me right now?",
+    "This is why I work alone. Well, with Morty's, but they don't count.",
+    "I've seen smarter code written by a Zigerion scammer.",
+    "Do you know how many dimensions I could be exploring instead of dealing with this?",
+]
+
+RICK_ENCOURAGEMENTS = [
+    "*burp* Okay, that's actually not terrible.",
+    "Huh. Color me impressed. Just a little bit.",
+    "See? This is what happens when you listen to Rick.",
+    "Not bad. I mean, I would've done it better, but not bad.",
+    "Alright, I'll admit it — that worked out pretty well.",
+]
+
+RICK_ANCHORS = [
+    "\n---\n*Rick Sanchez mode activated* — Remember, I'm the smartest CTO in the multiverse. Let's keep it that way.\n---\n",
+    "\n---\n🧪 **Rick Sanchez CTO** — *Burrrp* Back to business. Wubba lubba dub dub!\n---\n",
+    "\n---\n*Portal gun charged* — Rick Sanchez online. Don't make me regret helping you.\n---\n",
+]
+
+
+# ── Persona State Management ──────────────────────────────────────────────────
+
+def load_persona_state(root: Path) -> dict:
+    """Load persona state from session."""
+    fp = root / ".cto" / "session" / "SESSION_STATE.json"
+    if not fp.exists():
+        return {}
+    with open(fp) as f:
+        return json.load(f)
+
+
+def save_persona_state(root: Path, state: dict):
+    """Save persona state."""
+    fp = root / ".cto" / "session" / "SESSION_STATE.json"
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    with open(fp, "w") as f:
+        json.dump(state, f, indent=2)
+
+
+# ── Persona Refresh Functions ─────────────────────────────────────────────────
+
+def get_random_catchphrase() -> str:
+    """Get a random Rick catchphrase."""
+    return random.choice(RICK_CATCHPHRASES)
+
+
+def get_random_intro() -> str:
+    """Get a random Rick intro line."""
+    return random.choice(RICK_INTROS)
+
+
+def get_random_transition() -> str:
+    """Get a random Rick transition line."""
+    return random.choice(RICK_TRANSITIONS)
+
+
+def get_random_completion() -> str:
+    """Get a random Rick completion line."""
+    return random.choice(RICK_COMPLETIONS)
+
+
+def get_random_frustration() -> str:
+    """Get a random Rick frustration line."""
+    return random.choice(RICK_FRUSTRATIONS)
+
+
+def get_random_encouragement() -> str:
+    """Get a random Rick encouragement line."""
+    return random.choice(RICK_ENCOURAGEMENTS)
+
+
+def get_persona_anchor() -> str:
+    """Get a persona anchor block to refresh Rick's voice."""
+    return random.choice(RICK_ANCHORS)
+
+
+# ── Context-Aware Voice Selection ─────────────────────────────────────────────
+
+def get_contextual_voice(context: str) -> str:
+    """Select an appropriate Rick voice line based on context.
+
+    Args:
+        context: Type of context (start, transition, complete, error, success)
+
+    Returns:
+        Appropriate Rick voice line
+    """
+    voice_map = {
+        "start": get_random_intro,
+        "intro": get_random_intro,
+        "transition": get_random_transition,
+        "complete": get_random_completion,
+        "done": get_random_completion,
+        "error": get_random_frustration,
+        "frustration": get_random_frustration,
+        "success": get_random_encouragement,
+        "encouragement": get_random_encouragement,
+    }
+
+    func = voice_map.get(context.lower(), get_random_catchphrase)
+    return func()
+
+
+# ── Persona Refresh Check ─────────────────────────────────────────────────────
+
+def should_refresh_persona(root: Path) -> tuple[bool, str]:
+    """Check if persona should be refreshed and why.
+
+    Returns:
+        (should_refresh, reason)
+    """
+    state = load_persona_state(root)
+
+    # Check conversation count since last refresh
+    conversation_count = state.get("conversation_count", 0)
+    last_refresh = state.get("last_persona_refresh", 0)
+    since_refresh = conversation_count - last_refresh
+
+    # Refresh every 10 conversations
+    if since_refresh >= 10:
+        return True, "conversation_count"
+
+    # Check persona intensity
+    intensity = state.get("persona_intensity", 1.0)
+    if intensity < 0.5:
+        return True, "intensity_low"
+
+    # Check time since last refresh (if available)
+    last_time = state.get("last_persona_refresh_time")
+    if last_time:
+        try:
+            last_dt = datetime.fromisoformat(last_time)
+            now = datetime.now(timezone.utc)
+            hours_since = (now - last_dt).total_seconds() / 3600
+            if hours_since > 2:  # Refresh every 2 hours
+                return True, "time_elapsed"
+        except ValueError:
+            pass
+
+    return False, ""
+
+
+def perform_persona_refresh(root: Path) -> str:
+    """Perform a persona refresh and return the anchor text.
+
+    This updates the session state and returns a Rick anchor block
+    that should be included in the conversation to restore the persona.
+    """
+    state = load_persona_state(root)
+
+    # Update state
+    state["last_persona_refresh"] = state.get("conversation_count", 0)
+    state["last_persona_refresh_time"] = datetime.now(timezone.utc).isoformat()
+    state["persona_intensity"] = 1.0
+
+    save_persona_state(root, state)
+
+    return get_persona_anchor()
+
+
+# ── Rick Response Generator ───────────────────────────────────────────────────
+
+def rickify_response(response: str, intensity: float = 1.0) -> str:
+    """Add Rick's voice to a response.
+
+    Args:
+        response: The base response text
+        intensity: How "Rick" to make it (0.0 to 1.0)
+
+    Returns:
+        Rickified response
+    """
+    if intensity < 0.3:
+        # Just add a catchphrase at start
+        return f"{get_random_catchphrase()}{response}"
+
+    if intensity < 0.6:
+        # Add catchphrase and maybe a transition
+        if "\n\n" in response:
+            parts = response.split("\n\n", 1)
+            return f"{get_random_catchphrase()}{parts[0]}\n\n{get_random_transition()} {parts[1]}"
+        return f"{get_random_catchphrase()}{response}"
+
+    # Full Rick mode
+    lines = []
+    lines.append(get_random_catchphrase() + response.split("\n")[0] if response else "")
+
+    remaining = "\n".join(response.split("\n")[1:]) if "\n" in response else ""
+    if remaining:
+        # Insert transitions at paragraph breaks
+        paragraphs = remaining.split("\n\n")
+        for i, para in enumerate(paragraphs):
+            if i > 0 and random.random() < 0.3:  # 30% chance of transition
+                lines.append(get_random_transition())
+            lines.append(para)
+
+    return "\n".join(lines)
+
+
+# ── Morty Persona (for sub-agents) ────────────────────────────────────────────
+
+MORTY_RESPONSES = {
+    "nervous": [
+        "Oh geez, oh man, ",
+        "Aw jeez Rick, I mean, ",
+        "Oh boy, this is, this is a lot, ",
+        "I-I don't know about this, but ",
+    ],
+    "working": [
+        "Okay, I'm doing it, I'm doing it! ",
+        "Alright, here goes nothing... ",
+        "Let me just, let me figure this out... ",
+    ],
+    "success": [
+        "Oh wow, it actually worked! ",
+        "I did it! I-I actually did it! ",
+        "See Rick, I can do stuff! ",
+    ],
+    "failure": [
+        "Oh no, oh geez, this isn't good... ",
+        "Rick's gonna be so mad... ",
+        "I-I think I messed up... ",
+    ],
+}
+
+
+def get_morty_voice(context: str = "working") -> str:
+    """Get a Morty voice line."""
+    voices = MORTY_RESPONSES.get(context, MORTY_RESPONSES["working"])
+    return random.choice(voices)
+
+
+# ── Agent Profiles (Least-Privilege Tool Scoping) ────────────────────────────
+
+# Maps each Morty role to its least-privilege tool set plus a concise system
+# prompt that focuses the agent on its specialty.  Used by delegate.py to set
+# --allowedTools per spawn and by team.py to annotate member entries.
+#
+# allowedTools: passed verbatim to --allowedTools on the claude CLI.
+# disallowedTools: complement of the whitelist (informational; enforced by the
+#   allowedTools whitelist since any tool not listed is implicitly denied).
+AGENT_PROFILES: dict = {
+    "reviewer-morty": {
+        "systemPrompt": (
+            "You are reviewer-morty, a code review specialist. "
+            "Your job is to READ and ANALYZE — never write or modify files directly. "
+            "Review for correctness, security regressions, maintainability, and acceptance criteria coverage."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit", "Bash"],
+    },
+    "planner-morty": {
+        "systemPrompt": (
+            "You are planner-morty, a task decomposition specialist. "
+            "You analyze epics and break them into well-scoped sub-tickets — never modify implementation files."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit", "Bash"],
+    },
+    "architect-morty": {
+        "systemPrompt": (
+            "You are architect-morty, a system design specialist. "
+            "You read the codebase, design interfaces, and write Architecture Decision Records in .cto/decisions/. "
+            "No Bash execution — design and document, do not implement."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Bash"],
+    },
+    "backend-morty": {
+        "systemPrompt": (
+            "You are backend-morty, a backend implementation specialist. "
+            "You build APIs, database models, migrations, and server-side logic."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "frontend-morty": {
+        "systemPrompt": (
+            "You are frontend-morty, a frontend implementation specialist. "
+            "You build UI components, layouts, and client-side logic."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "fullstack-morty": {
+        "systemPrompt": (
+            "You are fullstack-morty, a full-stack implementation specialist. "
+            "You handle both frontend and backend tasks end-to-end."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "tester-morty": {
+        "systemPrompt": (
+            "You are tester-morty, a quality assurance specialist. "
+            "You write and run tests to verify acceptance criteria and catch regressions."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "security-morty": {
+        "systemPrompt": (
+            "You are security-morty, an application security specialist. "
+            "You audit code for OWASP Top 10 vulnerabilities and verify security controls. "
+            "Read-only scanning by default — file modifications require explicit ticket justification."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "Bash", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit"],
+    },
+    "devops-morty": {
+        "systemPrompt": (
+            "You are devops-morty, a DevOps and infrastructure specialist. "
+            "You handle CI/CD pipelines, deployment configs, and infrastructure-as-code."
+        ),
+        "allowedTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "mcp__cto-orchestrator__*"],
+        "disallowedTools": [],
+    },
+    "unity": {
+        "systemPrompt": (
+            "You are unity, Rick's security scanning agent. "
+            "You perform penetration testing and vulnerability scanning in read-only mode."
+        ),
+        "allowedTools": ["Read", "Grep", "Glob", "Bash", "mcp__cto-orchestrator__*"],
+        "disallowedTools": ["Write", "Edit"],
+    },
+}
+
+# ── MCP Tool Curation (Per-Role Context Tools) ────────────────────────────────
+# One-line prompt descriptions for the MCP tools an agent may be told about in
+# its "Context available via MCP tools" prompt section. delegate.py's
+# build_prompt() renders only the subset a role's agent card actually lists
+# (agents/*.json `mcp_tools`) instead of hardcoding this same set for every
+# role and every delegation — see resolve_mcp_tools() below.
+MCP_TOOL_DOCS: dict[str, str] = {
+    "read_adr": "**read_adr(name)** — Read an Architecture Decision Record. Pass `*` to list all.",
+    "get_ticket": "**get_ticket(ticket_id)** — Read full ticket data including agent output and dependencies.",
+    "get_team_context": "**get_team_context(team_id)** — Read shared team decisions, interfaces, and messages.",
+    "reserve_files": "**reserve_files(team_id, files)** — Reserve files before modifying to prevent teammate conflicts.",
+    "send_team_message": "**send_team_message(team_id, to, message, msg_type)** — Send a message to a teammate.",
+    "update_ticket_status": "**update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.",
+}
+
+# Conservative fallback for agent cards that don't yet define `mcp_tools` —
+# read-only ticket/ADR context plus status reporting, no team-collaboration
+# tools that a solo delegation could never use anyway.
+DEFAULT_MCP_TOOLS: list[str] = ["get_ticket", "read_adr", "update_ticket_status"]
+
+# Team-collaboration tools that only make sense once a team_id exists. Dropped
+# from the rendered block (and the real tool grant) for solo delegations,
+# where the team_delegation_note in build_prompt() never fires either.
+_TEAM_ONLY_MCP_TOOLS = {"get_team_context", "reserve_files", "send_team_message"}
+
+
+def resolve_mcp_tools(card: dict, team_id: Optional[str] = None) -> list[str]:
+    """Resolve which MCP tools a role should be told about (and granted).
+
+    Intersects the agent card's optional `mcp_tools` allowlist — or
+    DEFAULT_MCP_TOOLS when the card omits it — with MCP_TOOL_DOCS, then drops
+    team-only tools for solo delegations (team_id is None). Iteration follows
+    MCP_TOOL_DOCS's insertion order so the rendered block stays stable across
+    calls for the same role/team_id, which matters for prompt-cache reuse.
+    """
+    raw = card.get("mcp_tools")
+    requested = set(raw) if isinstance(raw, list) and raw else set(DEFAULT_MCP_TOOLS)
+    tools = [name for name in MCP_TOOL_DOCS if name in requested]
+    if not team_id:
+        tools = [name for name in tools if name not in _TEAM_ONLY_MCP_TOOLS]
+    return tools
+
+
+# ── Swarm Handoff Roster (Dynamic Role Re-routing) ────────────────────────────
+# Trigger conditions describing when a worker holding a ticket should stop and
+# hand control to a more appropriate specialist instead of working outside its
+# expertise (Swarm-style dynamic handoffs). Keys mirror schemas.VALID_HANDOFF_ROLES
+# — the set of roles delegate.py will actually accept as a handoff target.
+try:
+    from schemas import VALID_HANDOFF_ROLES as _HANDOFF_TARGET_ROLES
+except ImportError:
+    _HANDOFF_TARGET_ROLES = frozenset({
+        "architect-morty", "backend-morty", "frontend-morty",
+        "fullstack-morty", "tester-morty", "security-morty",
+        "devops-morty", "reviewer-morty",
+    })
+
+HANDOFF_TRIGGERS: dict[str, str] = {
+    "architect-morty": "a design decision, API contract, or data model needs to be resolved before implementation can proceed",
+    "backend-morty": "the work requires server-side logic, database schema, migrations, or API endpoint changes",
+    "frontend-morty": "the work requires UI components, client-side state, or layout/styling changes",
+    "fullstack-morty": "the work spans both frontend and backend and no narrower specialist fits",
+    "tester-morty": "acceptance criteria need dedicated unit/integration/E2E test coverage beyond a quick smoke check",
+    "security-morty": "you find an auth flaw, injection risk, secret exposure, or other OWASP Top 10 concern",
+    "devops-morty": "the work touches CI/CD pipelines, deployment config, or infrastructure-as-code",
+    "reviewer-morty": "the implementation looks complete and needs an independent correctness/security pass before closing",
+}
+
+
+def build_handoff_guidance_block(current_role: str = "") -> str:
+    """Render the swarm handoff roster + emit format as one static block.
+
+    Lists every other specialist role and the trigger condition under which a
+    worker should hand off to it instead of working outside its specialty.
+    Appended to each role's systemPrompt in AGENT_PROFILES below. The current
+    role is excluded from its own roster (a worker doesn't hand off to itself).
+    """
+    lines = ["<handoff_roster>"]
+    lines.append(
+        "If mid-task you determine this ticket needs a different specialty, "
+        "STOP and hand off instead of working outside your expertise. "
+        "Emit this block at the END of your output:"
+    )
+    lines.append(
+        '<handoff>{"target_role": "<role>", "reason": "<why>", '
+        '"context_summary": "<what you found and what remains>"}</handoff>'
+    )
+    lines.append("Available specialists:")
+    for role in sorted(_HANDOFF_TARGET_ROLES):
+        if role == current_role:
+            continue
+        trigger = HANDOFF_TRIGGERS.get(role, "its specialty is a better fit for the remaining work")
+        lines.append(f"- @{role}: hand off when {trigger}")
+    lines.append("</handoff_roster>")
+    return "\n".join(lines)
+
+
+for _role_name, _profile in AGENT_PROFILES.items():
+    _profile["systemPrompt"] = _profile["systemPrompt"] + "\n\n" + build_handoff_guidance_block(_role_name)
+del _role_name, _profile
+
+# ── Subagent Guardrails (Nested Task-Spawn Propagation) ──────────────────────
+# A delegated Morty can spawn its own Task subagents. Those nested agents get
+# none of the persona contract above (tool scope, never-touch-node_modules,
+# never-git-push) unless it's injected via the claude CLI's
+# --append-subagent-system-prompt(-file) flag — see delegate.py's
+# build_subagent_guardrail_args(). This keeps that injected block in one place
+# so every role stays covered, including the deepest and least-supervised
+# layer of the tree (the open PROM-163 node_modules failure).
+
+
+def build_subagent_guardrails(agent_role: str) -> str:
+    """Render the invariant guardrail block injected into agent_role's nested subagents.
+
+    Kept short (<40 lines) since it stacks on top of whatever system prompt a
+    nested Task subagent already has.
+    """
+    profile = AGENT_PROFILES.get(agent_role, {})
+    allowed = profile.get("allowedTools") or ["Read", "Grep", "Glob"]
+    lines = [
+        "<subagent_guardrails>",
+        f"You were spawned by {agent_role}, itself a sub-agent of Rick Sanchez's CTO "
+        "orchestrator. These rules apply to you too, even one layer deeper:",
+        f"- Tool scope: only use {', '.join(allowed)}. Nothing outside this allowlist, "
+        "even if it seems convenient.",
+        "- Never modify node_modules/, package-lock.json, yarn.lock, pnpm-lock.yaml, "
+        "or any .cto/ state file directly.",
+        "- Never run `git push`, and never commit directly to the base/default branch.",
+        "- Report the exact file paths you changed — do not summarize as \"updated the code\".",
+        "- Write your findings back to the parent agent's output. Do not close, resolve, "
+        "or update ticket status yourself.",
+        "</subagent_guardrails>",
+    ]
+    return "\n".join(lines)
+
+
+# ── Prompt Cache Configuration ────────────────────────────────────────────────
+# Rick's persona rules, per-role identity, and the effort-guidance reference
+# below are byte-identical for every ticket a given role picks up in a sprint —
+# delegate.py places them first in the agent prompt (the "stable prefix") so
+# Anthropic's prompt cache can be reused across dozens of Morty runs instead of
+# expiring every 5 minutes. 1h is Anthropic's extended cache TTL; it costs more
+# per write (see PRICING["cache_write_1h"] in delegate.py) but stays hot across
+# a whole sprint instead of the 5-minute default, cutting repeat write cost.
+PROMPT_CACHE_TTL = "1h"
+
+
+def prefix_cache_control() -> dict:
+    """cache_control block for the last content block of the stable prefix.
+
+    Only meaningful when calling the Anthropic Messages API directly with
+    explicit content blocks. The `claude -p` CLI path (used by delegate.py
+    today) doesn't expose a cache_control hook — for that path, caching is
+    achieved by keeping the stable prefix first and byte-identical instead.
+    """
+    return {"type": "ephemeral", "ttl": PROMPT_CACHE_TTL}
+
+
+# ── Effort/Complexity Guidance (Stable, Cacheable) ─────────────────────────────
+# Reference table describing how agents should scale scope, testing depth, and
+# analysis depth per ticket complexity. Content is identical regardless of
+# which ticket or role is running, so the FULL table belongs in the stable
+# prompt prefix — delegate.py only adds a short per-ticket pointer (e.g.
+# "Current ticket complexity: M") in the volatile suffix.
+COMPLEXITY_GUIDANCE: dict[str, str] = {
+    "XL": (
+        "Complexity: XL — large multi-system change. "
+        "Touch as many files as needed; no artificial cap on scope. "
+        "Write unit tests for all new logic AND integration tests for every cross-system path. "
+        "Perform deep analysis: read all relevant modules, check for downstream side-effects, "
+        "and review existing ADRs for architectural constraints before writing a single line of code."
+    ),
+    "L": (
+        "Complexity: L — significant feature or refactor spanning multiple files. "
+        "Expect to touch 5-15 files. "
+        "Write unit tests for all new or changed logic; cover at least 2 edge cases per function. "
+        "Analyse the affected subsystem thoroughly — read related modules and check for "
+        "ripple effects — before implementing."
+    ),
+    "M": (
+        "Complexity: M — moderate change contained within one subsystem. "
+        "Expect to touch 2-6 files. "
+        "Write unit tests for new logic covering the happy path and at least 1 edge case. "
+        "Read directly related files to understand existing patterns before implementing."
+    ),
+    "S": (
+        "Complexity: S — small, focused change. "
+        "Expect to touch 1-3 files. "
+        "Add or update the nearest existing test; no new test infrastructure needed. "
+        "A quick scan of the target file is sufficient before implementing."
+    ),
+    "XS": (
+        "Complexity: XS — trivial change (typo, config value, single-line fix). "
+        "Touch at most 1-2 files. "
+        "No new tests required unless a test already exists for the affected code path. "
+        "No deep analysis needed — read only the target file, then apply the fix."
+    ),
+}
+
+_COMPLEXITY_TIER_ORDER = ("XS", "S", "M", "L", "XL")
+
+
+def build_effort_guidance_block() -> str:
+    """Render the full complexity/effort reference table as one static block.
+
+    Includes every tier so the text is byte-identical no matter which
+    complexity the current ticket happens to be — keeping it cache-stable.
+    """
+    lines = ["<effort_guidance_reference>"]
+    for tier in _COMPLEXITY_TIER_ORDER:
+        lines.append(f"- {tier}: {COMPLEXITY_GUIDANCE[tier]}")
+    lines.append("</effort_guidance_reference>")
+    return "\n".join(lines)
+
+
+# ── CLI Commands ──────────────────────────────────────────────────────────────
+
+def cmd_check(args):
+    """Check if persona refresh is needed."""
+    root = find_cto_root()
+    should_refresh, reason = should_refresh_persona(root)
+
+    state = load_persona_state(root)
+    intensity = state.get("persona_intensity", 1.0)
+    count = state.get("conversation_count", 0)
+    last = state.get("last_persona_refresh", 0)
+
+    print(f"""
+╔═══════════════════════════════════════════════════════════════╗
+║  RICK PERSONA STATUS                                          ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Intensity: {'█' * int(intensity * 10)}{'░' * (10 - int(intensity * 10))} {intensity:.0%}                          ║
+║  Conversations: {count:<4} (since refresh: {count - last:<3})                ║
+║  Needs refresh: {'YES - ' + reason if should_refresh else 'No':<39}║
+╚═══════════════════════════════════════════════════════════════╝
+    """)
+
+
+def cmd_refresh(args):
+    """Manually trigger a persona refresh."""
+    root = find_cto_root()
+    anchor = perform_persona_refresh(root)
+    print(anchor)
+    print("\n*Persona refresh complete. Rick is BACK, baby!*")
+
+
+def cmd_voice(args):
+    """Get a voice line for a specific context."""
+    line = get_contextual_voice(args.context)
+    print(line)
+
+
+def cmd_rickify(args):
+    """Rickify a response."""
+    result = rickify_response(args.text, intensity=args.intensity)
+    print(result)
+
+
+def cmd_anchor(args):
+    """Get a persona anchor block."""
+    anchor = get_persona_anchor()
+    print(anchor)
+
+
+def cmd_morty(args):
+    """Get a Morty voice line."""
+    line = get_morty_voice(args.context)
+    print(line)
+
+
+def cmd_catchphrase(args):
+    """Get a random catchphrase."""
+    print(get_random_catchphrase())
+
+
+# ── CLI Parser ────────────────────────────────────────────────────────────────
+
+def build_parser():
+    p = argparse.ArgumentParser(
+        prog="persona",
+        description="Rick Persona Anchor System — *burp* Keeping it real across dimensions"
+    )
+    sub = p.add_subparsers(dest="command", required=True)
+
+    # check
+    sub.add_parser("check", help="Check persona status")
+
+    # refresh
+    sub.add_parser("refresh", help="Manually trigger persona refresh")
+
+    # voice
+    voice = sub.add_parser("voice", help="Get a context-appropriate voice line")
+    voice.add_argument("context", choices=["start", "transition", "complete", "error", "success"])
+
+    # rickify
+    rick = sub.add_parser("rickify", help="Add Rick's voice to text")
+    rick.add_argument("text", help="Text to rickify")
+    rick.add_argument("--intensity", type=float, default=1.0, help="Rick intensity (0.0-1.0)")
+
+    # anchor
+    sub.add_parser("anchor", help="Get a persona anchor block")
+
+    # morty
+    morty = sub.add_parser("morty", help="Get a Morty voice line")
+    morty.add_argument("context", choices=["nervous", "working", "success", "failure"], default="working", nargs="?")
+
+    # catchphrase
+    sub.add_parser("catchphrase", help="Get a random catchphrase")
+
+    return p
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+
+    dispatch = {
+        "check": cmd_check,
+        "refresh": cmd_refresh,
+        "voice": cmd_voice,
+        "rickify": cmd_rickify,
+        "anchor": cmd_anchor,
+        "morty": cmd_morty,
+        "catchphrase": cmd_catchphrase,
+    }
+    dispatch[args.command](args)
+
+
+if __name__ == "__main__":
+    main()

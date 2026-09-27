@@ -1,0 +1,26 @@
+{
+  "id": "security-team",
+  "description": "Security audit and hardening team",
+  "roles": [
+    {
+      "role": "architect-morty",
+      "focus": "security architecture review"
+    },
+    {
+      "role": "security-morty",
+      "focus": "vulnerability assessment"
+    },
+    {
+      "role": "unity",
+      "focus": "penetration testing (Shannon)"
+    },
+    {
+      "role": "tester-morty",
+      "focus": "security test automation"
+    }
+  ],
+  "coordination": {
+    "mode": "parallel",
+    "lead": "security-morty"
+  }
+}

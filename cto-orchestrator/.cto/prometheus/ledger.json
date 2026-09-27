@@ -2699,5 +2699,296 @@
     "target_files": [
       "scripts/orchestrate.py"
     ]
+  },
+  {
+    "timestamp": "2026-08-20T14:29:03.369489+00:00",
+    "proposal_id": "PROM-168",
+    "action": "self-reported",
+    "title": "ticket.py accepteert unpadded --parent/--depends IDs zonder normalisatie",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-08-20T14:33:08.669208+00:00",
+    "proposal_id": "PROM-169",
+    "action": "needs-human",
+    "reason": "self-protection",
+    "title": "evolve werkt integrity-manifest niet bij na self-edit"
+  },
+  {
+    "timestamp": "2026-08-20T15:52:55.791379+00:00",
+    "proposal_id": "PROM-170",
+    "action": "self-reported",
+    "title": "team create: template-registry leeg vanuit sprint-context",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-08-20T15:52:55.905023+00:00",
+    "proposal_id": "PROM-171",
+    "action": "self-reported",
+    "title": "DAG-composer wijst tickets aan verkeerde Morty-rol toe",
+    "severity": "high",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-08-20T15:55:44.200191+00:00",
+    "proposal_id": "PROM-172",
+    "action": "self-reported",
+    "title": "Delegate-timeout hardcoded op 600s, niet complexity-aware",
+    "severity": "medium",
+    "category": "self-diagnosed"
+  },
+  {
+    "timestamp": "2026-09-27T18:43:21.730963+00:00",
+    "proposal_id": "PROM-173",
+    "action": "created",
+    "title": "Use the CLI's native --json-schema for all helper JSON calls",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-09-27T18:43:21.735033+00:00",
+    "proposal_id": "PROM-174",
+    "action": "created",
+    "title": "Two-gate refute-or-promote reviewer with cold-start context asymmetry",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-09-27T18:43:21.737800+00:00",
+    "proposal_id": "PROM-175",
+    "action": "created",
+    "title": "Mid-run structured note-taking so interrupted tickets resume from a checkpoint",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-09-27T18:43:21.740429+00:00",
+    "proposal_id": "PROM-176",
+    "action": "created",
+    "title": "Derive the MCP tool block from the role's real allowlist instead of hardcoding six tools",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-09-27T18:43:21.743360+00:00",
+    "proposal_id": "PROM-177",
+    "action": "created",
+    "title": "Move the stable persona prefix into the system prompt via --append-system-prompt-file",
+    "category": "prompt-engineering"
+  },
+  {
+    "timestamp": "2026-09-27T18:48:52.358364+00:00",
+    "proposal_id": "PROM-173",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-09-27T18:53:06.448809+00:00",
+    "proposal_id": "PROM-174",
+    "action": "applied",
+    "title": "Two-gate refute-or-promote reviewer with cold-start context asymmetry",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/schemas.py",
+      "agents/reviewer-morty.json"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T18:57:29.260055+00:00",
+    "proposal_id": "PROM-175",
+    "action": "applied",
+    "title": "Mid-run structured note-taking so interrupted tickets resume from a checkpoint",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/ticket.py"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T19:04:03.730437+00:00",
+    "proposal_id": "PROM-176",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-09-27T19:06:39.832865+00:00",
+    "proposal_id": "PROM-158",
+    "action": "applied",
+    "title": "Sprint error messages truncated in console output",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T19:11:39.965559+00:00",
+    "proposal_id": "PROM-177",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-09-27T19:32:07.407292+00:00",
+    "proposal_id": "PROM-178",
+    "action": "created",
+    "title": "Isolate Morty MCP surface with --strict-mcp-config",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-09-27T19:32:07.412534+00:00",
+    "proposal_id": "PROM-179",
+    "action": "needs-human",
+    "reason": "self-protection",
+    "title": "Add --fallback-model so overload does not kill unattended runs"
+  },
+  {
+    "timestamp": "2026-09-27T19:32:07.416170+00:00",
+    "proposal_id": "PROM-180",
+    "action": "created",
+    "title": "Propagate Morty guardrails into nested subagents via --append-subagent-system-prompt-file",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-09-27T19:32:07.419886+00:00",
+    "proposal_id": "PROM-181",
+    "action": "created",
+    "title": "Surface nested subagent and hook activity in the roro event stream",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-09-27T19:32:07.423873+00:00",
+    "proposal_id": "PROM-182",
+    "action": "created",
+    "title": "Run throwaway helper calls with --bare and --no-session-persistence",
+    "category": "tooling"
+  },
+  {
+    "timestamp": "2026-09-27T19:33:38.253794+00:00",
+    "proposal_id": "PROM-171",
+    "action": "applied",
+    "title": "DAG-composer wijst tickets aan verkeerde Morty-rol toe",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T19:35:46.602130+00:00",
+    "proposal_id": "PROM-172",
+    "action": "applied",
+    "title": "Delegate-timeout hardcoded op 600s, niet complexity-aware",
+    "target_files": [
+      "scripts/orchestrate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T19:37:22.388665+00:00",
+    "proposal_id": "PROM-156",
+    "action": "applied",
+    "title": "Default 600s delegate timeout too short for L/XL tickets",
+    "target_files": [
+      "scripts/delegate.py"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T19:43:01.914257+00:00",
+    "proposal_id": "PROM-178",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-09-27T19:48:02.055165+00:00",
+    "proposal_id": "PROM-180",
+    "action": "failed",
+    "reason": "Evolve timed out after 300s"
+  },
+  {
+    "timestamp": "2026-09-27T19:49:31.665882+00:00",
+    "proposal_id": "PROM-152",
+    "action": "applied",
+    "title": "team create: template registry leeg in projectworkspaces",
+    "target_files": [
+      "scripts/team.py"
+    ]
+  },
+  {
+    "timestamp": "2026-09-27T19:55:19.377188+00:00",
+    "proposal_id": "PROM-173",
+    "action": "requeued",
+    "reason": "rejected only by the flat 300s evolve timeout; timeout now scales with effort/file size"
+  },
+  {
+    "timestamp": "2026-09-27T19:55:19.379620+00:00",
+    "proposal_id": "PROM-176",
+    "action": "requeued",
+    "reason": "rejected only by the flat 300s evolve timeout; timeout now scales with effort/file size"
+  },
+  {
+    "timestamp": "2026-09-27T19:55:19.382058+00:00",
+    "proposal_id": "PROM-177",
+    "action": "requeued",
+    "reason": "rejected only by the flat 300s evolve timeout; timeout now scales with effort/file size"
+  },
+  {
+    "timestamp": "2026-09-27T19:55:19.384116+00:00",
+    "proposal_id": "PROM-178",
+    "action": "requeued",
+    "reason": "rejected only by the flat 300s evolve timeout; timeout now scales with effort/file size"
+  },
+  {
+    "timestamp": "2026-09-27T19:55:19.386151+00:00",
+    "proposal_id": "PROM-180",
+    "action": "requeued",
+    "reason": "rejected only by the flat 300s evolve timeout; timeout now scales with effort/file size"
+  },
+  {
+    "timestamp": "2026-09-27T20:02:18.971311+00:00",
+    "proposal_id": "PROM-178",
+    "action": "applied",
+    "title": "Isolate Morty MCP surface with --strict-mcp-config",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/orchestrate.py"
+    ],
+    "collateral_changed": []
+  },
+  {
+    "timestamp": "2026-09-27T20:10:07.476429+00:00",
+    "proposal_id": "PROM-173",
+    "action": "applied",
+    "title": "Use the CLI's native --json-schema for all helper JSON calls",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/schemas.py"
+    ],
+    "collateral_changed": []
+  },
+  {
+    "timestamp": "2026-09-27T20:17:17.823108+00:00",
+    "proposal_id": "PROM-180",
+    "action": "applied",
+    "title": "Propagate Morty guardrails into nested subagents via --append-subagent-system-prompt-file",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/persona.py"
+    ],
+    "collateral_changed": []
+  },
+  {
+    "timestamp": "2026-09-27T20:37:52.247922+00:00",
+    "proposal_id": "PROM-176",
+    "action": "applied",
+    "title": "Derive the MCP tool block from the role's real allowlist instead of hardcoding six tools",
+    "target_files": [
+      "scripts/delegate.py",
+      "agents/fullstack-morty.json",
+      "scripts/persona.py"
+    ],
+    "collateral_changed": []
+  },
+  {
+    "timestamp": "2026-09-27T20:58:11.920352+00:00",
+    "proposal_id": "PROM-177",
+    "action": "applied",
+    "title": "Move the stable persona prefix into the system prompt via --append-system-prompt-file",
+    "target_files": [
+      "scripts/delegate.py",
+      "scripts/persona.py"
+    ],
+    "collateral_changed": []
   }
 ]

@@ -8,11 +8,13 @@ Now with Team Collaboration support — Morty's can work together!
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,21 +29,47 @@ err_console = Console(stderr=True)
 # effort-guidance reference and cache-TTL config used to build a cacheable
 # prompt prefix (see build_prompt()).
 try:
-    from persona import AGENT_PROFILES, COMPLEXITY_GUIDANCE, PROMPT_CACHE_TTL, build_effort_guidance_block
+    from persona import (
+        AGENT_PROFILES,
+        COMPLEXITY_GUIDANCE,
+        PROMPT_CACHE_TTL,
+        MCP_TOOL_DOCS,
+        DEFAULT_MCP_TOOLS,
+        build_effort_guidance_block,
+        build_subagent_guardrails,
+        resolve_mcp_tools,
+    )
 except ImportError:
     AGENT_PROFILES: dict = {}
     COMPLEXITY_GUIDANCE: dict = {}
     PROMPT_CACHE_TTL = "1h"
+    MCP_TOOL_DOCS: dict = {}
+    DEFAULT_MCP_TOOLS: list = ["get_ticket", "read_adr", "update_ticket_status"]
 
     def build_effort_guidance_block() -> str:
         return ""
 
+    def build_subagent_guardrails(agent_role: str) -> str:
+        return ""
+
+    def resolve_mcp_tools(card: dict, team_id: Optional[str] = None) -> list:
+        return []
+
 # Import routing schema + validator for strict structured-output routing
 # (smart_select_agent) — see schemas.validate_schema().
 try:
-    from schemas import ROUTING_DECISION_SCHEMA, validate_schema
+    from schemas import (
+        ROUTING_DECISION_SCHEMA,
+        AGENT_SCORING_SCHEMA,
+        REVIEW_CANDIDATE_SCHEMA,
+        REVIEW_KILL_VERDICT_SCHEMA,
+        validate_schema,
+    )
 except ImportError:
     ROUTING_DECISION_SCHEMA: dict = {}
+    AGENT_SCORING_SCHEMA: dict = {}
+    REVIEW_CANDIDATE_SCHEMA: dict = {}
+    REVIEW_KILL_VERDICT_SCHEMA: dict = {}
 
     def validate_schema(data, schema_def):
         return False, ["schemas module unavailable"]
@@ -893,7 +921,7 @@ def smart_select_agent(ticket: dict, root: Optional[Path] = None) -> tuple:
         f"{json.dumps(ROUTING_DECISION_SCHEMA)}"
     )
 
-    data = _call_helper_json(routing_prompt)
+    data = _call_helper_json(routing_prompt, schema=ROUTING_DECISION_SCHEMA)
     if data is None:
         # Transport error — no parseable reply at all.
         return fallback_agent, fallback_complexity
@@ -960,7 +988,7 @@ def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
         f'{{"{list(agent_caps.keys())[0]}": 7, ...}}. No other text.'
     )
 
-    data = _call_helper_json(scoring_prompt)
+    data = _call_helper_json(scoring_prompt, schema=AGENT_SCORING_SCHEMA)
     if data:
         try:
             valid = {k: float(v) for k, v in data.items() if k in agent_caps}
@@ -974,6 +1002,18 @@ def match_agent_cards(ticket: dict, root: Optional[Path] = None) -> str:
 
 
 # ── Scratchpad / Persistent Memory ──────────────────────────────────────────
+
+def _ticket_progress_path(root: Path, ticket_id: str) -> Path:
+    """Return the mid-run progress checkpoint path for a ticket, creating its dir.
+
+    Unlike the role scratchpad (cross-ticket, append-only), this file carries
+    only the current ticket's state — it's overwritten each phase so a killed
+    or requeued attempt can resume without re-reading everything from zero.
+    """
+    progress_dir = root / ".cto" / "scratchpad" / "progress"
+    progress_dir.mkdir(parents=True, exist_ok=True)
+    return progress_dir / f"{ticket_id}.md"
+
 
 def _ensure_scratchpad(root: Path, agent_role: str) -> Path:
     """Return the scratchpad path for agent_role, creating it if needed."""
@@ -1282,6 +1322,17 @@ _COMPLEXITY_BUDGET_MAP = {
 }
 _MIN_TASK_BUDGET = 20_000
 
+# Default delegate_to_agent timeout (seconds) scaled by ticket complexity, so
+# an L/XL ticket isn't killed mid-flight by the flat 600s default. --timeout
+# on the CLI always overrides this.
+_COMPLEXITY_TIMEOUT_MAP = {
+    "XL": 2700,
+    "L": 1800,
+    "M": 900,
+    "S": 600,
+}
+_DEFAULT_TIMEOUT = 600
+
 _COMPLEXITY_EFFORT_MAP = {
     "XL": "max",
     "L": "high",
@@ -1303,6 +1354,8 @@ _EXTENDED_THINKING_ROLES = frozenset({"architect-morty", "security-morty"})
 _claude_effort_supported: Optional[bool] = None
 _claude_thinking_supported: Optional[bool] = None
 _claude_output_format_json_supported: Optional[bool] = None
+_claude_json_schema_supported: Optional[bool] = None
+_claude_flag_support_cache: dict = {}
 _last_session_id: Optional[str] = None
 _last_stream_usage: dict = {}  # populated from stream-json 'result' event
 
@@ -1409,6 +1462,161 @@ def _check_claude_output_format_json_support() -> bool:
     return _claude_output_format_json_supported
 
 
+def _check_claude_json_schema_support() -> bool:
+    """Return True if the installed claude CLI supports --json-schema."""
+    global _claude_json_schema_supported
+    if _claude_json_schema_supported is not None:
+        return _claude_json_schema_supported
+    try:
+        result = subprocess.run(
+            ["claude", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        _claude_json_schema_supported = "--json-schema" in (result.stdout + result.stderr)
+    except Exception:
+        _claude_json_schema_supported = False
+    return _claude_json_schema_supported
+
+
+_claude_help_flags_cache: Optional[set] = None
+
+
+def _claude_help_flags() -> set:
+    """All long flags advertised by `claude --help`, with bracket shorthand
+    expanded: `--append-system-prompt[-file]` yields both
+    `--append-system-prompt` and `--append-system-prompt-file`. Cached."""
+    global _claude_help_flags_cache
+    if _claude_help_flags_cache is not None:
+        return _claude_help_flags_cache
+    flags: set = set()
+    try:
+        result = subprocess.run(
+            ["claude", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        for m in re.finditer(r"(--[a-z0-9][a-z0-9-]*)((?:\[-[a-z0-9-]+\])*)", result.stdout + result.stderr):
+            base, brackets = m.group(1), m.group(2)
+            flags.add(base)
+            for opt in re.findall(r"\[(-[a-z0-9-]+)\]", brackets):
+                flags.add(base + opt)
+    except Exception:
+        pass
+    _claude_help_flags_cache = flags
+    return flags
+
+
+def _probe_claude_flag(flag: str) -> bool:
+    """Live probe for a flag `--help` does not advertise (e.g. the 2.1.x
+    --append-subagent-system-prompt-file). The bogus --mcp-config path makes
+    the CLI fail *after* option parsing but *before* any API call, so the
+    only signal we read is commander's "unknown option" error."""
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+            fh.write("probe\n")
+            tmp_path = fh.name
+        result = subprocess.run(
+            ["claude", "-p", "--no-session-persistence", flag, tmp_path,
+             "--mcp-config", "/nonexistent/cto-flag-probe.json", "--", "ping"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            stdin=subprocess.DEVNULL,
+        )
+        out = (result.stdout + result.stderr).lower()
+        if "unknown option" in out:
+            return False
+        # Only the expected post-parse failure counts as proof; anything else
+        # (auth error, mocked output, crash) is treated as "unsupported".
+        return "mcp config" in out or "mcp configuration" in out
+    except Exception:
+        return False
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+def _reset_claude_flag_caches() -> None:
+    """Forget every cached CLI-capability probe (tests, or after a CLI upgrade
+    mid-process)."""
+    global _claude_help_flags_cache
+    global _claude_append_subagent_prompt_file_supported, _claude_append_subagent_prompt_inline_supported
+    global _claude_append_system_prompt_file_supported, _claude_exclude_dynamic_system_prompt_sections_supported
+    _claude_help_flags_cache = None
+    _claude_flag_support_cache.clear()
+    _claude_append_subagent_prompt_file_supported = None
+    _claude_append_subagent_prompt_inline_supported = None
+    _claude_append_system_prompt_file_supported = None
+    _claude_exclude_dynamic_system_prompt_sections_supported = None
+
+
+def _check_claude_flag_support(flag: str) -> bool:
+    """Return True if the installed claude CLI supports the given flag.
+    Checks `--help` first (with `[-file]` shorthand expanded), then falls back
+    to a cheap live probe for flags the help text omits. Cached per process."""
+    if flag in _claude_flag_support_cache:
+        return _claude_flag_support_cache[flag]
+    supported = flag in _claude_help_flags()
+    if not supported:
+        supported = _probe_claude_flag(flag)
+    _claude_flag_support_cache[flag] = supported
+    return supported
+
+
+_claude_append_subagent_prompt_file_supported: Optional[bool] = None
+_claude_append_subagent_prompt_inline_supported: Optional[bool] = None
+
+
+def _check_claude_append_subagent_prompt_file_support() -> bool:
+    """Return True if the installed claude CLI supports --append-subagent-system-prompt-file."""
+    global _claude_append_subagent_prompt_file_supported
+    if _claude_append_subagent_prompt_file_supported is not None:
+        return _claude_append_subagent_prompt_file_supported
+    _claude_append_subagent_prompt_file_supported = _check_claude_flag_support("--append-subagent-system-prompt-file")
+    return _claude_append_subagent_prompt_file_supported
+
+
+def _check_claude_append_subagent_prompt_inline_support() -> bool:
+    """Return True if the installed claude CLI supports --append-subagent-system-prompt (inline)."""
+    global _claude_append_subagent_prompt_inline_supported
+    if _claude_append_subagent_prompt_inline_supported is not None:
+        return _claude_append_subagent_prompt_inline_supported
+    _claude_append_subagent_prompt_inline_supported = _check_claude_flag_support("--append-subagent-system-prompt")
+    return _claude_append_subagent_prompt_inline_supported
+
+
+def build_subagent_guardrail_args(root: Path, agent_role: str) -> list:
+    """Return argv args that propagate persona guardrails into nested Task subagents.
+
+    A delegated Morty can spawn its own Task subagents, which otherwise inherit
+    none of the persona contract (tool scope, never-touch-node_modules,
+    never-git-push, etc. — see persona.build_subagent_guardrails()). Prefers
+    --append-subagent-system-prompt-file (writes the block to
+    .cto/session/subagent_prompt_<role>.txt so it survives argv length limits),
+    falls back to the inline --append-subagent-system-prompt flag on older
+    CLIs, and no-ops if the installed CLI supports neither.
+    """
+    guardrails = build_subagent_guardrails(agent_role)
+    if not guardrails:
+        return []
+    if _check_claude_append_subagent_prompt_file_support():
+        session_dir = root / ".cto" / "session"
+        session_dir.mkdir(parents=True, exist_ok=True)
+        prompt_path = session_dir / f"subagent_prompt_{agent_role}.txt"
+        prompt_path.write_text(guardrails)
+        return ["--append-subagent-system-prompt-file", str(prompt_path)]
+    if _check_claude_append_subagent_prompt_inline_support():
+        return ["--append-subagent-system-prompt", guardrails]
+    return []
+
+
 # ── Native Subagent Support ─────────────────────────────────────────────────
 # Migrates Morty tool-scoping from hand-rolled --allowedTools (AGENT_PROFILES /
 # ROLE_TOOL_ALLOWLISTS) to native Claude Code subagent definitions in
@@ -1460,18 +1668,108 @@ def use_native_subagent(root: Path, agent_role: str) -> bool:
     return _check_claude_agent_flag_support()
 
 
-def _call_helper_json(prompt: str, model: str = "claude-haiku-4-5-20251001", timeout: int = 30) -> Optional[dict]:
+# ── Cache-Optimized System Prompt ───────────────────────────────────────────
+# Moves the stable persona/role/effort-guidance prefix (build_system_prefix())
+# out of the `-p` user message and into an actual system prompt via
+# --append-system-prompt-file, paired with --exclude-dynamic-system-prompt-sections
+# to evict the per-machine cwd/env/memory-path/git-status sections the CLI
+# otherwise puts ahead of everything else in the default system prompt — those
+# sections change every run and were poisoning the cache prefix. Gated behind
+# .cto/config.json's cache_optimized_prompt.enabled (default off) so the
+# existing full-prompt-as-`-p` path keeps working while parity is validated —
+# same staged-rollout pattern as native_subagents.enabled above.
+
+_claude_append_system_prompt_file_supported: Optional[bool] = None
+_claude_exclude_dynamic_system_prompt_sections_supported: Optional[bool] = None
+
+
+def _check_claude_append_system_prompt_file_support() -> bool:
+    """Return True if the installed claude CLI supports --append-system-prompt-file."""
+    global _claude_append_system_prompt_file_supported
+    if _claude_append_system_prompt_file_supported is not None:
+        return _claude_append_system_prompt_file_supported
+    _claude_append_system_prompt_file_supported = _check_claude_flag_support("--append-system-prompt-file")
+    return _claude_append_system_prompt_file_supported
+
+
+def _check_claude_exclude_dynamic_system_prompt_sections_support() -> bool:
+    """Return True if the installed claude CLI supports --exclude-dynamic-system-prompt-sections."""
+    global _claude_exclude_dynamic_system_prompt_sections_supported
+    if _claude_exclude_dynamic_system_prompt_sections_supported is not None:
+        return _claude_exclude_dynamic_system_prompt_sections_supported
+    _claude_exclude_dynamic_system_prompt_sections_supported = _check_claude_flag_support("--exclude-dynamic-system-prompt-sections")
+    return _claude_exclude_dynamic_system_prompt_sections_supported
+
+
+def use_cache_optimized_prompt(root: Path) -> bool:
+    """Return True if the stable persona prefix should be sent as a real system
+    prompt instead of being smuggled into the `-p` user message.
+
+    Requires cache_optimized_prompt.enabled in .cto/config.json AND an
+    installed CLI that supports both --append-system-prompt-file and
+    --exclude-dynamic-system-prompt-sections. Any missing piece silently
+    falls back to today's behaviour of sending the whole prompt via `-p`.
+    Never applies on `claude --resume` — see the resume branch in
+    delegate_to_agent(), and persona.prefix_cache_control()'s note that
+    --system-prompt-snapshot replays the first launch's system prompt
+    verbatim on every resume.
+    """
+    try:
+        cfg = load_config(root)
+    except Exception:
+        return False
+    if not cfg.get("cache_optimized_prompt", {}).get("enabled", False):
+        return False
+    return (
+        _check_claude_append_system_prompt_file_support()
+        and _check_claude_exclude_dynamic_system_prompt_sections_support()
+    )
+
+
+def _call_helper_json(
+    prompt: str,
+    model: str = "claude-haiku-4-5-20251001",
+    timeout: int = 30,
+    schema: Optional[dict] = None,
+) -> Optional[dict]:
     """Call a Haiku helper subprocess and return the parsed JSON response.
 
-    Appends a strict JSON-only instruction to the prompt. When --output-format
-    json is supported by the installed CLI, uses it and reads the 'result' field.
-    Falls back to regex extraction. Retries once on JSONDecodeError.
+    When *schema* is given and the installed CLI supports --json-schema,
+    invokes grammar-constrained decoding via --output-format json
+    --json-schema and reads the structured reply directly — no prose
+    JSON-only instruction, no regex scraping, and no blind retry, since the
+    CLI itself guarantees the reply conforms to *schema*.
+
+    Otherwise falls back to the legacy path: appends a strict JSON-only
+    instruction to the prompt, uses --output-format json when supported
+    (reading the 'result' field) or raw stdout otherwise, regex-extracts a
+    {...} block, and retries once on parse failure.
+
     Returns the parsed dict or None on any failure.
     """
-    json_suffix = "\n\nIMPORTANT: Respond with ONLY valid JSON — no prose, no markdown, no code fences."
-    full_prompt = prompt + json_suffix
     resolved_model = _resolve_model_for_cli(model)
     env = _clean_subprocess_env()
+
+    if schema is not None and _check_claude_json_schema_support() and _check_claude_output_format_json_support():
+        try:
+            r = subprocess.run(
+                ["claude", "-p", "--model", resolved_model, "--output-format", "json",
+                 "--json-schema", json.dumps(schema), "--", prompt],
+                capture_output=True, text=True, timeout=timeout, env=env,
+            )
+            outer = json.loads(r.stdout.strip())
+            structured = outer.get("structured_output")
+            if isinstance(structured, dict):
+                return structured
+            data = json.loads(outer.get("result", ""))
+            if isinstance(data, dict):
+                return data
+            return None
+        except Exception:
+            return None
+
+    json_suffix = "\n\nIMPORTANT: Respond with ONLY valid JSON — no prose, no markdown, no code fences."
+    full_prompt = prompt + json_suffix
 
     def _run() -> str:
         if _check_claude_output_format_json_support():
@@ -1634,26 +1932,49 @@ def _render_fewshot_examples(examples: list[dict]) -> str:
     return "\n".join(blocks)
 
 
-def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None, task_budget: Optional[int] = None) -> str:
-    """Assemble the full prompt for the sub-agent.
+def _check_mcp_tool_mismatch(root: Path, agent_role: str, ticket_id: str, mcp_tool_names: list) -> None:
+    """Log a prompt_tool_mismatch event if the prompt would advertise an MCP
+    tool this role's tool scope doesn't actually grant.
 
-    The prompt is split into a STABLE PREFIX (persona, role rules, and the
-    full effort-guidance table — byte-identical for every ticket this role
-    picks up in a sprint) followed by a VOLATILE SUFFIX (ticket body, file
-    context, sprint/memory state). The stable content is assembled first so
-    Anthropic's prompt cache can reuse it across delegations instead of
-    re-writing it every 5 minutes — see persona.PROMPT_CACHE_TTL.
+    Best-effort only: when native `--agent` dispatch is active for this role,
+    the .claude/agents/{role}.md profile is the authoritative tool scope and
+    isn't parsed here, so the check is skipped rather than guessing.
+    """
+    if not mcp_tool_names or use_native_subagent(root, agent_role):
+        return
+    profile = AGENT_PROFILES.get(agent_role, {})
+    allowed = profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
+    wildcard = "mcp__cto-orchestrator__*" in allowed
+    for name in mcp_tool_names:
+        if wildcard or f"mcp__cto-orchestrator__{name}" in allowed:
+            continue
+        append_log(root, {
+            "timestamp": now_iso(),
+            "ticket_id": ticket_id,
+            "agent_role": agent_role,
+            "event": "prompt_tool_mismatch",
+            "tool": name,
+            "reason": "advertised in prompt but not granted by role's --allowedTools",
+        })
 
-    Context is kept minimal here — agents pull ADRs, related ticket details,
-    and team state on-demand via MCP tools (get_ticket, get_team_context,
-    read_adr, reserve_files, send_team_message) instead of bloating the prompt.
+
+def build_system_prefix(root: Path, agent_role: str) -> str:
+    """Assemble the STABLE PREFIX portion of the agent prompt.
+
+    Persona, role rules, the full effort-guidance table, and the
+    reasoning/execution protocols are byte-identical for every ticket this
+    role picks up in a sprint, so they live here rather than in
+    build_task_prompt(). Split out of the former build_prompt() so this
+    content can be sent as an actual system prompt (see
+    use_cache_optimized_prompt() and delegate_to_agent()) instead of being
+    smuggled into the `-p` user message ahead of per-ticket content — a
+    direct Anthropic SDK call would additionally attach
+    persona.prefix_cache_control() (ttl="1h") to this prefix's last content
+    block.
 
     Args:
         root: Project root path
-        ticket: Ticket dict
         agent_role: Role of the agent
-        team_id: Optional team session ID for team collaboration context
-        task_budget: Optional advisory token budget (Opus 4.7 task_budget feature)
     """
     card = load_agent_card(agent_role, root=root) or load_agent_card("fullstack-morty", root=root)
     role_prompt = _build_agent_prompt(
@@ -1671,19 +1992,18 @@ def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[st
         f"</available_tools>\n"
     )
 
-    # ── STABLE PREFIX ────────────────────────────────────────────────────
     # role_prompt, allowed_tools_block, and the effort-guidance table are
     # identical for every ticket this role runs this sprint (the agent card,
     # rubric, and guidance tables don't change mid-sprint), so they're
-    # assembled first, unmodified, ahead of any per-ticket content below.
-    # The `claude -p` CLI path has no cache_control hook, so consistent
-    # prefix ordering is the only lever available here; a direct Anthropic
-    # SDK call would additionally attach persona.prefix_cache_control()
-    # (ttl="1h") to this prefix's last content block.
+    # assembled first, unmodified, ahead of the protocol/rules blocks below.
     stable_prefix = f"""{role_prompt}
 
 {allowed_tools_block}{build_effort_guidance_block()}
 """
+    # Ordered identity/specialization → rules/conventions → protocols →
+    # output contract → anti-patterns, with common_mistakes LAST so it reads
+    # as a final checklist against everything defined above it instead of
+    # being buried ahead of the output contract.
     stable_prefix += """
 <reasoning_protocol>
 Use your internal thinking to reason deeply, then show a brief summary of your approach before executing.
@@ -1697,6 +2017,19 @@ If extended thinking is not available, follow this fallback sequence:
 
 Show a brief summary of your approach before diving into implementation — Rick respects agents who think before they code.
 </reasoning_protocol>
+
+<progress_protocol>
+Your run can be killed by a timeout, context compaction, or a requeue before you finish — the next attempt (possibly a fresh instance with no memory of this conversation) needs a checkpoint to resume from instead of starting over.
+
+After each of ANALYZE, PLAN, EXECUTE, and SELF_CRITIQUE, OVERWRITE (never append — this file must stay a bounded, current snapshot) a checkpoint of ≤30 lines at `.cto/scratchpad/progress/<TICKET_ID>.md`, where `<TICKET_ID>` is this ticket's ID (given in your mission below). Use exactly these four sections:
+
+PHASE: <ANALYZE|PLAN|EXECUTE|SELF_CRITIQUE>
+DONE: <files already changed, and what changed in each — empty if none yet>
+NEXT: <the single next action to take>
+UNKNOWNS: <open questions or unverified assumptions>
+
+If a `<resumed_progress>` block appears below, a previous attempt at this exact ticket left that checkpoint — treat it as the source of truth over your own recollection, but verify each DONE item with Read/Grep before trusting it.
+</progress_protocol>
 
 <self_critique>
 After EXECUTE and before emitting the JSON report, perform a structured self-check:
@@ -1716,18 +2049,6 @@ After EXECUTE and before emitting the JSON report, perform a structured self-che
 - VERIFY by reading each file before modifying it — never assume its contents from prior reasoning; use Read/Grep on every file you intend to touch.
 - Address EVERY acceptance criterion individually — completing one does NOT implicitly satisfy similar ones.
 </execution_rules>
-
-<common_mistakes>NEVER do any of these — Rick has seen enough Jerry behavior:
-
-❌ WRONG: "I recommend creating a file at src/auth.py with the following content..." (describing instead of doing)
-✅ RIGHT: Actually create src/auth.py with the implementation.
-
-❌ WRONG: "Should I proceed with approach A or B?" (asking permission)
-✅ RIGHT: Pick the best approach, implement it, document why in the report.
-
-❌ WRONG: Adding logging, refactoring, or extra features not in the ticket (scope creep)
-✅ RIGHT: Complete exactly what the ticket asks — nothing more, nothing less.
-</common_mistakes>
 
 <output_format>
 End your work with a JSON report inside EXACTLY these XML tags — no other summary format needed:
@@ -1754,13 +2075,41 @@ As a backup, also emit a `## Files changed` markdown block listing every file yo
 - path/to/file1.py
 - path/to/file2.py
 </output_format>
-"""
 
-    # ── VOLATILE SUFFIX ──────────────────────────────────────────────────
-    # Everything below is per-ticket: budget, file scope, ticket body,
-    # sprint/memory state, and few-shot examples. None of it is assumed
-    # stable across tickets, so it's appended after the cacheable prefix
-    # rather than interleaved with it.
+<common_mistakes>NEVER do any of these — Rick has seen enough Jerry behavior:
+
+❌ WRONG: "I recommend creating a file at src/auth.py with the following content..." (describing instead of doing)
+✅ RIGHT: Actually create src/auth.py with the implementation.
+
+❌ WRONG: "Should I proceed with approach A or B?" (asking permission)
+✅ RIGHT: Pick the best approach, implement it, document why in the report.
+
+❌ WRONG: Adding logging, refactoring, or extra features not in the ticket (scope creep)
+✅ RIGHT: Complete exactly what the ticket asks — nothing more, nothing less.
+</common_mistakes>
+"""
+    return stable_prefix
+
+
+def build_task_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None, task_budget: Optional[int] = None) -> str:
+    """Assemble the VOLATILE SUFFIX portion of the agent prompt.
+
+    Everything here is per-ticket: budget, file scope, ticket body,
+    sprint/memory state, and few-shot examples. None of it is assumed
+    stable across tickets, so it's kept out of build_system_prefix().
+
+    Context is kept minimal here — agents pull ADRs, related ticket details,
+    and team state on-demand via MCP tools (get_ticket, get_team_context,
+    read_adr, reserve_files, send_team_message) instead of bloating the prompt.
+
+    Args:
+        root: Project root path
+        ticket: Ticket dict
+        agent_role: Role of the agent
+        team_id: Optional team session ID for team collaboration context
+        task_budget: Optional advisory token budget (Opus 4.7 task_budget feature)
+    """
+    card = load_agent_card(agent_role, root=root) or load_agent_card("fullstack-morty", root=root)
     target_files = ticket.get("target_files") or []
     if target_files:
         task_boundaries_block = (
@@ -1813,6 +2162,25 @@ As a backup, also emit a `## Files changed` markdown block listing every file yo
     adr_names = [fp.stem for fp in sorted(dd.glob("*.md"))] if dd.exists() else []
     adr_list = ", ".join(adr_names) if adr_names else "(none)"
 
+    # Curate the MCP tool doc block from this role's real allowlist
+    # (agents/{role}.json `mcp_tools`, via resolve_mcp_tools) intersected with
+    # persona.MCP_TOOL_DOCS, instead of hardcoding the same six tools for every
+    # role and every delegation — a solo run no longer gets told about
+    # team-only tools it has no team_id to use.
+    mcp_tool_names = resolve_mcp_tools(card, team_id)
+    _check_mcp_tool_mismatch(root, agent_role, ticket.get("id", "?"), mcp_tool_names)
+    mcp_tool_lines = []
+    for _mcp_name in mcp_tool_names:
+        _doc = MCP_TOOL_DOCS.get(_mcp_name, "")
+        if _mcp_name == "read_adr":
+            _doc += f"\n  Available ADRs: {adr_list}"
+        elif _mcp_name == "get_ticket":
+            _doc += f"\n  Related ticket IDs: {related_summary}"
+        elif _mcp_name == "get_team_context" and team_id:
+            _doc += f" Your team_id: {team_id}"
+        mcp_tool_lines.append(f"- {_doc}")
+    mcp_tools_block = "\n".join(mcp_tool_lines) if mcp_tool_lines else "(none available for this role)"
+
     team_delegation_note = ""
     contract_note = ""
     if team_id:
@@ -1842,7 +2210,26 @@ As a backup, also emit a `## Files changed` markdown block listing every file yo
             f"finish gracefully as the budget approaches exhaustion.\n\n"
         )
 
-    volatile_suffix = f"""{budget_section}{task_boundaries_block}{review_feedback_block}
+    # Resume support: only a ticket that's already been requeued/retried has a
+    # meaningful checkpoint to resume from — a first attempt (requeue_count == 0)
+    # never sees this block, keeping the cold-start prompt unchanged.
+    resumed_progress_block = ""
+    if int(ticket.get("requeue_count", 0) or 0) > 0:
+        progress_fp = _ticket_progress_path(root, ticket["id"])
+        if progress_fp.exists():
+            progress_text = progress_fp.read_text().strip()
+            if progress_text:
+                safe_progress = wrap_untrusted_content(progress_text[:2000], label="RESUMED_PROGRESS")
+                resumed_progress_block = (
+                    f"<resumed_progress>\n"
+                    f"A previous attempt at THIS ticket was interrupted. Verify each DONE item "
+                    f"with Read/Grep before trusting it, then continue from NEXT — do not restart "
+                    f"from scratch.\n"
+                    f"{safe_progress}\n"
+                    f"</resumed_progress>\n"
+                )
+
+    volatile_suffix = f"""{budget_section}{task_boundaries_block}{review_feedback_block}{resumed_progress_block}
 ## Your Mission, Morty
 
 **Ticket {ticket['id']}**: {ticket['title']}
@@ -1861,14 +2248,7 @@ As a backup, also emit a `## Files changed` markdown block listing every file yo
 
 ### Context available via MCP tools
 You have MCP tools to pull context on-demand — use them instead of guessing:
-- **read_adr(name)** — Read an Architecture Decision Record. Pass `*` to list all.
-  Available ADRs: {adr_list}
-- **get_ticket(ticket_id)** — Read full ticket data including agent output and dependencies.
-  Related ticket IDs: {related_summary}
-- **get_team_context(team_id)** — Read shared team decisions, interfaces, and messages.{f" Your team_id: {team_id}" if team_id else " (solo delegation — no team)"}
-- **reserve_files(team_id, files)** — Reserve files before modifying to prevent teammate conflicts.
-- **send_team_message(team_id, to, message, msg_type)** — Send a message to a teammate.
-- **update_ticket_status(ticket_id, status, output)** — Report interim progress to Rick.
+{mcp_tools_block}
 {team_delegation_note}{contract_note}"""
 
     # Inject sprint context for downstream agents (PROM-008).
@@ -1966,7 +2346,22 @@ Now execute the ticket. After completing all work, your FINAL output must be the
 
 Begin:
 """
-    return stable_prefix + volatile_suffix
+    return volatile_suffix
+
+
+def build_prompt(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None, task_budget: Optional[int] = None) -> str:
+    """Assemble the full prompt for the sub-agent.
+
+    Thin wrapper concatenating build_system_prefix() (stable, cacheable) and
+    build_task_prompt() (per-ticket) so every existing caller that expects one
+    combined prompt string keeps working unchanged. delegate_to_agent() peels
+    the two apart again internally when use_cache_optimized_prompt() is on,
+    to send the stable part as a real system prompt instead.
+    """
+    return (
+        build_system_prefix(root, agent_role)
+        + build_task_prompt(root, ticket, agent_role, team_id=team_id, task_budget=task_budget)
+    )
 
 
 def _reformat_retry_haiku(output: str) -> Optional[dict]:
@@ -2267,21 +2662,117 @@ def _collect_review_diff(root: Path, files_changed: list) -> str:
         return ""
 
 
-def review_ticket(root: Path, ticket: dict, handoff: dict, model: str = "sonnet", timeout: int = 120) -> dict:
-    """Spawn a dedicated reviewer-morty to adversarially check a worker's handoff.
+# Only candidates that survive gate 2 at this severity and confidence become
+# real issues — a nit or a shaky guess should never trigger a rework loop.
+_REVIEW_PROMOTE_SEVERITIES = {"blocker", "major"}
+_REVIEW_MIN_CONFIDENCE = 0.7
 
-    Independent from the implementing agent: reviews the git diff of the files
-    the worker touched against the ticket's acceptance criteria and its own
-    summary, and reports whether the work should be accepted. Defaults to
-    approved=True when there's nothing to check or the review call itself
+# Calibrates gate 1's severity/confidence judgment with one confirmed blocker
+# and one plausible-but-wrong false positive, per LLM-judge calibration
+# guidance. The false positive is deliberately the kind of finding gate 2's
+# kill mandate is built to catch: sounds right, diff proves otherwise.
+_REVIEW_FEWSHOT_EXAMPLES = """Calibration examples (how to judge severity and confidence):
+
+Example 1 — CONFIRMED BLOCKER (would PROMOTE):
+Criterion: "Password reset tokens must expire after 1 hour."
+Diff adds `generate_reset_token()`, which creates and stores a token with no `expires_at` field, and `validate_reset_token()` never checks an expiry at all.
+-> candidate: {"criterion": "Password reset tokens must expire after 1 hour", "claim": "Reset tokens are never expired — no expires_at is set or checked", "severity": "blocker", "evidence": "auth.py:142-158", "confidence": 0.95}
+This survives gate 2: the diff has no expiry branch anywhere, so it cannot be disproven.
+
+Example 2 — PLAUSIBLE BUT WRONG (would get KILLed):
+Criterion: "Reject null user input before processing."
+First instinct: "There's no null check before `user.name.strip()` on line 40."
+But the diff two lines up (line 38) shows `if user is None: return error_response(...)`, which already guards the whole block.
+Do not raise this as a confident candidate — if raised at all, confidence should be low, and gate 2 will KILL it by quoting auth.py:38 as the guard that already handles it.
+"""
+
+
+def _build_gate1_review_prompt(ticket: dict, criteria_text: str, diff_block: str) -> str:
+    """Build the GATE 1 (detect, cold-start) prompt.
+
+    Deliberately built from acceptance criteria + diff ONLY — no worker
+    summary/description is included, so the reviewer judges the diff on its
+    own merits instead of anchoring on the implementer's framing of what
+    they did.
+    """
+    return (
+        "You are an independent, skeptical code reviewer. You have NOT been shown "
+        "the implementer's own account of what they did — review the diff on its "
+        "own merits against the acceptance criteria only.\n\n"
+        "Flag every issue you find as a structured candidate — do not just narrate. "
+        "Each candidate needs the criterion it violates, a severity, an evidence "
+        "pointer (file:line) into the diff, and your honest confidence (0-1) that "
+        "it's real. A second, independent reviewer will try to disprove each "
+        "candidate next, so do not inflate confidence to make a point.\n\n"
+        f"{_REVIEW_FEWSHOT_EXAMPLES}\n"
+        f"Ticket: {ticket.get('id', '?')} — {ticket.get('title', '')}\n\n"
+        f"Acceptance criteria:\n{criteria_text}\n\n"
+        f"Diff:\n{diff_block}\n\n"
+        "Respond with ONLY a JSON object matching EXACTLY this schema, no other text:\n"
+        f"{json.dumps(REVIEW_CANDIDATE_SCHEMA)}"
+    )
+
+
+def _build_gate2_refute_prompt(criterion: str, claim: str, evidence: str, diff_block: str) -> str:
+    """Build the GATE 2 (refute, cross-model) prompt for a single candidate."""
+    return (
+        "A different reviewer flagged the finding below. Your job is to DISPROVE "
+        "this finding using the diff. Default verdict is KILL. Only PROMOTE if you "
+        "can quote the exact diff line proving the criterion is unmet.\n\n"
+        f"Criterion: {criterion}\n"
+        f"Claimed issue: {claim}\n"
+        f"Cited evidence: {evidence}\n\n"
+        f"Diff:\n{diff_block}\n\n"
+        "Respond with ONLY a JSON object matching EXACTLY this schema, no other text:\n"
+        f"{json.dumps(REVIEW_KILL_VERDICT_SCHEMA)}"
+    )
+
+
+def _resolve_cross_model_critic(root: Path, gate1_model: str) -> str:
+    """Pick gate 2's model — a different family/size than gate 1.
+
+    Reads review.cross_model_critic from .cto/config.json if set. Otherwise
+    defaults to the opposite end of the haiku/sonnet axis from gate 1, so the
+    two gates are never the same model judging its own finding.
+    """
+    try:
+        cfg = load_config(root)
+        configured = (cfg.get("review") or {}).get("cross_model_critic")
+        if configured:
+            return configured
+    except Exception:
+        pass
+    return "haiku" if "haiku" not in (gate1_model or "").lower() else "sonnet"
+
+
+def review_ticket(root: Path, ticket: dict, handoff: dict, model: str = "sonnet", timeout: int = 120) -> dict:
+    """Two-gate adversarial review of a worker's handoff: detect, then refute.
+
+    GATE 1 (detect, cold-start): an independent reviewer sees ONLY the
+    acceptance criteria and the git diff — never the worker's own summary —
+    and emits structured candidate issues (REVIEW_CANDIDATE_SCHEMA) instead of
+    free-text strings, so a nit and a blocker carry different weight.
+
+    GATE 2 (refute, cross-model): each candidate is re-checked by a different
+    model (review.cross_model_critic in .cto/config.json, defaulting to the
+    haiku/sonnet opposite of gate 1) under an explicit kill mandate — default
+    to KILL, only PROMOTE with a quoted diff line. This is meant to catch
+    plausible-but-wrong findings before they burn a whole re-delegation cycle.
+
+    Only candidates that survive gate 2 with severity in {blocker, major} and
+    confidence >= 0.7 become `issues`. Everything else is logged to
+    .cto/logs/{date}.jsonl under event review_candidate_killed, along with the
+    kill reason, so the rubric can be calibrated against real outcomes later.
+
+    Defaults to approved=True when there's nothing to check or gate 1 itself
     fails, so a broken reviewer never wedges the pipeline.
 
     Args:
         root: Project root path
         ticket: Ticket dict (id, title, acceptance_criteria)
-        handoff: Worker's parsed completion report (files_changed, description, ...)
-        model: Model alias for the reviewer subprocess
-        timeout: Subprocess timeout in seconds
+        handoff: Worker's parsed completion report (files_changed, ...)
+        model: Model alias for the gate-1 reviewer subprocess
+        timeout: Subprocess timeout in seconds, applied per gate call
 
     Returns:
         {"approved": bool, "issues": [str, ...]}
@@ -2290,37 +2781,90 @@ def review_ticket(root: Path, ticket: dict, handoff: dict, model: str = "sonnet"
     if not criteria:
         return {"approved": True, "issues": []}
 
+    ticket_id = ticket.get("id", "?")
     files_changed = handoff.get("files_changed") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria)
     diff = _collect_review_diff(root, files_changed)
-    diff_block = diff if diff else "(no git diff available — review the description below)"
+    diff_block = diff if diff else "(no git diff available)"
 
-    prompt = (
-        "You are an independent, skeptical code reviewer — NOT the agent that wrote this code. "
-        "Your job is to catch silently-wrong completions before they ship. "
-        "Review the diff below against the acceptance criteria and the worker's own summary. "
-        "Reject if any criterion is unmet, the diff looks incomplete, or the summary overstates what was done. "
-        'Return ONLY a JSON object: {"approved": true/false, "issues": ["specific, actionable issue", ...]}\n\n'
-        f"Ticket: {ticket.get('id', '?')} — {ticket.get('title', '')}\n\n"
-        f"Acceptance criteria:\n{criteria_text}\n\n"
-        f"Worker's summary: {(handoff.get('description') or '')[:1000]}\n\n"
-        f"Files changed: {', '.join(files_changed) or '(none reported)'}\n\n"
-        f"Diff:\n{diff_block}"
-    )
+    gate1_prompt = _build_gate1_review_prompt(ticket, criteria_text, diff_block)
+    gate1_data = _call_helper_json(gate1_prompt, model=model, timeout=timeout, schema=REVIEW_CANDIDATE_SCHEMA)
 
-    data = _call_helper_json(prompt, model=model, timeout=timeout)
-    if data is not None:
-        return {
-            "approved": bool(data.get("approved", True)),
-            "issues": [str(i) for i in (data.get("issues") or [])],
-        }
+    if gate1_data is None:
+        audit_log_security_event(
+            "review_error",
+            f"Reviewer-morty gate 1 failed for {ticket_id}: helper returned no JSON",
+            severity="info",
+        )
+        return {"approved": True, "issues": []}
 
-    audit_log_security_event(
-        "review_error",
-        f"Reviewer-morty pass failed for {ticket.get('id', '?')}: helper returned no JSON",
-        severity="info",
-    )
-    return {"approved": True, "issues": []}
+    is_valid, errors = validate_schema(gate1_data, REVIEW_CANDIDATE_SCHEMA)
+    if not is_valid:
+        audit_log_security_event(
+            "review_schema_validation_failed",
+            f"Reviewer-morty gate 1 reply failed schema validation for {ticket_id}: {'; '.join(errors)[:300]}",
+            severity="info",
+        )
+        return {"approved": True, "issues": []}
+
+    candidates = gate1_data.get("candidates") or []
+    if not candidates:
+        return {"approved": True, "issues": []}
+
+    gate2_model = _resolve_cross_model_critic(root, model)
+    surviving_issues: list[str] = []
+
+    for candidate in candidates:
+        severity = str(candidate.get("severity", "")).lower().strip()
+        try:
+            confidence = float(candidate.get("confidence", 0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        criterion = str(candidate.get("criterion", ""))[:300]
+        claim = str(candidate.get("claim", ""))[:500]
+        evidence = str(candidate.get("evidence", ""))[:200]
+
+        gate2_prompt = _build_gate2_refute_prompt(criterion, claim, evidence, diff_block)
+        gate2_data = _call_helper_json(gate2_prompt, model=gate2_model, timeout=timeout, schema=REVIEW_KILL_VERDICT_SCHEMA)
+
+        verdict = "KILL"
+        reason = "gate 2 call failed — defaulted to KILL"
+        if gate2_data is not None:
+            is_valid2, _ = validate_schema(gate2_data, REVIEW_KILL_VERDICT_SCHEMA)
+            if is_valid2:
+                verdict = str(gate2_data.get("verdict", "KILL")).upper().strip()
+                reason = str(gate2_data.get("reason", ""))[:500]
+
+        promoted = (
+            verdict == "PROMOTE"
+            and severity in _REVIEW_PROMOTE_SEVERITIES
+            and confidence >= _REVIEW_MIN_CONFIDENCE
+        )
+
+        if promoted:
+            surviving_issues.append(f"[{severity}] {criterion}: {claim} (evidence: {evidence})")
+            continue
+
+        if verdict == "PROMOTE":
+            reason = f"below severity/confidence bar (severity={severity}, confidence={confidence})"
+        append_log(root, {
+            "timestamp": now_iso(),
+            "ticket_id": ticket_id,
+            "event": "review_candidate_killed",
+            "candidate": {
+                "criterion": criterion,
+                "claim": claim,
+                "severity": severity,
+                "evidence": evidence,
+                "confidence": confidence,
+            },
+            "gate2_verdict": verdict,
+            "kill_reason": reason,
+            "gate1_model": model,
+            "gate2_model": gate2_model,
+        })
+
+    return {"approved": len(surviving_issues) == 0, "issues": surviving_issues}
 
 
 # ── Progress Phase Detection ─────────────────────────────────────────────────
@@ -2477,21 +3021,51 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             # fall back to ROLE_TOOL_ALLOWLISTS (security_utils) then the global default.
             _profile = AGENT_PROFILES.get(agent_role, {})
             allowed = _profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
+            # Narrow the blanket MCP wildcard down to this role's actual
+            # mcp_tools allowlist (agents/{role}.json, via resolve_mcp_tools)
+            # so unused MCP tool definitions stop entering the subprocess
+            # context window — mirrors the block build_prompt() renders.
+            if "mcp__cto-orchestrator__*" in allowed:
+                _role_card = load_agent_card(agent_role, root=delegate_root)
+                _role_mcp_tools = resolve_mcp_tools(_role_card, team_id)
+                allowed = [t for t in allowed if t != "mcp__cto-orchestrator__*"] + [
+                    f"mcp__cto-orchestrator__{name}" for name in _role_mcp_tools
+                ]
             cmd.extend(["--allowedTools", ",".join(allowed)])
+
+    # Propagate this role's guardrails (tool scope, never touch node_modules/
+    # lockfiles/.cto state, never git push, report file paths, don't close
+    # tickets) into any Task subagent this Morty spawns — closes the gap where
+    # nested agents inherited none of the persona contract (PROM-163).
+    cmd.extend(build_subagent_guardrail_args(delegate_root, agent_role))
 
     # Attach MCP server so agents can query/update CTO state during execution
     mcp_server = Path(__file__).parent / "mcp_server.py"
     if mcp_server.exists():
-        import json as _json
-        mcp_config = _json.dumps({
+        mcp_config = {
             "mcpServers": {
                 "cto-orchestrator": {
                     "command": "python3",
                     "args": [str(mcp_server)],
                 }
             }
-        })
-        cmd.extend(["--mcp-config", mcp_config])
+        }
+        # Config goes to a temp file (not inline JSON) to keep argv small —
+        # defence-in-depth for the ENAMETOOLONG class of bug (PROM-162).
+        session_dir = delegate_root / ".cto" / "session"
+        session_dir.mkdir(parents=True, exist_ok=True)
+        fd, mcp_config_path = tempfile.mkstemp(dir=session_dir, prefix="mcp-config-", suffix=".json")
+        with os.fdopen(fd, "w") as f:
+            json.dump(mcp_config, f)
+        cmd.extend(["--mcp-config", mcp_config_path])
+        # --strict-mcp-config makes this the ONLY MCP config the subprocess loads,
+        # instead of merging in every user/project-scope server (Figma, Slack, ...)
+        # from the operator's own config. Token-budget win + least-agency win.
+        # CTO_MCP_STRICT=false is the escape hatch for tickets that genuinely
+        # need an external MCP server.
+        if (os.environ.get("CTO_MCP_STRICT", "").lower() != "false"
+                and _check_claude_flag_support("--strict-mcp-config")):
+            cmd.append("--strict-mcp-config")
 
     if model:
         cmd.extend(["--model", _resolve_model_for_cli(model)])
@@ -2509,7 +3083,28 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             safe_prompt = f"## EFFORT LEVEL: {effort} — reason accordingly.\n\n{safe_prompt}"
     if stream:
         cmd.extend(["--output-format", "stream-json", "--verbose", "--include-partial-messages"])
-    cmd.append(safe_prompt)
+
+    # Cache-optimized system prompt: move the stable persona/role/effort-guidance
+    # prefix out of the `-p` user message into an actual system prompt, so it no
+    # longer sits behind the CLI's own per-machine cwd/env/memory-path/git-status
+    # sections and breaks Anthropic's prompt-cache prefix. Never applied on
+    # --resume: --system-prompt-snapshot replays the first launch's system
+    # prompt verbatim on every resume, so a --append-system-prompt-file passed
+    # here would be silently ignored anyway (see persona.prefix_cache_control()).
+    task_prompt_arg = safe_prompt
+    if not session_id and use_cache_optimized_prompt(delegate_root):
+        safe_system_prefix = sanitize_prompt_content(build_system_prefix(delegate_root, agent_role))
+        if safe_system_prefix and safe_prompt.startswith(safe_system_prefix):
+            cache_dir = delegate_root / ".cto" / "cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            prefix_hash = hashlib.sha1(safe_system_prefix.encode()).hexdigest()[:8]
+            system_prompt_path = cache_dir / f"system-{agent_role}-{prefix_hash}.md"
+            if not system_prompt_path.exists():
+                system_prompt_path.write_text(safe_system_prefix)
+            cmd.extend(["--append-system-prompt-file", str(system_prompt_path)])
+            cmd.append("--exclude-dynamic-system-prompt-sections")
+            task_prompt_arg = safe_prompt[len(safe_system_prefix):]
+    cmd.append(task_prompt_arg)
 
     # Strip auth-interfering env vars (CLAUDECODE, ANTHROPIC_API_KEY, ...) so
     # the subprocess doesn't get a "nested session" error or silently switch
@@ -2849,11 +3444,18 @@ def cmd_delegate(args):
     elif complexity in _COMPLEXITY_EFFORT_MAP:
         effort = _COMPLEXITY_EFFORT_MAP[complexity]
 
+    # Derive timeout: use explicit CLI arg if given, otherwise scale from complexity
+    if getattr(args, "timeout", None) is not None:
+        timeout = args.timeout
+    else:
+        timeout = _COMPLEXITY_TIMEOUT_MAP.get(complexity, _DEFAULT_TIMEOUT)
+
     console.print(f"[green]*Burrrp* Alright, sending [bold]{agent}[/bold] on a mission — ticket [yellow]{ticket['id']}[/yellow] (model: {model}){team_msg}[/green]")
     if task_budget:
         console.print(f"[dim]Task budget: ~{task_budget:,} tokens[/dim]")
     if effort:
         console.print(f"[dim]Effort level: {effort}[/dim]")
+    console.print(f"[dim]Timeout: {timeout}s[/dim]")
     agent_card_preview = load_agent_card(agent, root=root)
     preview_tools = agent_card_preview.get("allowed_tools", ["Read", "Write", "Edit", "Bash", "Grep", "Glob"])
     console.print(f"[dim]Allowed tools: {', '.join(preview_tools)}[/dim]")
@@ -2941,7 +3543,7 @@ def cmd_delegate(args):
     # Execute
     run_hooks("pre_delegate", ticket, agent, root=root)
     try:
-        output = delegate_to_agent(prompt, model=model, timeout=args.timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id, ticket_id=ticket["id"], verbose=getattr(args, 'verbose', False))
+        output = delegate_to_agent(prompt, model=model, timeout=timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id, ticket_id=ticket["id"], verbose=getattr(args, 'verbose', False))
     except RuntimeError as e:
         error_msg = str(e)
         run_hooks("on_failure", ticket, agent, root=root)
@@ -2984,7 +3586,7 @@ def cmd_delegate(args):
                 "ticket_id": ticket["id"],
                 "title": ticket.get("title"),
                 "agent": agent,
-                "timeout": args.timeout,
+                "timeout": timeout,
                 "team_id": team_id,
             }, role=agent, team_id=team_id)
         else:
@@ -3067,7 +3669,7 @@ def cmd_delegate(args):
             handoff_output = delegate_to_agent(
                 handoff_prompt,
                 model=new_model,
-                timeout=args.timeout,
+                timeout=timeout,
                 skip_permissions=True,
                 agent_role=handoff.target_role,
                 team_id=team_id,
@@ -3197,7 +3799,7 @@ def cmd_delegate(args):
                     output = delegate_to_agent(
                         retry_prompt,
                         model=model,
-                        timeout=args.timeout,
+                        timeout=timeout,
                         thinking_budget=thinking_budget,
                         agent_role=agent,
                         team_id=team_id,
@@ -3335,7 +3937,9 @@ def build_parser():
                             "tester-morty", "security-morty", "devops-morty", "reviewer-morty", "unity"])
     p.add_argument("--model", default=None, choices=["opus", "opus-4-7", "sonnet", "sonnet-4-6", "haiku"])
     p.add_argument("--dry-run", action="store_true", help="Show prompt without executing")
-    p.add_argument("--timeout", type=int, default=600, help="Timeout in seconds (default: 600)")
+    p.add_argument("--timeout", type=int, default=None,
+                   help="Timeout in seconds. Overrides the complexity-scaled default "
+                        "(XL=2700, L=1800, M=900, S/XS=600) if set.")
     p.add_argument("--team-id", default=None, help="Team session ID for team collaboration")
     p.add_argument("--task-budget", type=int, default=None,
                    help="Advisory token budget for the full agentic loop (e.g. 60000). "

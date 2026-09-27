@@ -1,0 +1,77 @@
+# Unity (Shannon) Configuration Template
+# Copy this to config.yaml and customize for your project
+
+# Target configuration
+target:
+  # Base URL for live testing (optional)
+  url: null
+  # Repository path for code analysis
+  repo: "."
+  # Scope of testing
+  scope: "full"  # full, quick, recon, exploit
+
+# Authentication (if needed)
+auth:
+  # Bearer token
+  token: null
+  # Cookie-based auth
+  cookies: null
+  # Basic auth
+  basic:
+    username: null
+    password: null
+
+# Scanning options
+scan:
+  # Enable/disable specific scan types
+  enabled:
+    - sast          # Static Application Security Testing
+    - dast          # Dynamic Application Security Testing
+    - secrets       # Secret detection
+    - dependencies  # Dependency vulnerability scanning
+    - config        # Configuration security
+
+  # Exclude patterns
+  exclude:
+    paths:
+      - "node_modules/**"
+      - "vendor/**"
+      - ".git/**"
+      - "*.min.js"
+    rules:
+      - "info-*"  # Exclude informational findings
+
+# Severity threshold (only report >= this level)
+severity_threshold: "low"  # critical, high, medium, low, info
+
+# Output configuration
+output:
+  # Report formats
+  formats:
+    - json
+    - markdown
+  # Output directory
+  directory: ".cto/unity/reports"
+
+# Temporal configuration (for async workflows)
+temporal:
+  # Temporal server address
+  address: "localhost:7233"
+  # Namespace
+  namespace: "default"
+  # Task queue
+  task_queue: "unity-security"
+
+# Rate limiting
+rate_limit:
+  # Requests per second
+  rps: 10
+  # Concurrent connections
+  concurrency: 5
+
+# Timeouts (in seconds)
+timeouts:
+  # Per-request timeout
+  request: 30
+  # Total scan timeout
+  total: 3600  # 1 hour
