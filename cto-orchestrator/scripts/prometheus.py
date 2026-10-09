@@ -35,6 +35,12 @@ except ImportError:
     def emit(*args, **kwargs):
         pass
 
+try:
+    from model_fallback import fallback_args
+except ImportError:
+    def fallback_args(*args, **kwargs):
+        return []
+
 # Import security utilities
 try:
     from security_utils import sanitize_prompt_content, sanitize_text_input
@@ -492,7 +498,7 @@ def claude_scan(prompt: str, model: str = "opus", timeout: int = 300) -> str:
     Uses `claude -p --model opus` for scanning.
     """
     safe_prompt = sanitize_prompt_content(prompt)
-    cmd = ["claude", "-p", "--model", model, safe_prompt]
+    cmd = ["claude", "-p", "--model", model, *fallback_args(model), safe_prompt]
 
     try:
         result = subprocess.run(
@@ -547,7 +553,7 @@ def evolve_timeout_for(root: Path, proposal: dict, explicit: int | None = None) 
 def delegate_evolve(prompt: str, model: str = "sonnet", timeout: int = 600) -> str:
     """Delegate an evolution task to a Morty via claude subprocess."""
     safe_prompt = sanitize_prompt_content(prompt)
-    cmd = ["claude", "-p", "--model", model, "--dangerously-skip-permissions", safe_prompt]
+    cmd = ["claude", "-p", "--model", model, *fallback_args(model), "--dangerously-skip-permissions", safe_prompt]
 
     try:
         result = subprocess.run(

@@ -20,6 +20,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+try:
+    from model_fallback import FALLBACK_CHAINS, fallback_args, detect_model_used, is_fallback
+except ImportError:
+    FALLBACK_CHAINS = {}
+    def fallback_args(*args, **kwargs):
+        return []
+    def detect_model_used(*args, **kwargs):
+        return None
+    def is_fallback(*args, **kwargs):
+        return False
+
 from rich.console import Console
 
 console = Console()
@@ -1358,6 +1369,8 @@ _claude_json_schema_supported: Optional[bool] = None
 _claude_flag_support_cache: dict = {}
 _last_session_id: Optional[str] = None
 _last_stream_usage: dict = {}  # populated from stream-json 'result' event
+_last_model_used: Optional[str] = None  # model that actually served the run (fallback-aware)
+_last_model_requested: Optional[str] = None  # model requested by the most recent delegate_to_agent call
 
 # Maps versioned model aliases to the short names accepted by claude CLI 2.1.x.
 # CLI ≤2.1.x rejects aliases like "opus-4-7"; only "opus/sonnet/haiku" work.
@@ -2976,9 +2989,11 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     Raises:
         RuntimeError: If agent fails or times out
     """
-    global _last_session_id, _last_stream_usage
+    global _last_session_id, _last_stream_usage, _last_model_used, _last_model_requested
     _last_session_id = None
     _last_stream_usage = {}
+    _last_model_used = None
+    _last_model_requested = model
 
     # Sanitize the prompt to prevent prompt injection
     safe_prompt = sanitize_prompt_content(prompt)
@@ -3069,6 +3084,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
 
     if model:
         cmd.extend(["--model", _resolve_model_for_cli(model)])
+        if not session_id:  # resume path: keep the original session's model, no fallback
+            cmd.extend(fallback_args(model, agent_role))
     # Enable extended thinking when the caller has allocated a budget for it.
     # Budget is set for: architect/security roles (M+) or any role on L/XL tickets.
     # Requires Opus model and CLI --thinking support.
@@ -3154,6 +3171,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                         event = json.loads(line.strip())
                         etype = event.get("type", "")
                         if etype == "assistant":
+                            _mu = None if event.get("parent_tool_use_id") else detect_model_used(event)
+                            if _mu and not _mu.startswith("<"):  # ignore synthetic placeholders / subagent events
+                                _last_model_used = _mu
                             content = event.get("message", {}).get("content", [])
                             for block in content:
                                 btype = block.get("type", "")
@@ -3247,6 +3267,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
+                            _mu = detect_model_used(event, requested=model)
+                            if _mu:
+                                _last_model_used = _mu
                             try:
                                 emit_morty_done(
                                     total_cost_usd=event.get("total_cost_usd"),
@@ -3269,6 +3292,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
+                            _mu = None if event.get("parent_tool_use_id") else detect_model_used(event)
+                            if _mu:
+                                _last_model_used = _mu
                     except (json.JSONDecodeError, KeyError, TypeError):
                         output_chunks.append(line)
                         phase = _detect_phase(line)
@@ -3699,23 +3725,53 @@ def cmd_delegate(args):
             parsed["files_changed"] = git_files
             console.print(f"[dim]files_changed auto-collected from git ({len(git_files)} file(s))[/dim]")
 
-    # Record and emit cost for this delegation
+    # Record and emit cost for this delegation (attribute cost to the model that actually ran)
     _cost_tracker = CostTracker()
+    model_requested = _last_model_requested or model
+    model_used = _last_model_used or model_requested
+    # Pricing table only knows aliases/known ids; map unknown full API ids back to a safe key.
+    if model_used in _MODEL_PRICING_USD_PER_1M:
+        _price_model = model_used
+    else:
+        _fam = next((f for f in ("opus", "sonnet", "haiku") if f in model_used.lower()), None)
+        _price_model = _fam if _fam in _MODEL_PRICING_USD_PER_1M else model_requested
     if _last_stream_usage:
         cost_breakdown = _cost_tracker.record_actual(
             ticket["id"], agent,
             _last_stream_usage.get("usage", {}),
             _last_stream_usage.get("total_cost_usd", 0.0),
-            model,
+            model_used,
         )
     else:
-        cost_breakdown = _cost_tracker.record(ticket["id"], agent, prompt, output, model)
-    emit("cto.cost.delegation", {
-        "ticket_id": ticket["id"],
-        "agent": agent,
-        "model": model,
-        **cost_breakdown,
-    }, role=agent, team_id=team_id)
+        cost_breakdown = _cost_tracker.record(ticket["id"], agent, prompt, output, _price_model)
+    _cost_event = {**cost_breakdown, "ticket_id": ticket["id"], "agent": agent,
+                   "model": model_used, "model_used": model_used, "model_requested": model_requested}
+    emit("cto.cost.delegation", _cost_event, role=agent, team_id=team_id)
+    if is_fallback(model_requested, model_used):
+        console.print(
+            f"[yellow]Model fallback: requested {model_requested}, served by {model_used} "
+            f"(primary overloaded/unavailable)[/yellow]"
+        )
+        emit("cto.model.fallback", {
+            "ticket_id": ticket["id"],
+            "agent": agent,
+            "model_requested": model_requested,
+            "model_used": model_used,
+        }, role=agent, team_id=team_id)
+        try:
+            ticket["model_requested"] = model_requested
+            ticket["model_used"] = model_used
+            save_ticket(root, ticket)
+        except Exception as exc:
+            console.print(f"[yellow]Could not persist model_used on ticket: {exc}[/yellow]")
+    elif "model_used" in ticket or "model_requested" in ticket:
+        # Clear stale fallback markers from an earlier run
+        try:
+            ticket.pop("model_used", None)
+            ticket.pop("model_requested", None)
+            save_ticket(root, ticket)
+        except Exception as exc:
+            console.print(f"[yellow]Could not clear stale model_used on ticket: {exc}[/yellow]")
     cache_read = cost_breakdown.get("cache_read_input_tokens", 0)
     cache_creation = cost_breakdown.get("cache_creation_input_tokens", 0)
     cached_marker = " [dim cyan](cached)[/dim cyan]" if cache_read > 0 else ""

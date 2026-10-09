@@ -44,6 +44,12 @@ except ImportError:
         pass
 
 try:
+    from model_fallback import fallback_args
+except ImportError:
+    def fallback_args(*args, **kwargs):
+        return []
+
+try:
     import sys as _sys_ticket
     import os as _os_ticket
     _scripts_dir = str(Path(__file__).parent.resolve())
@@ -875,7 +881,7 @@ def claude_prompt(prompt: str, model: str = "opus-4-7", thinking_budget: int = N
             "Event logged and prompt quarantined."
         ) from exc
 
-    cmd = ["claude", "-p", "--model", model]
+    cmd = ["claude", "-p", "--model", model, *fallback_args(model)]
 
     # SECURITY: Only skip permissions if BOTH explicit_flag=True AND env var set
     if should_skip_permissions(explicit_flag=False):
