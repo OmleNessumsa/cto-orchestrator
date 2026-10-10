@@ -72,6 +72,7 @@ EVOLVE_TIMEOUT_PER_KLOC = 60         # seconds per 1000 lines of target files
 EVOLVE_TIMEOUT_MAX = 2700
 EVOLVE_TIMEOUT_RETRY_FACTOR = 1.5    # timeout multiplier per previous timeout
 EVOLVE_MAX_TIMEOUT_RETRIES = 2       # timeouts before a proposal is rejected
+EVOLVE_OUTPUT_TAIL_CHARS = 3000      # end of Morty's output kept on the proposal
 
 # ── Scan categories ──────────────────────────────────────────────────────────
 
@@ -1306,6 +1307,9 @@ End with:
 
         try:
             output = delegate_evolve(evolve_prompt, model=model, timeout=apply_timeout)
+            # Keep the end of Morty's answer (the Upgrade Report and the
+            # reason it gave up) so a rejected proposal explains itself.
+            proposal["last_output_tail"] = (output or "")[-EVOLVE_OUTPUT_TAIL_CHARS:]
         except RuntimeError as e:
             print(f"  Evolution failed for {prom_id}: {e}")
 
@@ -1632,6 +1636,60 @@ def cmd_rollback(args):
         print("No files were restored.")
 
 
+# ── Command: requeue ─────────────────────────────────────────────────────────
+
+def cmd_requeue(args):
+    """Move rejected proposals back to pending so the next evolve retries them."""
+    root = find_cto_root()
+    dirs = ensure_prometheus_dirs(root)
+    failed = 0
+
+    for prom_id in args.proposal_ids:
+        if not re.match(r'^PROM-\d{3,}$', prom_id):
+            print(f"Error: Invalid proposal ID format: {prom_id}", file=sys.stderr)
+            failed += 1
+            continue
+
+        rejected_fp = dirs["rejected"] / f"{prom_id}.json"
+        if not rejected_fp.exists():
+            where = next((s for s in ("proposals", "applied", "needs_human")
+                          if (dirs[s] / f"{prom_id}.json").exists()), None)
+            hint = f" (it is in {where})" if where else ""
+            print(f"Error: {prom_id} is not a rejected proposal{hint}.", file=sys.stderr)
+            failed += 1
+            continue
+
+        proposal = load_json(rejected_fp)
+        previous_reason = proposal.get("reject_reason")
+        proposal["status"] = "pending"
+        proposal["requeued_at"] = now_iso()
+        proposal["requeue_count"] = int(proposal.get("requeue_count", 0) or 0) + 1
+        if previous_reason:
+            proposal["previous_reject_reason"] = previous_reason
+        for key in ("reject_reason", "timeout_retries", "last_error", "last_failed_at"):
+            proposal.pop(key, None)
+
+        save_json(dirs["proposals"] / f"{prom_id}.json", proposal)
+        rejected_fp.unlink()
+
+        emit("cto.prometheus.requeued", {
+            "proposal_id": prom_id,
+            "previous_reject_reason": previous_reason,
+        }, role="rick")
+
+        append_ledger(root, {
+            "timestamp": now_iso(),
+            "proposal_id": prom_id,
+            "action": "requeued",
+            "reason": (previous_reason or "")[:200],
+        })
+
+        print(f"Requeued {prom_id}: {proposal.get('title', 'unknown')}")
+
+    if failed:
+        sys.exit(1)
+
+
 # ── Command: status ──────────────────────────────────────────────────────────
 
 def cmd_status(args):
@@ -1941,6 +1999,10 @@ def build_parser():
     rb = sub.add_parser("rollback", help="Rollback a proposal")
     rb.add_argument("proposal_id", help="Proposal ID to rollback (e.g., PROM-001)")
 
+    # requeue
+    rq = sub.add_parser("requeue", help="Move rejected proposals back to pending")
+    rq.add_argument("proposal_ids", nargs="+", help="Proposal IDs to requeue (e.g., PROM-001 PROM-002)")
+
     # self-report
     sr = sub.add_parser("self-report", help="Report a bug/issue in Rick's own tooling")
     sr.add_argument("title", help="Short description of the bug/issue")
@@ -1975,6 +2037,7 @@ def main():
         "status": cmd_status,
         "history": cmd_history,
         "rollback": cmd_rollback,
+        "requeue": cmd_requeue,
         "self-report": cmd_self_report,
     }
     dispatch[args.command](args)
