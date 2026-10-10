@@ -9,6 +9,7 @@ Because unlike you people, Rick improves himself. Constantly.
 
 Commands:
   scan     — Scan internet for improvement proposals
+  scan --batch — Same scan via the Message Batches API (~50% token cost, async)
   evolve   — Apply pending proposals via Morty delegation
   status   — Prometheus dashboard (pending/applied/rejected)
   history  — Evolution ledger (chronological)
@@ -25,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -83,6 +85,33 @@ SCAN_CATEGORIES = {
 }
 
 
+# ── Batch scan (Message Batches API) ─────────────────────────────────────────
+
+# Scan alias -> API model id + the web search tool version it supports.
+BATCH_MODELS = {
+    "opus": {"model": "claude-opus-5-5", "tool": "web_search_20260209"},
+    "sonnet": {"model": "claude-sonnet-5-5", "tool": "web_search_20260209"},
+    "haiku": {"model": "claude-haiku-4-5", "tool": "web_search_20250305"},
+}
+
+# USD per million tokens (input, output). Prices were taken from Anthropic's
+# model table as of 2026-09 and MUST be re-verified whenever they change.
+MODEL_PRICING_PER_MTOK = {
+    "claude-opus-5-5": {"input": 4.00, "output": 20.00},
+    "claude-sonnet-5-5": {"input": 2.00, "output": 10.00},
+    "claude-haiku-4-5": {"input": 1.00, "output": 5.00},
+}
+
+BATCH_DISCOUNT = 0.5                 # Batch API discount on token costs
+# Web search fees (USD per 1000 searches) are NOT covered by the batch discount.
+WEB_SEARCH_COST_PER_1K = 10.00
+BATCH_POLL_INTERVAL = 30             # seconds between retrieve() polls
+BATCH_MAX_WAIT = 24 * 3600           # batches expire after 24h
+BATCH_SCAN_MAX_TOKENS = 16000
+BATCH_WEB_SEARCH_MAX_USES = 8
+BATCH_RETRIEVE_MAX_ERRORS = 3        # consecutive poll failures before giving up
+
+
 # ── Shared helpers (same patterns as delegate.py / orchestrate.py) ───────────
 
 def find_cto_root(start=None) -> Path:
@@ -136,6 +165,7 @@ def ensure_prometheus_dirs(root: Path) -> dict[str, Path]:
         "rejected": base / "rejected",
         "needs_human": base / "needs-human",
         "snapshots": base / "snapshots",
+        "batches": base / "batches",
     }
     for d in dirs.values():
         d.mkdir(parents=True, exist_ok=True)
@@ -720,6 +750,305 @@ def persist_scan_items(root: Path, dirs: dict[str, Path], category: str,
     return persisted
 
 
+# ── Batch scan helpers ───────────────────────────────────────────────────────
+
+class BatchUnavailable(RuntimeError):
+    """Batch API cannot be used (SDK missing or no credentials)."""
+
+
+def build_batch_requests(categories: list[str], root: Path,
+                         model_alias: str) -> list[dict]:
+    """One Message Batches request per category (custom_id = category)."""
+    spec = BATCH_MODELS[model_alias]
+    requests = []
+    for category in categories:
+        params = {
+            "model": spec["model"],
+            "max_tokens": BATCH_SCAN_MAX_TOKENS,
+            "messages": [{"role": "user", "content": build_scan_prompt(category, root)}],
+            "tools": [{
+                "type": spec["tool"],
+                "name": "web_search",
+                "max_uses": BATCH_WEB_SEARCH_MAX_USES,
+            }],
+        }
+        requests.append({"custom_id": category, "params": params})
+    return requests
+
+
+def extract_proposals_json(text: str, label: str = "") -> list | None:
+    """Extract the JSON proposal array from model output (None if unusable).
+
+    Shared by the subprocess scan and the batch scan; `label` (the category)
+    is only used in the printed diagnostics.
+    """
+    suffix = f" for {label}" if label else ""
+    json_match = re.search(r"\[.*\]", text or "", re.DOTALL)
+    if not json_match:
+        print(f"  No valid JSON proposals found{suffix}")
+        return None
+    try:
+        proposals_raw = json.loads(json_match.group(0))
+    except json.JSONDecodeError as e:
+        print(f"  JSON parse error{suffix}: {e}")
+        return None
+    if not isinstance(proposals_raw, list):
+        print(f"  Invalid response{suffix}: expected list")
+        return None
+    return proposals_raw
+
+
+def batch_cost_usd(usage_totals: dict) -> float:
+    """Cost of a batch run from per-model usage totals (batch pricing).
+
+    Token costs get BATCH_DISCOUNT; web search fees do not. Models missing
+    from MODEL_PRICING_PER_MTOK contribute no token cost (search fees still
+    count) and are reported by batch_cost_warnings().
+    """
+    total = 0.0
+    for model, u in usage_totals.items():
+        searches = u.get("web_search_requests", 0) or 0
+        total += searches / 1000 * WEB_SEARCH_COST_PER_1K
+        price = MODEL_PRICING_PER_MTOK.get(model)
+        if not price:
+            continue
+        inp = (u.get("input_tokens", 0) or 0) + (u.get("cache_creation_input_tokens", 0) or 0)
+        cache_read = u.get("cache_read_input_tokens", 0) or 0
+        out = u.get("output_tokens", 0) or 0
+        token_cost = (inp * price["input"]
+                      + cache_read * price["input"] * 0.1
+                      + out * price["output"]) / 1e6
+        total += token_cost * BATCH_DISCOUNT
+    return round(total, 4)
+
+
+def batch_cost_warnings(usage_totals: dict) -> list[str]:
+    """Warnings for models whose cost could not be computed."""
+    return [f"unknown model pricing: {m} (token cost counted as 0)"
+            for m in usage_totals if m not in MODEL_PRICING_PER_MTOK]
+
+
+def get_batch_client():
+    """Return an anthropic client or raise BatchUnavailable."""
+    try:
+        import anthropic
+    except ImportError as e:
+        raise BatchUnavailable(f"anthropic SDK not installed ({e})") from e
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        raise BatchUnavailable("no ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN in environment")
+    try:
+        return anthropic.Anthropic()
+    except Exception as e:  # noqa: BLE001 — SDK raises various config errors
+        raise BatchUnavailable(f"could not create anthropic client: {e}") from e
+
+
+def _batch_state_path(dirs: dict[str, Path], batch_id: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9_\-]+", batch_id or ""):
+        raise ValueError(f"invalid batch id: {batch_id!r}")
+    return dirs["batches"] / f"{batch_id}.json"
+
+
+def _usage_field(usage, name: str) -> int:
+    return getattr(usage, name, 0) or 0
+
+
+def run_batch_scan(root: Path, dirs: dict[str, Path], categories: list[str],
+                   model_alias: str, resume_id: str | None = None,
+                   poll_interval: int = BATCH_POLL_INTERVAL,
+                   max_wait: int = BATCH_MAX_WAIT, client=None) -> int:
+    """Run (or resume) a scan through the Message Batches API.
+
+    Returns the number of proposals created. A poll timeout returns 0 and
+    leaves the state file at "submitted" so the run can be resumed.
+    """
+    if client is None:
+        client = get_batch_client()
+
+    state: dict = {}
+    if resume_id:
+        batch_id = resume_id
+        state_fp = _batch_state_path(dirs, batch_id)
+        if state_fp.exists():
+            state = load_json(state_fp)
+            model_alias = state.get("model", model_alias)
+            categories = state.get("categories", categories)
+            if state.get("status") == "collected":
+                print(f"Batch {batch_id} was already collected "
+                      f"({state.get('proposals_created', 0)} proposals); not re-importing.")
+                return 0
+        else:
+            print(f"No local state for {batch_id}; using given model/categories.")
+    else:
+        requests = build_batch_requests(categories, root, model_alias)
+        try:
+            batch = client.messages.batches.create(requests=requests)
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"batch create failed: {e}") from e
+        batch_id = batch.id
+        state_fp = _batch_state_path(dirs, batch_id)
+        state = {
+            "batch_id": batch_id,
+            "model": model_alias,
+            "categories": categories,
+            "submitted_at": now_iso(),
+            "status": "submitted",
+        }
+        save_json(state_fp, state)
+        print(f"Batch submitted: {batch_id}")
+        print(f"Resume with: python scripts/prometheus.py scan --batch --resume {batch_id}")
+
+    # ── Poll until ended ──
+    waited = 0.0
+    poll_errors = 0
+    while True:
+        try:
+            batch = client.messages.batches.retrieve(batch_id)
+            poll_errors = 0
+        except Exception as e:  # noqa: BLE001
+            poll_errors += 1
+            print(f"  Poll failed ({poll_errors}/{BATCH_RETRIEVE_MAX_ERRORS}): {e}")
+            if poll_errors >= BATCH_RETRIEVE_MAX_ERRORS:
+                raise RuntimeError(f"batch poll failed repeatedly: {e}") from e
+            batch = None
+
+        if batch is not None:
+            if getattr(batch, "processing_status", None) == "ended":
+                break
+            counts = getattr(batch, "request_counts", None)
+            if counts is not None:
+                print("  Batch processing... " + ", ".join(
+                    f"{k}={getattr(counts, k, 0)}"
+                    for k in ("processing", "succeeded", "errored", "canceled", "expired")))
+
+        if waited >= max_wait:
+            print(f"Batch {batch_id} is still running after {int(waited)}s. "
+                  f"Resume later with: python scripts/prometheus.py scan --batch --resume {batch_id}")
+            return 0
+        time.sleep(poll_interval)
+        waited += poll_interval
+
+    # ── Collect results (arrive in any order, keyed by custom_id) ──
+    spec = BATCH_MODELS.get(model_alias, BATCH_MODELS["opus"])
+    usage_totals: dict[str, dict] = {}
+    succeeded: list[str] = []
+    failed: list[str] = []
+    total_created = 0
+    seen: set[str] = set()
+
+    try:
+        results = list(client.messages.batches.results(batch_id))
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(f"batch results fetch failed: {e}") from e
+
+    for entry in results:
+        category = entry.custom_id
+        res = entry.result
+        rtype = getattr(res, "type", None)
+
+        if category not in SCAN_CATEGORIES:
+            print(f"  WARNING: skipping result for unknown category {category!r}")
+            continue
+        seen.add(category)
+
+        print(f"\n{'─' * 50}")
+        print(f"  Batch result: {category} ({rtype})")
+        print(f"{'─' * 50}")
+
+        if rtype != "succeeded":
+            detail = ""
+            err = getattr(res, "error", None)
+            if err is not None:
+                detail = f": {getattr(err, 'error', err)}"
+            print(f"  {category}: {rtype}{detail}")
+            failed.append(category)
+            continue
+
+        message = res.message
+        model_id = getattr(message, "model", None) or spec["model"]
+        u = getattr(message, "usage", None)
+        tot = usage_totals.setdefault(model_id, {
+            "input_tokens": 0, "output_tokens": 0,
+            "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0,
+            "web_search_requests": 0,
+        })
+        for field in ("input_tokens", "output_tokens",
+                      "cache_creation_input_tokens", "cache_read_input_tokens"):
+            tot[field] += _usage_field(u, field)
+        tot["web_search_requests"] += _usage_field(
+            getattr(u, "server_tool_use", None), "web_search_requests")
+
+        stop_reason = getattr(message, "stop_reason", None)
+        if stop_reason in ("pause_turn", "max_tokens"):
+            print(f"  WARNING: {category} stopped with {stop_reason}; output may be incomplete")
+
+        text = "".join(
+            getattr(b, "text", "") or ""
+            for b in (getattr(message, "content", None) or [])
+            if getattr(b, "type", None) == "text"
+        )
+        items = extract_proposals_json(text, category)
+        if items is None:
+            print(f"  {category}: no usable proposals in response")
+            failed.append(category)
+            continue
+
+        succeeded.append(category)
+        total_created += persist_scan_items(root, dirs, category, items)
+
+    for category in categories:
+        if category not in seen:
+            print(f"  {category}: no result returned")
+            failed.append(category)
+
+    cost = batch_cost_usd(usage_totals)
+    for w in batch_cost_warnings(usage_totals):
+        print(f"  WARNING: {w}")
+
+    summary = {
+        "batch_id": batch_id,
+        "model": model_alias,
+        "categories": categories,
+        "succeeded": len(succeeded),
+        "failed": failed,
+        "proposals_created": total_created,
+        "usage": usage_totals,
+        "cost_usd": cost,
+    }
+    append_ledger(root, {
+        "timestamp": now_iso(),
+        "proposal_id": None,
+        "action": "batch-scan",
+        **summary,
+        "pricing": "batch-50%",
+    })
+    emit("cto.prometheus.scan.batch.completed", summary, role="rick")
+    append_log(root, {
+        "timestamp": now_iso(),
+        "ticket_id": None,
+        "agent": "prometheus",
+        "action": "batch_scan_completed",
+        "message": (f"Batch {batch_id}: {len(succeeded)} ok, {len(failed)} failed, "
+                    f"{total_created} proposals, ${cost}"),
+        "files_changed": [],
+    })
+
+    if state_fp.exists() or not resume_id:
+        state.update({
+            "batch_id": batch_id,
+            "model": model_alias,
+            "categories": categories,
+            "status": "collected",
+            "collected_at": now_iso(),
+            "proposals_created": total_created,
+            "cost_usd": cost,
+        })
+        save_json(state_fp, state)
+
+    print(f"\nBatch {batch_id}: {len(succeeded)} succeeded, {len(failed)} failed "
+          f"({', '.join(failed) if failed else 'none'}); est. cost ${cost} (batch pricing)")
+    return total_created
+
+
 # ── Command: scan ────────────────────────────────────────────────────────────
 
 def cmd_scan(args):
@@ -741,6 +1070,32 @@ def cmd_scan(args):
     model = args.model or "opus"
     total_proposals = 0
 
+    resume_id = getattr(args, "resume", None)
+    use_batch = bool(getattr(args, "batch", False) or resume_id)
+    batch_client = None
+
+    if use_batch and args.dry_run:
+        spec = BATCH_MODELS[model]
+        print(f"[DRY RUN] Planned batch scan ({len(categories)} requests)")
+        print(f"  Model: {spec['model']} (alias: {model})")
+        print(f"  Web search tool: {spec['tool']} (max_uses={BATCH_WEB_SEARCH_MAX_USES})")
+        print(f"  Max tokens per request: {BATCH_SCAN_MAX_TOKENS}")
+        if resume_id:
+            print(f"  Would resume batch: {resume_id}")
+        for category in categories:
+            print(f"  - {category}: {len(build_scan_prompt(category, root))} char prompt")
+        return
+
+    if use_batch:
+        try:
+            batch_client = get_batch_client()
+        except BatchUnavailable as e:
+            if resume_id:
+                print(f"Error: cannot resume batch: {e}", file=sys.stderr)
+                sys.exit(1)
+            print(f"WARNING: batch API unavailable ({e}); "
+                  "falling back to per-category subprocess scan")
+
     print(f"*Burrrp* Prometheus scanning {len(categories)} categories... (model: {model})")
     print(f"Categories: {', '.join(categories)}")
 
@@ -758,7 +1113,16 @@ def cmd_scan(args):
         "files_changed": [],
     })
 
-    for category in categories:
+    if batch_client is not None:
+        try:
+            total_proposals = run_batch_scan(
+                root, dirs, categories, model, resume_id=resume_id,
+                poll_interval=args.poll_interval, client=batch_client)
+        except (RuntimeError, ValueError) as e:
+            print(f"Error: batch scan failed: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    for category in (categories if batch_client is None else []):
         print(f"\n{'─' * 50}")
         print(f"  Scanning: {category}")
         print(f"{'─' * 50}")
@@ -776,19 +1140,8 @@ def cmd_scan(args):
             continue
 
         # Parse JSON proposals from output
-        json_match = re.search(r"\[.*\]", output, re.DOTALL)
-        if not json_match:
-            print(f"  No valid JSON proposals found for {category}")
-            continue
-
-        try:
-            proposals_raw = json.loads(json_match.group(0))
-        except json.JSONDecodeError as e:
-            print(f"  JSON parse error for {category}: {e}")
-            continue
-
-        if not isinstance(proposals_raw, list):
-            print(f"  Invalid response for {category}: expected list")
+        proposals_raw = extract_proposals_json(output, category)
+        if proposals_raw is None:
             continue
 
         total_proposals += persist_scan_items(root, dirs, category, proposals_raw)
@@ -1541,6 +1894,13 @@ def build_parser():
                     help="Model for scanning (default: opus)")
     sc.add_argument("--dry-run", action="store_true", help="Preview without scanning")
     sc.add_argument("--timeout", type=int, default=300, help="Timeout per category (default: 300s)")
+    sc.add_argument("--batch", action="store_true",
+                    help="Async Message Batches API at ~50%% token cost, for non-interactive "
+                         "full-board runs; needs ANTHROPIC_API_KEY")
+    sc.add_argument("--resume", default=None, metavar="BATCH_ID",
+                    help="Resume collecting a previously submitted batch (implies --batch)")
+    sc.add_argument("--poll-interval", type=int, default=BATCH_POLL_INTERVAL,
+                    help=f"Batch poll interval in seconds (default: {BATCH_POLL_INTERVAL})")
 
     # evolve
     ev = sub.add_parser("evolve", help="Apply pending proposals")
