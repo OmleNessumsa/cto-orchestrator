@@ -306,6 +306,33 @@ except ImportError:
 # Import sprint checkpoint helpers for resumable sprint execution
 from session import checkpoint_ticket, load_sprint_checkpoint
 
+# Approval gates: park risky tickets for a human instead of blocking the sprint
+from ticket import match_approval_gate, request_approval
+
+
+def _ticket_actual_files(ticket: dict) -> list:
+    """Files the ticket really touched (verification.actual_files, else files_touched)."""
+    return (ticket.get("verification") or {}).get("actual_files") or ticket.get("files_touched") or []
+
+
+def _park_for_approval(root: Path, ticket: dict, phase: str, reason: str) -> None:
+    files = _ticket_actual_files(ticket) if phase == "pre_merge" else (ticket.get("target_files") or [])
+    request_approval(root, ticket, phase, reason, diff_summary=", ".join(files[:20]))
+    checkpoint_ticket(root, ticket["id"], "awaiting_approval", {"phase": phase, "reason": reason})
+    console.print(f"  [magenta]{ticket['id']} → awaiting approval ({phase}): {reason}[/magenta]")
+
+
+def _park_gated_candidates(root: Path, candidates: list[dict]) -> list[dict]:
+    """Drop tickets that hit a pre_delegate approval gate; the rest of the DAG keeps moving."""
+    runnable = []
+    for c in candidates:
+        reason = match_approval_gate(root, c, "pre_delegate")
+        if reason:
+            _park_for_approval(root, c, "pre_delegate", reason)
+        else:
+            runnable.append(c)
+    return runnable
+
 
 def _estimate_ticket_cost_usd(ticket: dict, default_model: str = "sonnet") -> float:
     """Rough cost estimate for a completed delegation using agent_output as proxy."""
@@ -333,6 +360,36 @@ def _passes_quality_gate(ticket: dict) -> bool:
 
 
 MAX_REVIEW_RETRIES = 2
+MAX_LEDGER_STALLS = 3
+
+
+def _ledger_stalled(ledger: list) -> bool:
+    """True if the latest entry is stuck, or the last two entries both show no progress."""
+    if not ledger:
+        return False
+    if ledger[-1].get("is_stuck"):
+        return True
+    return len(ledger) >= 2 and all(not e.get("is_progressing", True) for e in ledger[-2:])
+
+
+def _record_progress(root: Path, ticket: dict, issues: list, attempt: int) -> Optional[dict]:
+    """Append a progress-ledger entry after a failed review and checkpoint it."""
+    from delegate import assess_progress
+
+    ledger = ticket.setdefault("progress_ledger", [])
+    try:
+        entry = assess_progress(root, ticket, issues, ledger)
+    except Exception as e:
+        console.print(f"  [yellow]Progress ledger unavailable for {ticket['id']}: {e}[/yellow]")
+        return None
+    if not entry:
+        return None
+    entry = {**entry, "attempt": attempt + 1, "at": now_iso()}
+    entry["stalled"] = _ledger_stalled(ledger + [entry])
+    ledger.append(entry)
+    save_ticket(root, ticket)
+    checkpoint_ticket(root, ticket["id"], "review", {"files_touched": ticket.get("files_touched", [])}, progress_ledger=ledger)
+    return entry
 
 
 def _review_and_close_ticket(root: Path, ticket: dict) -> bool:
@@ -348,6 +405,11 @@ def _review_and_close_ticket(root: Path, ticket: dict) -> bool:
     files_touched and agent_output). Returns True if the ticket closed as done.
     """
     from delegate import review_ticket
+
+    reason = match_approval_gate(root, ticket, "pre_merge", _ticket_actual_files(ticket))
+    if reason:
+        _park_for_approval(root, ticket, "pre_merge", reason)
+        return False
 
     attempt = 0
     while True:
@@ -375,6 +437,36 @@ def _review_and_close_ticket(root: Path, ticket: dict) -> bool:
             role="rick",
         )
 
+        retry_agent = None
+        entry = _record_progress(root, ticket, issues, attempt)
+        if entry and entry["stalled"]:
+            ledger = ticket["progress_ledger"]
+            stalls = sum(1 for e in ledger if e.get("stalled"))
+            if stalls >= MAX_LEDGER_STALLS:
+                ticket["status"] = "blocked"
+                ticket["blocked_reason"] = "stalled"
+                ticket["review_notes"] = f"BLOCKED: stalled {stalls} times — {entry.get('root_cause', '')}"
+                ticket["updated_at"] = now_iso()
+                ticket.pop("review_issues", None)
+                save_ticket(root, ticket)
+                emit(
+                    "cto.ticket.stalled",
+                    {"ticket_id": ticket["id"], "stalls": stalls, "root_cause": entry.get("root_cause", "")},
+                    role="rick",
+                )
+                console.print(f"  [red]{ticket['id']} → BLOCKED: stalled {stalls} times in review loop.[/red]")
+                return False
+            if entry["next_agent"] != ticket.get("assigned_agent"):
+                retry_agent = entry["next_agent"]
+                console.print(f"  [yellow]{ticket['id']} → stalled, re-routing to {retry_agent}.[/yellow]")
+            else:
+                facts = (ticket.get("facts_learned") or "").strip()
+                ticket["facts_learned"] = (
+                    facts + ("\n" if facts else "") +
+                    f"- Root cause: {entry.get('root_cause', '')}\n- Change of approach: {entry.get('next_instruction', '')}"
+                )
+                console.print(f"  [yellow]{ticket['id']} → stalled, rewriting task contract with facts learned.[/yellow]")
+
         if attempt >= MAX_REVIEW_RETRIES:
             ticket["status"] = "blocked"
             ticket["blocked_reason"] = "review_rejected"
@@ -400,7 +492,7 @@ def _review_and_close_ticket(root: Path, ticket: dict) -> bool:
         save_ticket(root, ticket)
 
         try:
-            run_delegate(root, ticket["id"], timeout=get_delegate_timeout(root, ticket))
+            run_delegate(root, ticket["id"], agent=retry_agent, timeout=get_delegate_timeout(root, ticket))
         except Exception as e:
             console.print(f"  [red]Re-delegation after review failure errored: {e}[/red]")
             ticket = load_ticket(root, ticket["id"])
@@ -1296,7 +1388,11 @@ def build_capability_index(root: Path) -> dict[str, str]:
 
 
 def get_actionable_tickets(root: Path) -> list[dict]:
-    """Get tickets that can be worked on (todo/backlog with met dependencies)."""
+    """Get tickets that can be worked on (todo with met dependencies).
+
+    Backlog tickets are deliberately parked by the user and must never be
+    auto-picked by a sprint (see PAS-010 incident).
+    """
     tickets = all_tickets(root)
     done_ids = {t["id"] for t in tickets if t["status"] in ("done", "in_review", "testing")}
     in_progress_ids = {t["id"] for t in tickets if t["status"] == "in_progress"}
@@ -1304,7 +1400,7 @@ def get_actionable_tickets(root: Path) -> list[dict]:
 
     candidates = []
     for t in tickets:
-        if t["status"] not in ("todo", "backlog"):
+        if t["status"] != "todo":
             continue
         if t["type"] == "epic":
             continue  # epics are tracked via sub-tickets
@@ -1457,7 +1553,9 @@ def cmd_sprint(args):
         # _STALL_ITERATION_LIMIT iterations, the sprint isn't making progress
         # and won't on its own — abort loudly instead of silently spinning to
         # max_iterations and exiting 0.
-        _signature = json.dumps(sorted(status_counts.items()))
+        # awaiting_approval tickets are waiting on a human, not stuck — keep
+        # them out of the signature so a slow reviewer can't trip the abort.
+        _signature = json.dumps(sorted((k, v) for k, v in status_counts.items() if k != "awaiting_approval"))
         if _signature == _stall_signature:
             _stall_count += 1
         else:
@@ -1506,6 +1604,7 @@ def cmd_sprint(args):
                 c for c in candidates
                 if checkpoint["tickets"].get(c["id"], {}).get("phase") != "done"
             ]
+        candidates = _park_gated_candidates(root, candidates)
         if not candidates:
             # Check if there are in_review or testing tickets to process
             review_tickets = [t for t in tickets if t["status"] == "in_review"]

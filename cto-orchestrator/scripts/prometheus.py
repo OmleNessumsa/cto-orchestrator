@@ -52,6 +52,19 @@ except ImportError:
     def sanitize_text_input(text, max_length=5000):
         return (text or "")[:max_length].replace('\x00', '')
 
+# Native sandbox helpers (PROM-192) — absent module disables the sandbox only.
+try:
+    from security_utils import (
+        native_sandbox_enabled, cli_supports_native_sandbox, write_sandbox_settings,
+    )
+except ImportError:
+    def native_sandbox_enabled(root):
+        return False
+    def cli_supports_native_sandbox(version_string):
+        return False
+    def write_sandbox_settings(root, tag, base=None, unattended=False, extra_domains=()):
+        raise OSError("security_utils unavailable: native sandbox disabled")
+
 
 # ── Self-protection ──────────────────────────────────────────────────────────
 
@@ -301,6 +314,30 @@ def files_actually_changed(before: dict[str, str | None],
         if before.get(f) != after.get(f):
             changed.append(f)
     return changed
+
+
+_STATUS_LINE_RE = re.compile(r"^[\s>*_`-]*\**\s*status\s*\**\s*:\s*\**\s*`?\s*(.*)$", re.IGNORECASE)
+
+
+def parse_upgrade_status(output: str | None) -> str | None:
+    """Extract the Morty's self-reported status from its Upgrade Report.
+
+    Uses the LAST `**Status**:` line. Returns "completed", "failed", or None
+    if absent, unrecognized, or the unfilled template ("completed|failed").
+    """
+    if not output:
+        return None
+    value = None
+    for line in output.splitlines():
+        m = _STATUS_LINE_RE.match(line)
+        if m:
+            value = m.group(1).strip().strip("*`_ ").lower()
+    if not value:
+        return None
+    if "|" in value:
+        return None
+    m = re.match(r"(completed|failed)\b", value)
+    return m.group(1) if m else None
 
 
 # ── Snapshot management ──────────────────────────────────────────────────────
@@ -581,10 +618,59 @@ def evolve_timeout_for(root: Path, proposal: dict, explicit: int | None = None) 
     return int(min(EVOLVE_TIMEOUT_MAX, timeout))
 
 
+_claude_version_string = None
+
+
+def _get_claude_version() -> str:
+    """Return the installed claude CLI version string (cached, "" on failure)."""
+    global _claude_version_string
+    if _claude_version_string is None:
+        try:
+            result = subprocess.run(
+                ["claude", "--version"], capture_output=True, text=True, timeout=5,
+            )
+            _claude_version_string = (result.stdout or "").strip()
+        except Exception:
+            _claude_version_string = ""
+    return _claude_version_string
+
+
+def evolve_sandbox_args() -> list:
+    """Return ["--settings", path] enabling the native sandbox in strict mode.
+
+    Evolve runs unattended with --dangerously-skip-permissions; sandbox
+    network rules still apply in that mode, and strictAllowlist denies
+    silently instead of waiting on a prompt nobody will answer (PROM-192).
+    """
+    root = find_cto_root()
+    cli_version = _get_claude_version()
+    if not native_sandbox_enabled(root):
+        reason = "disabled by security.native_sandbox / CTO_NATIVE_SANDBOX"
+    elif not cli_supports_native_sandbox(cli_version):
+        reason = "claude CLI < 2.1.219 or version unknown"
+    else:
+        try:
+            path = write_sandbox_settings(root, f"evolve-{os.getpid()}", unattended=True)
+        except (OSError, ValueError) as e:
+            reason = f"could not write sandbox settings: {e}"
+        else:
+            emit("security.sandbox_enabled", {
+                "source": "prometheus.evolve",
+                "strict": True,
+                "settings_path": str(path),
+            })
+            return ["--settings", str(path)]
+    emit("security.sandbox_skipped", {
+        "source": "prometheus.evolve", "reason": reason, "cli_version": cli_version,
+    })
+    return []
+
+
 def delegate_evolve(prompt: str, model: str = "sonnet", timeout: int = 600) -> str:
     """Delegate an evolution task to a Morty via claude subprocess."""
     safe_prompt = sanitize_prompt_content(prompt)
-    cmd = ["claude", "-p", "--model", model, *fallback_args(model), "--dangerously-skip-permissions", safe_prompt]
+    cmd = ["claude", "-p", "--model", model, *fallback_args(model), "--dangerously-skip-permissions",
+           *evolve_sandbox_args(), safe_prompt]
 
     try:
         result = subprocess.run(
@@ -1364,6 +1450,35 @@ End with:
             })
             continue
 
+        reported = parse_upgrade_status(output)
+        if reported == "failed":
+            print(f"  Morty reported Status: failed for {prom_id}")
+            if snap_dir and snap_dir.exists():
+                print(f"  Rolling back from snapshot...")
+                restore_snapshot(root, snap_dir)
+
+            proposal["status"] = "rejected"
+            proposal["reject_reason"] = "Morty reported Status: failed"
+            save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
+            prop_fp = dirs["proposals"] / f"{prom_id}.json"
+            if prop_fp.exists():
+                prop_fp.unlink()
+
+            emit("cto.prometheus.evolve.failed", {
+                "proposal_id": prom_id,
+                "error": "Morty reported Status: failed",
+            }, role="rick")
+
+            append_ledger(root, {
+                "timestamp": now_iso(),
+                "proposal_id": prom_id,
+                "action": "failed",
+                "reason": "morty reported failure",
+            })
+            continue
+        if reported is None:
+            print(f"  WARNING: no parseable Upgrade Report status from Morty — relying on file checksums")
+
         # Validate syntax for .py / .json / .sh target files
         syntax_ok = True
         for tf in target_files:
@@ -1424,6 +1539,10 @@ End with:
 
         if not actually_changed:
             print(f"  NO FILES CHANGED — Morty claimed success but modified nothing!")
+            collateral = collateral_changes(root, snap_dir)
+            if collateral and snap_dir and snap_dir.exists():
+                print(f"  Reverting {len(collateral)} stray change(s) outside target_files: {', '.join(collateral)}")
+                restore_snapshot(root, snap_dir)
             proposal["status"] = "rejected"
             proposal["reject_reason"] = "No files were actually modified (false success)"
             save_json(dirs["rejected"] / f"{prom_id}.json", proposal)
@@ -1441,6 +1560,7 @@ End with:
                 "proposal_id": prom_id,
                 "action": "failed",
                 "reason": "no files changed (false success)",
+                "collateral_changed": collateral,
             })
             continue
 
@@ -1454,6 +1574,7 @@ End with:
         proposal["applied_at"] = now_iso()
         proposal["files_actually_changed"] = actually_changed
         proposal["collateral_changed"] = collateral
+        proposal["morty_reported_status"] = reported
         save_json(dirs["applied"] / f"{prom_id}.json", proposal)
         prop_fp = dirs["proposals"] / f"{prom_id}.json"
         if prop_fp.exists():

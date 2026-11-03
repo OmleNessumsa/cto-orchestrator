@@ -95,5 +95,58 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(mf.is_fallback("opus", None))
 
 
+class PricingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import delegate
+        cls.d = delegate
+
+    def test_alias_resolved_via_init_uses_55_pricing(self):
+        init = {"type": "system", "subtype": "init", "model": "claude-sonnet-5-5"}
+        resolved = mf.resolve_alias_from_init(init)
+        self.assertEqual(resolved, "claude-sonnet-5-5")
+        pricing = self.d._pricing_for(resolved)
+        self.assertEqual((pricing["input"], pricing["output"]), (2.0, 10.0))
+        self.assertIsNone(mf.resolve_alias_from_init({"type": "assistant"}))
+        self.assertIsNone(self.d._resolve_pricing_model("sonnet"))
+
+    def test_haiku_55_long_prompt_uses_higher_prices(self):
+        short = self.d._pricing_for("claude-haiku-5-5", 100000)
+        long_ = self.d._pricing_for("claude-haiku-5-5", 100001)
+        self.assertEqual((short["input"], short["output"]), (0.10, 0.50))
+        self.assertEqual((long_["input"], long_["output"]), (0.50, 2.50))
+
+    def test_opus_55_cache_read_is_005x(self):
+        p = self.d._pricing_for("claude-opus-5-5")
+        self.assertAlmostEqual(p["cache_read"], p["input"] * 0.05)
+        c = self.d.CostTracker().estimate("", "", "claude-opus-5-5", cache_read_tokens=1_000_000)
+        self.assertAlmostEqual(c["cache_read_cost_usd"], 0.20)
+
+    def test_record_actual_per_model_lines(self):
+        t = self.d.CostTracker()
+        b = t.record_actual("T-1", "dev", {}, 0.5, "claude-opus-5-5", {
+            "claude-opus-5-5": {"inputTokens": 10, "outputTokens": 5, "costUSD": 0.4},
+            "claude-sonnet-5-5": {"inputTokens": 10, "outputTokens": 5, "costUSD": 0.1},
+        })
+        self.assertEqual(b["total_cost_usd"], 0.5)
+        self.assertEqual([d["model"] for d in t.delegations], ["claude-opus-5-5", "claude-sonnet-5-5"])
+        self.assertAlmostEqual(t.total_cost_usd, 0.5)
+
+
+class AdvisorTests(unittest.TestCase):
+    def test_valid_pairings(self):
+        self.assertTrue(mf.advisor_is_valid("sonnet", "opus"))
+        self.assertTrue(mf.advisor_is_valid("claude-sonnet-5-5", "claude-opus-5-5"))
+        self.assertTrue(mf.advisor_is_valid("opus", "opus"))
+        self.assertTrue(mf.advisor_is_valid("haiku", "sonnet"))
+
+    def test_invalid_pairings(self):
+        self.assertFalse(mf.advisor_is_valid("opus", "sonnet"))
+        self.assertFalse(mf.advisor_is_valid("sonnet", "haiku"))
+        self.assertFalse(mf.advisor_is_valid("haiku", "haiku"))
+        self.assertFalse(mf.advisor_is_valid("sonnet", "gpt-x"))
+        self.assertFalse(mf.advisor_is_valid(None, "opus"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -192,7 +192,8 @@ def load_sprint_checkpoint(root: Path) -> dict:
     return data
 
 
-def checkpoint_ticket(root: Path, ticket_id: str, phase: str, handoff: Optional[dict] = None):
+def checkpoint_ticket(root: Path, ticket_id: str, phase: str, handoff: Optional[dict] = None,
+                      progress_ledger: Optional[list] = None):
     """Persist a ticket's execution phase to the sprint checkpoint ledger.
 
     Called after every phase transition (delegate/review/done) so a crashed
@@ -202,15 +203,25 @@ def checkpoint_ticket(root: Path, ticket_id: str, phase: str, handoff: Optional[
     Args:
         root: Project root path
         ticket_id: Ticket being executed
-        phase: Execution phase, e.g. "delegate", "review", "done"
+        phase: Execution phase, e.g. "delegate", "review", "done", or
+            "awaiting_approval" (handoff carries the gate's phase/reason so
+            --resume re-enters at pre_delegate or pre_merge once approved)
         handoff: Optional dict capturing the last handoff for this ticket
+        progress_ledger: Optional per-attempt progress ledger entries; when
+            omitted, any ledger already checkpointed for the ticket is kept so
+            --resume doesn't lose stall history on a phase transition.
     """
     state = load_sprint_checkpoint(root)
-    state["tickets"][ticket_id] = {
+    prev = state["tickets"].get(ticket_id) or {}
+    entry = {
         "phase": phase,
         "handoff": handoff or {},
         "updated_at": now_iso(),
     }
+    ledger = progress_ledger if progress_ledger is not None else prev.get("progress_ledger")
+    if ledger:
+        entry["progress_ledger"] = ledger
+    state["tickets"][ticket_id] = entry
 
     fp = sprint_checkpoint_path(root)
     fp.parent.mkdir(parents=True, exist_ok=True)

@@ -230,6 +230,13 @@ def create_team_session(
         assignment_suffix = chr(65 + i)  # A, B, C, ...
         role_name = role_def["role"]
         profile = AGENT_PROFILES.get(role_name, {})
+        # Same --agents spec delegate.py passes to each Morty, so team members
+        # get identical tool restrictions and compaction settings.
+        try:
+            from delegate import build_agent_definition
+            agent_def = build_agent_definition(role_name, {"id": f"{parent_ticket}-{assignment_suffix}"}, root=root)[role_name]
+        except Exception:
+            agent_def = {}
         members.append({
             "role": role_name,
             "focus": role_def.get("focus", ""),
@@ -239,8 +246,9 @@ def create_team_session(
             "completed_at": None,
             "output_summary": None,
             "tool_scope": {
-                "allowedTools": profile.get("allowedTools", []),
-                "disallowedTools": profile.get("disallowedTools", []),
+                "allowedTools": agent_def.get("tools") or profile.get("allowedTools", []),
+                "disallowedTools": agent_def.get("disallowedTools", profile.get("disallowedTools", [])),
+                "autoCompactWindow": agent_def.get("autoCompactWindow"),
                 "native_subagent_available": _native_agent_definition_exists(root, role_name),
             },
         })
@@ -695,6 +703,26 @@ def get_reserved_files(root: Path, team_id: str) -> dict[str, list[str]]:
     return team.get("files_reserved", {})
 
 
+def get_active_reservations(root: Path, exclude_role: Optional[str] = None) -> dict[str, list[str]]:
+    """Read-only view of file reservations across all active teams.
+
+    Returns role -> sorted file paths, merged over every active team session.
+    `exclude_role` omits that role's own reservations. Never exits or raises:
+    unreadable team files are skipped.
+    """
+    merged: dict[str, set] = {}
+    try:
+        teams = all_teams(root)
+    except Exception:
+        return {}
+    for team in teams:
+        for role, paths in (team.get("files_reserved") or {}).items():
+            if role == exclude_role or not paths:
+                continue
+            merged.setdefault(role, set()).update(paths)
+    return {role: sorted(paths) for role, paths in merged.items()}
+
+
 def aggregate_results(results: list[dict]) -> dict:
     """Aggregate parallel fan-out results into a structured team rollup.
 
@@ -914,7 +942,7 @@ def contract_exists(root: Path, team_id: str) -> bool:
 def write_contract(root: Path, team_id: str, ticket: dict) -> Path:
     """Generate INTEGRATION_CONTRACT.md for a team from the epic ticket.
 
-    Creates a structured contract that all team members MUST read before
+    Creates a structured contract that all team members read before
     writing any code. Prevents parallel-agent integration bugs by making
     API contracts, env vars, file ownership, and shared interfaces explicit.
 
@@ -945,10 +973,11 @@ def write_contract(root: Path, team_id: str, ticket: dict) -> Path:
 **Generated**: {now_iso()}
 **Status**: DRAFT — complete all sections before writing any code
 
-> **MANDATORY**: Every team member MUST read and honour this contract.
-> Do NOT write code that creates endpoints, env vars, file paths, queue names,
-> or TypeScript interfaces that contradict the signatures below.
-> If you need to deviate, broadcast a `decision` message to `@*` FIRST.
+<constraints>
+Read this contract before starting. Keep endpoints, env vars, file paths, queue names,
+and TypeScript interfaces consistent with the signatures below, because parallel agents
+build against them. If you need to deviate, broadcast a `decision` message to `@*` first.
+</constraints>
 
 ---
 
@@ -986,7 +1015,7 @@ List every env var agents depend on. Prevents "it works on my box" integration f
 ## 3. File Ownership
 
 Declare which agent owns which files/directories to prevent write conflicts.
-Files listed here are pre-reserved — agents MUST NOT modify files owned by another role.
+Files listed under another role are reserved for that role, because parallel edits to them cause merge conflicts; coordinate through the team channel instead.
 
 | File / Directory | Owner Agent | Purpose |
 |-----------------|-------------|---------|

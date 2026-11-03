@@ -34,7 +34,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 try:
-    from ticket import find_cto_root, load_ticket, save_ticket, all_tickets
+    from ticket import (
+        find_cto_root, load_ticket, save_ticket, all_tickets,
+        match_approval_gate, request_approval, pending_approvals,
+    )
 except ImportError:
     print("sleepy.py: could not import ticket.py — run from orchestrator repo", file=sys.stderr)
     sys.exit(1)
@@ -375,8 +378,13 @@ def run_delegate(
     task_budget: int,
     model: str = "opus-4-7",
     timeout: int = DEFAULT_DELEGATE_TIMEOUT,
+    resume: bool = False,
 ) -> tuple[bool, str]:
-    """Invoke delegate.py as a subprocess. Returns (ok, output_tail)."""
+    """Invoke delegate.py as a subprocess. Returns (ok, output_tail).
+
+    resume=True continues the ticket's stored (timed-out) session via
+    `delegate.py --resume` with CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1.
+    """
     cmd = [
         sys.executable,
         str(SCRIPT_DIR / "delegate.py"),
@@ -386,9 +394,16 @@ def run_delegate(
         "--task-budget", str(task_budget),
         "--timeout", str(timeout),
     ]
+    env = {**os.environ, "CTO_UNATTENDED": "1"}
+    if resume:
+        cmd.append("--resume")
+        env["CLAUDE_CODE_RESUME_INTERRUPTED_TURN"] = "1"
     try:
+        # CTO_UNATTENDED=1: nobody can answer sandbox network prompts, so the
+        # Morty gets sandbox.network.strictAllowlist (silent deny) — PROM-192.
         res = subprocess.run(
-            cmd, cwd=root, capture_output=True, text=True, timeout=timeout + 60
+            cmd, cwd=root, capture_output=True, text=True, timeout=timeout + 60,
+            env=env,
         )
         ok = res.returncode == 0
         tail = (res.stdout or "")[-2000:] + (res.stderr or "")[-500:]
@@ -421,6 +436,20 @@ def append_queue(root: Path, entry: dict) -> int:
     return idx
 
 
+def set_ticket_status(root: Path, ticket_id: str, new: str, only_from: Optional[str] = None) -> bool:
+    """Best-effort ticket status change; only_from guards against clobbering other states."""
+    try:
+        t = load_ticket(root, ticket_id)
+        if only_from and t.get("status") != only_from:
+            return False
+        t["status"] = new
+        t["updated_at"] = now_iso()
+        save_ticket(root, t)
+        return True
+    except (SystemExit, OSError, ValueError, KeyError):
+        return False
+
+
 def parse_queue(root: Path) -> list[dict]:
     fp = queue_path(root)
     if not fp.exists():
@@ -451,6 +480,16 @@ def log_iter(root: Path, payload: dict) -> None:
 
 
 # ───────────────────────── commands ─────────────────────────
+
+
+def _print_pending_approvals(root: Path) -> None:
+    pending = pending_approvals(root)
+    if not pending:
+        return
+    print(f"  🔐 Awaiting approval: {len(pending)} ticket(s)  (`ticket approve|reject <ID>`)")
+    for t in pending:
+        gate = t.get("approval_gate") or {}
+        print(f"    {t['id']:<12} [{gate.get('phase', '?')}] {gate.get('reason', '')[:70]}")
 
 
 def cmd_init(args):
@@ -587,7 +626,7 @@ def cmd_start(args):
         # failures/night, phantom-burning the entire token budget).
         noop_ticket_ids = {
             it["ticket_id"] for it in bud.get("iterations", [])
-            if it.get("status") in ("no-op", "queued", "denied", "failed")
+            if it.get("status") in ("no-op", "queued", "denied", "failed", "needs-human")
         }
         ticket = pick_next_ticket(root, exclude_ids=noop_ticket_ids)
         if not ticket:
@@ -597,6 +636,16 @@ def cmd_start(args):
                 if stop_flag(root).exists() or now() >= deadline:
                     break
                 time.sleep(10)
+            continue
+
+        # Approval gate: park risky tickets for a human and keep the night moving.
+        gate_reason = match_approval_gate(root, ticket, "pre_delegate")
+        if gate_reason:
+            request_approval(root, ticket, "pre_delegate", gate_reason,
+                             diff_summary=", ".join((ticket.get("target_files") or [])[:20]))
+            print(f"  [iter {iteration}] ⏸  {ticket['id']} awaiting approval: {gate_reason}")
+            log_iter(root, {"iteration": iteration, "ticket_id": ticket["id"],
+                            "status": "awaiting-approval", "note": gate_reason})
             continue
 
         if should_downshift(cfg, bud):
@@ -636,6 +685,7 @@ def cmd_start(args):
             ok, tail = run_delegate(
                 root, ticket["id"], agent, task_budget,
                 model=args.model, timeout=DEFAULT_DELEGATE_TIMEOUT,
+                resume=bool(ticket.get("session_id")) and ticket.get("resume_interrupted", False),
             )
             # Heuristic: assume delegation burned the budget it was given.
             # A sub-5s failure means the subprocess died before any model
@@ -666,7 +716,16 @@ def cmd_start(args):
         git(["checkout", cfg["base_branch"]], root, check=False)
 
         # Evaluate outcome.
-        if not ok:
+        perm_match = re.search(r"needs_permission: ([^\n\x1b]+)", tail or "")
+        if perm_match:
+            # Morty hit permission denials nobody can answer unattended: park the
+            # ticket for a human instead of requeueing it blindly.
+            status_label = "needs-human"
+            note = f"needs_permission: {perm_match.group(1).strip()}"
+            git(["branch", "-D", branch], root, check=False)
+            set_ticket_status(root, ticket["id"], "blocked")
+            print(f"  🙋 {note} — ticket blocked for human, branch deleted")
+        elif not ok:
             status_label = "failed"
             note = tail.splitlines()[-1] if tail else "delegation failed"
             git(["branch", "-D", branch], root, check=False)
@@ -684,6 +743,9 @@ def cmd_start(args):
         else:
             status_label = "queued"
             note = f"{len(diff_files)} file(s) changed"
+            merge_gate = match_approval_gate(root, ticket, "pre_merge", diff_files)
+            if merge_gate:
+                note += f" — needs approval: {merge_gate}"
             idx = append_queue(root, {
                 "ticket_id": ticket["id"],
                 "title": ticket["title"],
@@ -692,6 +754,13 @@ def cmd_start(args):
                 "tokens": spent_tokens,
                 "note": note,
             })
+            # Structural fix for re-picking: a queued ticket awaits review,
+            # so it must leave todo (reverted by `sleepy discard`).
+            if merge_gate:
+                request_approval(root, load_ticket(root, ticket["id"]), "pre_merge", merge_gate,
+                                diff_summary=", ".join(diff_files[:20]))
+            else:
+                set_ticket_status(root, ticket["id"], "in_review")
             print(f"  ✅ queued as #{idx}  {branch}  ({len(diff_files)} files)")
 
         bud["spent_tokens"] += spent_tokens
@@ -738,6 +807,7 @@ def cmd_start(args):
         f"  Spent: {fmt_tokens(bud['spent_tokens'])}/{fmt_tokens(cap)}  "
         f"({len(parse_queue(root))} items in queue)"
     )
+    _print_pending_approvals(root)
     print("═" * 64)
     emit("cto.sleepy.finished", {
         "iterations": bud["iterations_completed"],
@@ -793,7 +863,7 @@ def cmd_status(args):
             for it in recent:
                 marker = {
                     "queued": "✅", "denied": "🚫",
-                    "failed": "❌", "no-op": "⚠️",
+                    "failed": "❌", "no-op": "⚠️", "needs-human": "🙋",
                 }.get(it.get("status"), "·")
                 print(
                     f"    {marker} iter {it['iteration']:>3}  "
@@ -803,6 +873,7 @@ def cmd_status(args):
 
     q = parse_queue(root)
     print(f"\n  Review queue: {len(q)} item(s)")
+    _print_pending_approvals(root)
     print("═" * 64)
 
 
@@ -861,6 +932,8 @@ def cmd_discard(args):
             print(f"Failed to delete {branch}: {res.stderr}", file=sys.stderr)
             sys.exit(1)
     print(f"✓ Discarded {branch}")
+    if set_ticket_status(root, target["ticket_id"], "todo", only_from="in_review"):
+        print(f"  ↩ {target['ticket_id']} back to todo")
     _mark_queue_processed(root, args.index, "discarded")
 
 

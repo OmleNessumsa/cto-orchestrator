@@ -9,13 +9,13 @@ No external dependencies required — uses stdlib only.
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional, TypedDict
 
 
 # ── Schema definitions ──────────────────────────────────────────────────────
 
 VALID_AGENT_STATUSES = {"completed", "needs_review", "blocked"}
-VALID_MEESEEKS_STATUSES = {"completed", "too_complex"}
+VALID_MEESEEKS_STATUSES = {"completed", "too_complex", "out_of_scope"}
 VALID_COMPLEXITIES = {"simple", "medium", "too_complex"}
 
 
@@ -28,11 +28,13 @@ class AgentOutput:
     description: str = ""
     open_questions: Optional[str] = None
     criteria_check: list[dict] = field(default_factory=list)
+    status_coerced: bool = False
 
     def __post_init__(self):
-        # Validate status
+        # Fail closed: an invalid or missing status must never read as success
         if self.status not in VALID_AGENT_STATUSES:
-            self.status = "completed"
+            self.status = "needs_review"
+            self.status_coerced = True
         # Ensure files_changed is a list of strings
         if not isinstance(self.files_changed, list):
             self.files_changed = []
@@ -65,6 +67,7 @@ class AgentOutput:
             "description": self.description,
             "open_questions": self.open_questions or "",
             "criteria_check": self.criteria_check,
+            "status_coerced": self.status_coerced,
         }
 
 
@@ -80,10 +83,12 @@ class MeeseeksOutput:
     description: str = ""
     complexity: str = "simple"
     existence_is_pain: bool = False
+    status_coerced: bool = False
 
     def __post_init__(self):
         if self.status not in VALID_MEESEEKS_STATUSES:
-            self.status = "completed"
+            self.status = "too_complex"
+            self.status_coerced = True
         if not isinstance(self.files_changed, list):
             self.files_changed = []
         self.files_changed = [str(f) for f in self.files_changed if f]
@@ -98,6 +103,7 @@ class MeeseeksOutput:
             "description": self.description,
             "complexity": self.complexity,
             "existence_is_pain": self.existence_is_pain,
+            "status_coerced": self.status_coerced,
         }
 
 
@@ -192,7 +198,7 @@ def parse_agent_json(output: str) -> Optional[AgentOutput]:
 
     try:
         return AgentOutput(
-            status=data.get("status", "completed"),
+            status=data.get("status"),
             files_changed=data.get("files_changed", []),
             summary=data.get("summary", ""),
             description=data.get("description", ""),
@@ -253,7 +259,7 @@ def parse_meeseeks_json(output: str) -> Optional[MeeseeksOutput]:
 
     try:
         return MeeseeksOutput(
-            status=data.get("status", "completed"),
+            status=data.get("status"),
             files_changed=data.get("files_changed", []),
             description=data.get("description", ""),
             complexity=data.get("complexity", "simple"),
@@ -291,6 +297,19 @@ DELEGATE_OUTPUT_SCHEMA: dict = {
     "additionalProperties": True,
 }
 
+# Strict variant handed to the CLI via --json-schema so the Morty's final
+# report is a validated StructuredOutput tool call instead of regex-scraped text.
+AGENT_REPORT_JSON_SCHEMA: dict = {
+    **DELEGATE_OUTPUT_SCHEMA,
+    "properties": {
+        **DELEGATE_OUTPUT_SCHEMA["properties"],
+        "status": {"type": "string", "enum": sorted(VALID_AGENT_STATUSES)},
+        "files_changed": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "description": {"type": "string", "minLength": 1},
+    },
+    "required": ["status", "files_changed", "description"],
+}
+
 MEESEEKS_OUTPUT_SCHEMA: dict = {
     "type": "object",
     "required": ["status", "files_changed"],
@@ -303,6 +322,20 @@ MEESEEKS_OUTPUT_SCHEMA: dict = {
         "next_steps": {"type": "array"},
     },
     "additionalProperties": True,
+}
+
+# Strict variant handed to the CLI via --json-schema so the Meeseeks' final
+# report is a validated StructuredOutput tool call instead of a scraped JSON fence.
+MEESEEKS_RESULT_SCHEMA: dict = {
+    "type": "object",
+    "required": ["status", "files_changed", "summary", "followup_needed"],
+    "properties": {
+        "status": {"type": "string", "enum": ["done", "blocked", "out_of_scope"]},
+        "files_changed": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+        "followup_needed": {"type": ["string", "null"]},
+    },
+    "additionalProperties": False,
 }
 
 
@@ -326,6 +359,22 @@ ROUTING_DECISION_SCHEMA: dict = {
         "complexity": {"type": "string", "enum": ROUTING_VALID_COMPLEXITIES},
     },
     "required": ["agent", "complexity"],
+    "additionalProperties": False,
+}
+
+PROGRESS_LEDGER_SCHEMA: dict = {
+    "type": "object",
+    "description": "Per-attempt progress ledger for the review/retry loop (Magentic-One style): "
+                    "is the ticket done, is it progressing, is it stuck, and who/what should go next.",
+    "properties": {
+        "is_complete": {"type": "boolean"},
+        "is_progressing": {"type": "boolean"},
+        "is_stuck": {"type": "boolean"},
+        "root_cause": {"type": "string"},
+        "next_agent": {"type": "string", "enum": ROUTING_VALID_AGENTS},
+        "next_instruction": {"type": "string"},
+    },
+    "required": ["is_complete", "is_progressing", "is_stuck", "root_cause", "next_agent", "next_instruction"],
     "additionalProperties": False,
 }
 
@@ -652,3 +701,153 @@ class RoroEvent:
         if self.agent_id is not None:
             d["agent_id"] = self.agent_id
         return d
+
+
+# ── MCP structured tool output (read-only tools in mcp_server.py) ───────────
+#
+# FastMCP derives each tool's outputSchema from these return types and sends
+# structuredContent next to a text fallback. Every key is optional (total=False)
+# so error/hint payloads such as {"error": "..."} stay valid. Top-level
+# fields are also Optional because FastMCP dumps unset keys as null; a null
+# top-level field means "not applicable here". Free-text fields
+# (description, agent_output, message) hold peer-wrapped text, never raw input.
+
+class ResolvedDependency(TypedDict, total=False):
+    id: str
+    title: Optional[str]
+    status: Optional[str]
+    agent_output: Optional[str]
+
+
+class TicketView(TypedDict, total=False):
+    id: Optional[str]
+    title: Optional[str]
+    type: Optional[str]
+    status: Optional[str]
+    priority: Optional[str]
+    assigned_agent: Optional[str]
+    description: Optional[str]
+    agent_output: Optional[str]
+    review_notes: Any
+    files_touched: Optional[list[str]]
+    parent_ticket: Optional[str]
+    dependencies: Optional[list[str]]
+    acceptance_criteria: Optional[list[Any]]
+    estimated_complexity: Optional[str]
+    team_mode: Any
+    team_template: Any
+    team_id: Optional[str]
+    created_at: Optional[str]
+    updated_at: Optional[str]
+    completed_at: Optional[str]
+    verification: Any
+    session_id: Optional[str]
+    resolved_dependencies: Optional[list[ResolvedDependency]]
+    error: Optional[str]
+
+
+class TicketSummary(TypedDict, total=False):
+    id: Optional[str]
+    title: Optional[str]
+    status: Optional[str]
+    assignee: Optional[str]
+    priority: Optional[str]  # detailed only
+    type: Optional[str]  # detailed only
+    complexity: Optional[str]  # detailed only
+    dependencies: list[str]  # detailed only
+
+
+class TicketList(TypedDict, total=False):
+    count: Optional[int]
+    total: Optional[int]
+    offset: Optional[int]
+    tickets: Optional[list[TicketSummary]]
+    note: Optional[str]
+
+
+class BoardCard(TypedDict, total=False):
+    id: Optional[str]
+    title: Optional[str]
+    agent: Optional[str]
+    priority: Optional[str]
+
+
+class BoardView(TypedDict, total=False):
+    totals: Optional[dict[str, int]]
+    ids: Optional[dict[str, list[Optional[str]]]]  # concise
+    columns: Optional[dict[str, list[BoardCard]]]  # detailed
+
+
+class ProjectStatus(TypedDict, total=False):
+    project_name: Optional[str]
+    ticket_prefix: Optional[str]
+    ticket_counts: Optional[dict[str, int]]
+    current_sprint: Any  # detailed only
+    default_model: Optional[str]  # detailed only
+    next_ticket_number: Optional[int]  # detailed only
+    last_activity: Optional[str]  # detailed only
+
+
+class PendingApproval(TypedDict, total=False):
+    ticket_id: str
+    title: Optional[str]
+    phase: Optional[str]
+    reason: Optional[str]
+    requested_at: Optional[str]
+    diff_summary: Optional[str]
+
+
+class PendingApprovals(TypedDict, total=False):
+    count: Optional[int]
+    pending: Optional[list[PendingApproval]]
+
+
+# Messages carry "from" (a keyword), so the functional syntax is required.
+TeamMessage = TypedDict("TeamMessage", {
+    "id": Any,
+    "team_id": str,
+    "from": str,
+    "to": str,
+    "type": Optional[str],
+    "timestamp": Optional[str],
+    "message": Optional[str],
+    "read_by": list[str],
+}, total=False)
+
+
+class TeamContext(TypedDict, total=False):
+    team_id: Optional[str]
+    parent_ticket: Optional[str]
+    status: Optional[str]
+    members: Optional[list[Any]]
+    coordination: Optional[dict[str, Any]]
+    decisions: Optional[list[Any]]
+    interfaces: Optional[list[Any]]
+    recent_messages: Optional[list[TeamMessage]]
+    error: Optional[str]
+
+
+class FileReservation(TypedDict, total=False):
+    team_id: Optional[str]
+    your_role: Optional[str]
+    your_files: Optional[list[str]]
+    all_reservations: Optional[dict[str, list[str]]]
+    error: Optional[str]
+
+
+class SleepyStatus(TypedDict, total=False):
+    initialized: Optional[bool]
+    hint: Optional[str]
+    state: Optional[dict[str, Any]]
+    queue_depth: Optional[int]
+
+
+class SleepyQueue(TypedDict, total=False):
+    queue: Optional[str]
+    note: Optional[str]
+
+
+class PrometheusStatus(TypedDict, total=False):
+    initialized: Optional[bool]
+    counts: Optional[dict[str, int]]
+    ledger_tail: Optional[list[Any]]

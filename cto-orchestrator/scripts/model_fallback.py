@@ -111,6 +111,18 @@ def fallback_args(model: str, agent_role: Optional[str] = None) -> list[str]:
     return []
 
 
+def resolve_alias_from_init(event: dict) -> Optional[str]:
+    """Concrete model ID from a stream-json system/init event, else None.
+
+    Aliases ('opus', 'sonnet', 'haiku') resolve to whatever the CLI maps them to
+    today; pricing must use this resolved ID, never the alias itself.
+    """
+    if isinstance(event, dict) and event.get("type") == "system" and event.get("subtype", "init") == "init":
+        m = event.get("model")
+        return m if isinstance(m, str) and m else None
+    return None
+
+
 def detect_model_used(event: dict, requested: Optional[str] = None) -> Optional[str]:
     """Extract the model that actually served a stream-json event, if present.
 
@@ -143,6 +155,23 @@ def detect_model_used(event: dict, requested: Optional[str] = None) -> Optional[
                     return max(matches, key=_out)
             return max(usage, key=_out)
     return None
+
+
+# Advisor ranking (documented table): an advisor must rank at or above the main
+# model, and Haiku can never advise.
+_ADVISOR_RANK = {"haiku": 1, "sonnet": 2, "opus": 3}
+
+
+def advisor_is_valid(main: Optional[str], advisor: Optional[str]) -> bool:
+    """True if `--advisor <advisor>` is accepted alongside `--model <main>`.
+
+    The CLI exits at launch on an invalid pairing, so callers drop the flag
+    when this returns False.
+    """
+    m, a = normalise_model(main), normalise_model(advisor)
+    if not m or not a or a == "haiku":
+        return False
+    return _ADVISOR_RANK[a] >= _ADVISOR_RANK[m]
 
 
 def is_fallback(requested: str, used: Optional[str]) -> bool:

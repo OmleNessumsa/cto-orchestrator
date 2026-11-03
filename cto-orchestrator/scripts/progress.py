@@ -7,7 +7,9 @@ summaries/reports. Built by the smartest mammal in the multiverse.
 
 import argparse
 import json
+import atexit
 import os
+import signal
 import sys
 import time
 from datetime import datetime, timezone
@@ -24,7 +26,66 @@ def _animated_output() -> bool:
         return False
     if os.environ.get("NO_COLOR") or os.environ.get("CI"):
         return False
-    return sys.stdout.isatty()
+    return sys.stderr.isatty()
+
+
+_OSC_TERM_PROGRAMS = {"ghostty", "WezTerm", "iTerm.app"}
+_osc_active: "list[ProgressDisplay]" = []  # displays with a tab-progress state still set
+_osc_hooks_installed = False
+
+
+def _osc_progress_supported() -> bool:
+    """Return True when the terminal understands OSC 9;4 tab/taskbar progress."""
+    env = os.environ
+    if env.get("RICK_NO_OSC_PROGRESS") or env.get("NO_COLOR") or env.get("CI"):
+        return False
+    if not sys.stderr.isatty():
+        return False
+    if env.get("TERM_PROGRAM") == "Apple_Terminal":
+        return False
+    return env.get("TERM_PROGRAM") in _OSC_TERM_PROGRAMS or bool(env.get("WT_SESSION"))
+
+
+def _osc_progress_write(state: int, pct: int | None = None) -> None:
+    """Write an OSC 9;4 sequence to stderr (DCS-wrapped inside tmux)."""
+    seq = f"\033]9;4;{state};{'' if pct is None else pct}\a"
+    if os.environ.get("TMUX"):
+        seq = "\033Ptmux;" + seq.replace("\033", "\033\033") + "\033\\"
+    sys.stderr.write(seq)
+    sys.stderr.flush()
+
+
+def _osc_clear_all() -> None:
+    """Clear tab progress for every display that still has it set."""
+    while _osc_active:
+        display = _osc_active.pop()
+        try:
+            _osc_progress_write(0)
+        except (OSError, ValueError):
+            pass
+        display._osc_on = False
+
+
+def _install_osc_hooks() -> None:
+    """Register atexit + SIGINT clear so a crashed run doesn't leave the tab stuck."""
+    global _osc_hooks_installed
+    if _osc_hooks_installed:
+        return
+    _osc_hooks_installed = True
+    atexit.register(_osc_clear_all)
+    try:
+        previous = signal.getsignal(signal.SIGINT)
+
+        def _on_sigint(signum, frame):
+            _osc_clear_all()
+            if callable(previous):
+                previous(signum, frame)
+            else:
+                raise KeyboardInterrupt
+
+        signal.signal(signal.SIGINT, _on_sigint)
+    except ValueError:  # not in the main thread
+        pass
 
 
 class ProgressDisplay:
@@ -47,6 +108,8 @@ class ProgressDisplay:
         self._last_draw = 0.0
         self._spinner_idx = 0
         self._last_static_pct = -1  # tracks discrete update threshold
+        self._osc = _osc_progress_supported()
+        self._osc_on = False
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -75,13 +138,39 @@ class ProgressDisplay:
             f"  ✓ {self._label}: {self._completed}/{self._total} done "
             f"({pct:.0f}%) in {elapsed:.1f}s"
         )
+        self._osc_clear()
         if self._animated:
-            sys.stdout.write("\r\033[K" + line + "\n")
-            sys.stdout.flush()
+            sys.stderr.write("\r\033[K" + line + "\n")
+            sys.stderr.flush()
         else:
-            print(line)
+            print(line, file=sys.stderr)
+
+    def fail(self) -> None:
+        """Emit a failed line and leave the tab in the error state."""
+        elapsed = time.monotonic() - self._start
+        line = (
+            f"  ✗ {self._label}: failed at {self._completed}/{self._total} "
+            f"after {elapsed:.1f}s"
+        )
+        if self._osc:
+            if self._osc_on:
+                _osc_active.remove(self)
+                self._osc_on = False
+            pct = int(self._completed / self._total * 100) if self._total else 0
+            _osc_progress_write(2, pct)
+        if self._animated:
+            sys.stderr.write("\r\033[K" + line + "\n")
+            sys.stderr.flush()
+        else:
+            print(line, file=sys.stderr)
 
     # ── Internals ─────────────────────────────────────────────────────────────
+
+    def _osc_clear(self) -> None:
+        if self._osc_on:
+            _osc_active.remove(self)
+            self._osc_on = False
+            _osc_progress_write(0)
 
     def _elapsed(self) -> float:
         return time.monotonic() - self._start
@@ -118,8 +207,14 @@ class ProgressDisplay:
             f"  {frame} {self._label}: [{bar}] "
             f"{self._completed}/{self._total} ({pct:.0f}%)  {eta}{suffix}"
         )
-        sys.stdout.write("\r\033[K" + line)
-        sys.stdout.flush()
+        sys.stderr.write("\r\033[K" + line)
+        sys.stderr.flush()
+        if self._osc:
+            if not self._osc_on:
+                self._osc_on = True
+                _osc_active.append(self)
+                _install_osc_hooks()
+            _osc_progress_write(1, min(100, int(pct)))
 
     def _maybe_emit_static(self) -> None:
         """Emit a plain status line only at each 10-percentage-point step."""
@@ -131,7 +226,7 @@ class ProgressDisplay:
         eta = self._eta_str()
         rate = self._rate_str()
         suffix = f"  {rate}" if rate else ""
-        print(f"  {self._label}: {self._completed}/{self._total} ({pct}%)  {eta}{suffix}")
+        print(f"  {self._label}: {self._completed}/{self._total} ({pct}%)  {eta}{suffix}", file=sys.stderr)
 
 
 def find_cto_root(start=None) -> Path:

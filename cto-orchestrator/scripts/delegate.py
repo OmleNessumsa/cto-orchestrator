@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -21,8 +22,10 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from model_fallback import FALLBACK_CHAINS, fallback_args, detect_model_used, is_fallback
+    from model_fallback import FALLBACK_CHAINS, fallback_args, detect_model_used, is_fallback, advisor_is_valid
 except ImportError:
+    def advisor_is_valid(*args, **kwargs):
+        return False
     FALLBACK_CHAINS = {}
     def fallback_args(*args, **kwargs):
         return []
@@ -90,7 +93,7 @@ SECURITY_DEGRADED = False
 
 # Import roro event emitter
 try:
-    from roro_events import emit, emit_progress, emit_stream_progress, emit_morty_done, emit_review_event, get_agent_id
+    from roro_events import emit, emit_progress, emit_stream_progress, emit_morty_done, emit_morty_api_retry, emit_permission_denied, emit_review_event, get_agent_id
 except ImportError:
     # Fallback if module not found
     def emit(*args, **kwargs):
@@ -100,6 +103,10 @@ except ImportError:
     def emit_stream_progress(*args, **kwargs):
         pass
     def emit_morty_done(*args, **kwargs):
+        pass
+    def emit_morty_api_retry(*args, **kwargs):
+        pass
+    def emit_permission_denied(*args, **kwargs):
         pass
     def emit_review_event(*args, **kwargs):
         pass
@@ -120,6 +127,15 @@ except ImportError:
     def format_status_row(agent, role, ticket, state, elapsed, detail=None):
         row = f"? {agent} {role} {ticket} {state} {elapsed:>7.1f}s"
         return f"{row}  {detail}" if detail else row
+
+try:
+    from security_utils import is_test_path, diff_weakens_tests
+except ImportError:
+    def is_test_path(p):
+        return False
+
+    def diff_weakens_tests(diff_text):
+        return []
 
 # Import security utilities
 try:
@@ -237,28 +253,107 @@ except ImportError:
     def issue_agent_token(role, ticket_id, root_dir=None):
         return ""
 
+# Native sandbox helpers (PROM-192) — imported separately so a stale
+# security_utils disables only the sandbox, not every other security control.
+try:
+    from security_utils import (
+        native_sandbox_enabled,
+        cli_supports_native_sandbox,
+        write_sandbox_settings,
+        is_unattended,
+        sandbox_domains,
+    )
+except ImportError:
+    def native_sandbox_enabled(root):
+        return False
+
+    def cli_supports_native_sandbox(version_string):
+        return False
+
+    def write_sandbox_settings(root, tag, base=None, unattended=False, extra_domains=()):
+        raise OSError("security_utils unavailable: native sandbox disabled")
+
+    def is_unattended():
+        return os.environ.get("CTO_UNATTENDED") == "1"
+
+    def sandbox_domains(extra_domains=()):
+        return []
+
 
 # ── Cost Tracking ────────────────────────────────────────────────────────────
 
-# Rough model pricing per 1M tokens (USD) — estimates only, not billed amounts
-# cache_read: prompt-cache hit rate; cache_write_5m: cache-write premium (5-min
-# TTL, default); cache_write_1h: extended cache-write premium (1-hour TTL,
-# input * 2.0 per Anthropic's pricing). 1h writes cost more up front but stay
-# hot across a whole sprint instead of expiring every 5 minutes, so dozens of
-# same-role Morty delegations reuse one write instead of paying the premium
-# repeatedly — see persona.PROMPT_CACHE_TTL and build_prompt()'s stable prefix.
-_MODEL_PRICING_USD_PER_1M: dict[str, dict[str, float]] = {
-    "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
-    "opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
-    "claude-opus-4-7": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
-    "claude-opus-4-8": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write_5m": 18.75, "cache_write_1h": 30.00},
-    "sonnet": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00},
-    "sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00},
-    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00},
-    "haiku": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00, "cache_write_1h": 1.60},
-    "claude-haiku-4-5": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00, "cache_write_1h": 1.60},
-    "claude-haiku-4-5-20251001": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_write_5m": 1.00, "cache_write_1h": 1.60},
+# Model pricing per 1M tokens (USD), keyed by full model ID — pre-run estimates
+# only; actual spend comes from the CLI's result.total_cost_usd / modelUsage.
+# Aliases ('opus', 'sonnet', 'haiku') are NOT priced here: they resolve to
+# different models over time, so resolve them via the stream-json system/init
+# event's 'model' field first (see _resolve_pricing_model).
+# cache_read is explicit per model (it is not always input * 0.1); cache_write_5m
+# is input * 1.25 and cache_write_1h is input * 2.0 per Anthropic's pricing. 1h
+# writes cost more up front but stay hot across a whole sprint instead of
+# expiring every 5 minutes, so dozens of same-role Morty delegations reuse one
+# write instead of paying the premium repeatedly — see persona.PROMPT_CACHE_TTL
+# and build_prompt()'s stable prefix.
+# 'long_prompt_threshold' + 'long' (a second price set) apply when a prompt's
+# total tokens exceed the threshold.
+
+
+def _price_set(input_: float, output: float, cache_read: float) -> dict[str, float]:
+    return {
+        "input": input_,
+        "output": output,
+        "cache_read": cache_read,
+        "cache_write_5m": round(input_ * 1.25, 6),
+        "cache_write_1h": round(input_ * 2.0, 6),
+    }
+
+
+_MODEL_PRICING_USD_PER_1M: dict[str, dict] = {
+    "claude-fable-5-1": _price_set(10.0, 50.0, 0.25),
+    "claude-opus-5-5": _price_set(4.0, 20.0, 0.20),
+    "claude-opus-5": _price_set(5.0, 25.0, 0.50),
+    "claude-opus-4-8": _price_set(5.0, 25.0, 0.50),
+    "claude-opus-4-7": _price_set(5.0, 25.0, 0.50),
+    "claude-sonnet-5-5": _price_set(2.0, 10.0, 0.10),
+    "claude-sonnet-5": _price_set(2.0, 10.0, 0.20),
+    "claude-sonnet-4-6": _price_set(3.0, 15.0, 0.30),
+    "claude-haiku-5-5": {
+        **_price_set(0.10, 0.50, 0.01),
+        "long_prompt_threshold": 100000,
+        "long": _price_set(0.50, 2.50, 0.05),
+    },
+    "claude-haiku-4-5": _price_set(1.0, 5.0, 0.10),
 }
+_PRICING_FALLBACK_MODEL = "claude-sonnet-5-5"
+_warned_unpriced_models: set[str] = set()
+
+
+def _resolve_pricing_model(model: str) -> Optional[str]:
+    """Map a concrete model ID (optionally date-suffixed) to a pricing-table key."""
+    if model in _MODEL_PRICING_USD_PER_1M:
+        return model
+    base = re.sub(r"-\d{8}$", "", model or "")
+    return base if base in _MODEL_PRICING_USD_PER_1M else None
+
+
+def _pricing_for(model: str, prompt_tokens: int = 0) -> dict:
+    """Price set for a model; warns once per unknown ID instead of silently guessing."""
+    key = _resolve_pricing_model(model)
+    if key is None:
+        if model not in _warned_unpriced_models:
+            _warned_unpriced_models.add(model)
+            err_console.print(
+                f"[yellow][CostTracker] Model '{model}' missing from pricing table — "
+                f"using {_PRICING_FALLBACK_MODEL} pricing; resolve aliases via the init event. "
+                f"Ledger may be inaccurate.[/yellow]"
+            )
+        key = _PRICING_FALLBACK_MODEL
+    pricing = _MODEL_PRICING_USD_PER_1M[key]
+    threshold = pricing.get("long_prompt_threshold")
+    if threshold and prompt_tokens > threshold:
+        return pricing["long"]
+    return pricing
+
+
 _CHARS_PER_TOKEN = 4  # rough approximation: 4 chars ≈ 1 token
 
 
@@ -296,20 +391,18 @@ class CostTracker:
         """
         input_tokens = max(1, len(prompt) // _CHARS_PER_TOKEN)
         output_tokens = max(1, len(output) // _CHARS_PER_TOKEN)
-        if model not in _MODEL_PRICING_USD_PER_1M:
-            err_console.print(f"[yellow][CostTracker] Unknown model '{model}' — falling back to sonnet pricing; ledger may be inaccurate.[/yellow]")
-        pricing = _MODEL_PRICING_USD_PER_1M.get(model, _MODEL_PRICING_USD_PER_1M["sonnet"])
+        pricing = _pricing_for(model, input_tokens + cache_read_tokens + cache_creation_tokens)
         input_cost = input_tokens * pricing["input"] / 1_000_000
         output_cost = output_tokens * pricing["output"] / 1_000_000
-        cache_read_cost = cache_read_tokens * pricing.get("cache_read", pricing["input"] * 0.1) / 1_000_000
+        cache_read_cost = cache_read_tokens * pricing["cache_read"] / 1_000_000
         write_rate_key = "cache_write_1h" if cache_ttl == "1h" else "cache_write_5m"
-        cache_write_cost = cache_creation_tokens * pricing.get(write_rate_key, pricing["input"] * 1.25) / 1_000_000
+        cache_write_cost = cache_creation_tokens * pricing[write_rate_key] / 1_000_000
         # What this cache_read would have cost if the 5-minute default TTL had
         # already lapsed and the same content needed a fresh 5m cache_write
         # instead — i.e. the savings the 1h TTL realizes on this call.
         cache_ttl_savings_usd = 0.0
         if cache_ttl == "1h" and cache_read_tokens:
-            hypothetical_5m_cost = cache_read_tokens * pricing.get("cache_write_5m", pricing["input"] * 1.25) / 1_000_000
+            hypothetical_5m_cost = cache_read_tokens * pricing["cache_write_5m"] / 1_000_000
             cache_ttl_savings_usd = max(0.0, hypothetical_5m_cost - cache_read_cost)
         return {
             "input_tokens": input_tokens,
@@ -345,12 +438,53 @@ class CostTracker:
         self.delegations.append({"ticket_id": ticket_id, "agent": agent, **breakdown})
         return breakdown
 
-    def record_actual(self, ticket_id: str, agent: str, usage: dict, total_cost_usd: float, model: str) -> dict:
-        """Record real token usage from the CLI 'result' event; accumulate cost."""
+    def record_actual(
+        self,
+        ticket_id: str,
+        agent: str,
+        usage: dict,
+        total_cost_usd: float,
+        model: str,
+        model_usage: Optional[dict] = None,
+    ) -> dict:
+        """Record real usage from the CLI 'result' event; accumulate cost.
+
+        total_cost_usd (the CLI's own figure) is authoritative. When the result
+        carries a per-model breakdown (modelUsage), one cost line is recorded per
+        model so fallback-model runs and advisor tokens bill to the right model;
+        the local pricing table is only used for a model line lacking costUSD.
+        """
         input_tokens = usage.get("input_tokens", 0)
         output_tokens = usage.get("output_tokens", 0)
         cache_read = usage.get("cache_read_input_tokens", 0)
         cache_creation = usage.get("cache_creation_input_tokens", 0)
+        lines: list[dict] = []
+        if isinstance(model_usage, dict):
+            for m_id, mu in model_usage.items():
+                if not isinstance(mu, dict):
+                    continue
+                m_in = mu.get("inputTokens", 0)
+                m_out = mu.get("outputTokens", 0)
+                m_cr = mu.get("cacheReadInputTokens", 0)
+                m_cc = mu.get("cacheCreationInputTokens", 0)
+                m_cost = mu.get("costUSD")
+                if m_cost is None:
+                    p = _pricing_for(m_id, m_in + m_cr + m_cc)
+                    m_cost = (
+                        m_in * p["input"] + m_out * p["output"]
+                        + m_cr * p["cache_read"] + m_cc * p["cache_write_1h"]
+                    ) / 1_000_000
+                lines.append({
+                    "input_tokens": m_in,
+                    "output_tokens": m_out,
+                    "cache_read_input_tokens": m_cr,
+                    "cache_creation_input_tokens": m_cc,
+                    "total_cost_usd": round(m_cost, 6),
+                    "model": m_id,
+                    "source": "actual",
+                })
+        if not total_cost_usd and lines:
+            total_cost_usd = sum(l["total_cost_usd"] for l in lines)
         breakdown = {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
@@ -360,10 +494,16 @@ class CostTracker:
             "model": model,
             "source": "actual",
         }
+        if lines:
+            breakdown["models"] = lines
         self.total_cost_usd += breakdown["total_cost_usd"]
         self.total_input_tokens += input_tokens
         self.total_output_tokens += output_tokens
-        self.delegations.append({"ticket_id": ticket_id, "agent": agent, **breakdown})
+        if lines:
+            for line in lines:
+                self.delegations.append({"ticket_id": ticket_id, "agent": agent, **line})
+        else:
+            self.delegations.append({"ticket_id": ticket_id, "agent": agent, **breakdown})
         return breakdown
 
     def budget_exceeded(self) -> bool:
@@ -384,14 +524,73 @@ class CostTracker:
 # outright break claude.ai connector auth ("connectors are disabled because
 # ANTHROPIC_API_KEY or another auth source is set"). Extra keys can be added
 # via the comma-separated CTO_ENV_BLOCKLIST env var.
-_SUBPROCESS_ENV_STRIP_KEYS = {"CLAUDECODE", "ANTHROPIC_API_KEY"} | {
+# DISABLE_TELEMETRY is stripped too: the advisor tool needs feature-flag
+# fetching, which telemetry-off breaks.
+_SUBPROCESS_ENV_STRIP_KEYS = {"CLAUDECODE", "ANTHROPIC_API_KEY", "DISABLE_TELEMETRY"} | {
     k.strip() for k in os.environ.get("CTO_ENV_BLOCKLIST", "").split(",") if k.strip()
 }
 
 
+_warned_disable_telemetry = False
+
+
 def _clean_subprocess_env() -> dict:
     """Build the env for a claude subprocess with auth-interfering keys stripped."""
-    return {k: v for k, v in os.environ.items() if k not in _SUBPROCESS_ENV_STRIP_KEYS}
+    global _warned_disable_telemetry
+    if os.environ.get("DISABLE_TELEMETRY") and not _warned_disable_telemetry:
+        _warned_disable_telemetry = True
+        console.print(
+            "[yellow]DISABLE_TELEMETRY is set — not forwarding it to claude subprocesses "
+            "(the advisor tool needs feature-flag fetching).[/yellow]"
+        )
+    env = {k: v for k, v in os.environ.items() if k not in _SUBPROCESS_ENV_STRIP_KEYS}
+    if os.environ.get("CTO_DISABLE_ADVISOR") == "1":
+        env["CLAUDE_CODE_DISABLE_ADVISOR_TOOL"] = "1"
+    try:
+        from security_utils import install_hardening_env
+        env.update(install_hardening_env())
+    except Exception:
+        pass
+    return env
+
+
+_GRACEFUL_SIGINT_WAIT = 15
+_GRACEFUL_SIGTERM_WAIT = 10
+
+
+def _signal_proc_group(proc, sig) -> None:
+    """Signal the whole process group (Bash children included); fall back to the leader."""
+    try:
+        os.killpg(os.getpgid(proc.pid), sig)
+    except (ProcessLookupError, PermissionError, OSError):
+        try:
+            proc.send_signal(sig)
+        except Exception:
+            pass
+
+
+def _graceful_stop(proc) -> None:
+    """Stop a timed-out claude subprocess: SIGINT -> SIGTERM -> SIGKILL.
+
+    SIGINT lets the CLI close the transcript cleanly and run SessionEnd hooks, so
+    a requeued ticket can resume a consistent session. Needs the process to be a
+    group leader (start_new_session=True) so Bash children are cleaned up too.
+    """
+    for sig, wait in ((signal.SIGINT, _GRACEFUL_SIGINT_WAIT), (signal.SIGTERM, _GRACEFUL_SIGTERM_WAIT)):
+        if proc.poll() is not None:
+            break
+        _signal_proc_group(proc, sig)
+        try:
+            proc.wait(timeout=wait)
+            break
+        except subprocess.TimeoutExpired:
+            continue
+    if proc.poll() is None:
+        _signal_proc_group(proc, signal.SIGKILL)
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
 
 
 def find_cto_root(start=None) -> Path:
@@ -1295,6 +1494,129 @@ If you are unsure about an implementation choice, make the most pragmatic decisi
 </uncertainty_policy>{rubric_section}"""
 
 
+def _sibling_ownership(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None) -> list[dict]:
+    """Other in_progress/todo tickets in the same sprint/team, with the files they own.
+
+    A sibling shares this ticket's team_id or parent_ticket. Its files are its
+    target_files plus (when the sibling has an assigned role) that role's
+    reservations from team.get_active_reservations().
+    Returns [{id, title, role, files}].
+    """
+    try:
+        from team import get_active_reservations
+        reservations = get_active_reservations(root, exclude_role=agent_role)
+    except Exception:
+        reservations = {}
+    td = root / ".cto" / "tickets"
+    if not td.exists():
+        return []
+    my_team = team_id or ticket.get("team_id")
+    my_parent = ticket.get("parent_ticket")
+    siblings = []
+    for fp in sorted(td.glob("*.json")):
+        try:
+            t = load_json(fp)
+        except Exception:
+            continue
+        if t.get("id") == ticket.get("id") or t.get("status") not in ("in_progress", "todo"):
+            continue
+        same_team = bool(my_team) and t.get("team_id") == my_team
+        same_parent = bool(my_parent) and t.get("parent_ticket") == my_parent
+        if not (same_team or same_parent):
+            continue
+        role = t.get("assigned_agent") or ""
+        files = set(t.get("target_files") or [])
+        if role:
+            files.update(reservations.get(role, []))
+        siblings.append({"id": t.get("id", fp.stem), "title": t.get("title", ""), "role": role, "files": sorted(files)})
+    return siblings
+
+
+def _build_task_contract(root: Path, ticket: dict, agent_role: str, team_id: Optional[str] = None) -> str:
+    """Render the fixed <task_contract> block: objective, deliverable, scope, escalation."""
+    try:
+        from schemas import DELEGATE_OUTPUT_SCHEMA
+        schema_text = json.dumps(DELEGATE_OUTPUT_SCHEMA.get("properties", {}), indent=2)
+        required = ", ".join(DELEGATE_OUTPUT_SCHEMA.get("required", []))
+    except ImportError:
+        schema_text, required = "(see <result_json> format in the examples)", "status, files_changed"
+
+    criteria = ticket.get("acceptance_criteria") or []
+    criteria_text = "\n".join(f"  - {c}" for c in criteria) if criteria else "  - (none specified)"
+    in_scope = ticket.get("target_files") or []
+    in_scope_text = ", ".join(in_scope) if in_scope else "(not pre-declared — keep changes minimal and tied to the objective)"
+
+    out_lines = []
+    for sib in _sibling_ownership(root, ticket, agent_role, team_id):
+        owner = f"{sib['id']} / {sib['role']}" if sib["role"] else sib["id"]
+        files = ", ".join(sib["files"]) if sib["files"] else "(no files declared — do not solve its sub-problem)"
+        out_lines.append(f"  - {sib['id']} \"{sib['title']}\": {files}. Do NOT modify these; owned by {owner}")
+    out_text = "\n".join(out_lines) if out_lines else "  - (no sibling tickets in flight)"
+
+    facts = (ticket.get("facts_learned") or "").strip()
+    facts_text = f"FACTS_LEARNED (from earlier failed attempts — do not repeat them):\n{facts}\n" if facts else ""
+
+    return (
+        "<task_contract>\n"
+        f"OBJECTIVE: {ticket.get('title', '')}\n"
+        f"Acceptance criteria:\n{criteria_text}\n"
+        f"{facts_text}"
+        f"DELIVERABLE: end with a <result_json> block (required keys: {required}) matching:\n{schema_text}\n"
+        f"IN_SCOPE_FILES: {in_scope_text}\n"
+        f"OUT_OF_SCOPE:\n{out_text}\n"
+        "ESCALATION: if you must touch an out-of-scope file, stop and emit a <handoff> "
+        "or status=blocked with open_questions describing what you need and why.\n"
+        "</task_contract>\n"
+    )
+
+
+def assess_progress(root: Path, ticket: dict, issues: list, prior_ledger: list, model: str = "haiku") -> Optional[dict]:
+    """Ask a cheap helper model for a progress-ledger entry after a failed review.
+
+    Returns a PROGRESS_LEDGER_SCHEMA-valid dict, or None when the helper
+    fails or replies off-schema (callers then fall back to a plain retry).
+    """
+    from schemas import PROGRESS_LEDGER_SCHEMA, validate_schema
+
+    verification = ticket.get("verification") or {}
+    diff_summary = {
+        "actual_files": (verification.get("actual_files") or ticket.get("files_touched") or [])[:20],
+        "claimed_not_touched": (verification.get("claimed_not_touched") or [])[:10],
+        "touched_not_claimed": (verification.get("touched_not_claimed") or [])[:10],
+    }
+    prompt = (
+        "You track progress on a software ticket that failed review. Fill in a progress ledger entry.\n\n"
+        f"Ticket {ticket.get('id')}: {ticket.get('title', '')}\n"
+        f"Current agent: {ticket.get('assigned_agent') or 'unknown'}\n"
+        f"Acceptance criteria: {json.dumps(ticket.get('acceptance_criteria') or [])}\n\n"
+        f"Latest reviewer feedback:\n{wrap_untrusted_content(chr(10).join(f'- {i}' for i in issues), label='REVIEWER_FEEDBACK')}\n\n"
+        f"Verification diff summary: {json.dumps(diff_summary)}\n"
+        f"Previous ledger entries: {json.dumps(prior_ledger[-4:])}\n\n"
+        "is_progressing=false when the same issues recur or no new files/fixes appeared; is_stuck=true when "
+        "retrying with the same prompt is unlikely to help. root_cause: one sentence. next_agent: best role "
+        "for the next attempt. next_instruction: a concrete changed approach."
+    )
+    data = _call_helper_json(prompt, model=model, timeout=60, schema=PROGRESS_LEDGER_SCHEMA)
+    if not data:
+        return None
+    ok, _errors = validate_schema(data, PROGRESS_LEDGER_SCHEMA)
+    return data if ok else None
+
+
+def _boundary_violations(root: Path, ticket: dict, agent_role: str, team_id: Optional[str], touched_not_claimed: list) -> list[dict]:
+    """Map touched-but-unclaimed files onto sibling-owned (out-of-scope) files."""
+    if not touched_not_claimed:
+        return []
+    own = {os.path.normpath(f) for f in (ticket.get("target_files") or [])}
+    touched = {os.path.normpath(f) for f in touched_not_claimed} - own
+    violations = []
+    for sib in _sibling_ownership(root, ticket, agent_role, team_id):
+        hit = sorted(touched & {os.path.normpath(f) for f in sib["files"]})
+        if hit:
+            violations.append({"owner_ticket": sib["id"], "owner_role": sib["role"], "files": hit})
+    return violations
+
+
 def _load_sprint_context(root: Path) -> str:
     """Load sprint context from shared state file (PROM-008).
 
@@ -1320,7 +1642,11 @@ def _load_sprint_context(root: Path) -> str:
         sections.append(f"**Files modified this sprint**: {', '.join(recent)}")
     if state.get("blocked_reasons"):
         for b in state["blocked_reasons"][-3:]:
-            sections.append(f"**BLOCKED** {b['ticket_id']}: {b.get('reason', '')[:80]}")
+            # reason comes from the agent's open_questions: may be None or a list
+            reason = b.get("reason") or ""
+            if isinstance(reason, (list, tuple)):
+                reason = "; ".join(str(r) for r in reason)
+            sections.append(f"**BLOCKED** {b['ticket_id']}: {str(reason)[:80]}")
     return "\n".join(sections)
 
 
@@ -1369,6 +1695,7 @@ _claude_json_schema_supported: Optional[bool] = None
 _claude_flag_support_cache: dict = {}
 _last_session_id: Optional[str] = None
 _last_stream_usage: dict = {}  # populated from stream-json 'result' event
+_last_permission_denials: list = []  # denied tool calls from stream-json (permission_denied events / result.permission_denials)
 _last_model_used: Optional[str] = None  # model that actually served the run (fallback-aware)
 _last_model_requested: Optional[str] = None  # model requested by the most recent delegate_to_agent call
 
@@ -1405,6 +1732,34 @@ def _get_claude_version() -> str:
     return _claude_version_string
 
 
+_MIN_CLAUDE_VERSION = (2, 1, 288)
+
+
+def _persist_session_id(ticket_id: str, session_id: str) -> None:
+    """Store the session_id on the ticket at system/init so an interrupted run can be resumed."""
+    try:
+        root = find_cto_root()
+        ticket = load_ticket(root, ticket_id)
+        if ticket.get("session_id") != session_id:
+            ticket["session_id"] = session_id
+            save_ticket(root, ticket)
+    except Exception:
+        pass  # Never let bookkeeping break the stream loop
+
+
+def _check_claude_version() -> Optional[str]:
+    """Warn once if the installed claude CLI is older than _MIN_CLAUDE_VERSION."""
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", _get_claude_version() or "")
+    if not m or tuple(int(x) for x in m.groups()) >= _MIN_CLAUDE_VERSION:
+        return None
+    have = ".".join(m.groups())
+    want = ".".join(str(x) for x in _MIN_CLAUDE_VERSION)
+    msg = (f"claude CLI {have} is older than {want} — update for partial-response "
+           "continuation and SIGTERM handling in headless sessions.")
+    err_console.print(f"[yellow]{msg}[/yellow]")
+    return msg
+
+
 def _resolve_model_for_cli(model: str) -> str:
     """Resolve a model string to an alias the installed claude CLI accepts.
 
@@ -1437,6 +1792,107 @@ def _check_claude_effort_support() -> bool:
     except Exception:
         _claude_effort_supported = False
     return _claude_effort_supported
+
+
+_GUARDRAIL_FAIL_CLOSED_MIN_CLI = (2, 1, 295)
+_claude_hook_fail_closed_supported: Optional[bool] = None
+_warned_hooks_fail_open = False
+
+
+def _check_claude_hook_fail_closed_support() -> bool:
+    """Return True if the installed claude CLI (>= 2.1.295) honours hook
+    "onFailure": "block". Cached per process, like the other capability probes."""
+    global _claude_hook_fail_closed_supported
+    if _claude_hook_fail_closed_supported is not None:
+        return _claude_hook_fail_closed_supported
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", _get_claude_version())
+    _claude_hook_fail_closed_supported = bool(
+        match and tuple(int(g) for g in match.groups()) >= _GUARDRAIL_FAIL_CLOSED_MIN_CLI
+    )
+    return _claude_hook_fail_closed_supported
+
+
+def build_guardrail_hook_args(root: Path) -> list:
+    """Return --settings args wiring the guardrail PreToolUse hooks fail-closed.
+
+    On CLIs older than 2.1.295 nothing is added (the project settings hooks
+    still run, fail-open) and a one-time roro warning is emitted.
+    """
+    global _warned_hooks_fail_open
+    if not _check_claude_hook_fail_closed_support():
+        if not _warned_hooks_fail_open:
+            _warned_hooks_fail_open = True
+            emit("guardrail.warning", {
+                "reason": "claude CLI < 2.1.295: guardrail hooks are fail-open "
+                          "(a crashing or missing hook will not block tool calls)",
+                "cli_version": _get_claude_version(),
+            })
+        return []
+    from hooks import build_guardrail_hooks_settings
+    session_dir = root / ".cto" / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    fd, settings_path = tempfile.mkstemp(dir=session_dir, prefix="guardrail-hooks-", suffix=".json")
+    with os.fdopen(fd, "w") as f:
+        json.dump(build_guardrail_hooks_settings(fail_closed=True), f)
+    return ["--settings", settings_path]
+
+
+_warned_sandbox_skipped = False
+
+
+def build_settings_args(root: Path, ticket_id: Optional[str] = None, agent_role: str = "rick") -> list:
+    """Return exactly one --settings flag: native sandbox + fail-closed guardrail hooks.
+
+    The CLI takes a single --settings file, so the guardrail hooks (CLI >= 2.1.295)
+    and the OS-level sandbox (CLI >= 2.1.219, PROM-192) are merged into one file.
+    When the sandbox is flagged off or unsupported, this falls back to
+    build_guardrail_hook_args() (hooks-only, or nothing on old CLIs).
+    """
+    global _warned_sandbox_skipped, _warned_hooks_fail_open
+    cli_version = _get_claude_version()
+    if not native_sandbox_enabled(root):
+        reason = "disabled by security.native_sandbox / CTO_NATIVE_SANDBOX"
+    elif not cli_supports_native_sandbox(cli_version):
+        reason = "claude CLI < 2.1.219 or version unknown: sandbox.strictAllowlist unsupported"
+    else:
+        reason = None
+
+    if reason is None:
+        hooks_settings = None
+        if _check_claude_hook_fail_closed_support():
+            from hooks import build_guardrail_hooks_settings
+            hooks_settings = build_guardrail_hooks_settings(fail_closed=True)
+        elif not _warned_hooks_fail_open:
+            _warned_hooks_fail_open = True
+            emit("guardrail.warning", {
+                "reason": "claude CLI < 2.1.295: guardrail hooks are fail-open "
+                          "(a crashing or missing hook will not block tool calls)",
+                "cli_version": cli_version,
+            })
+        strict = is_unattended()
+        try:
+            path = write_sandbox_settings(
+                root,
+                ticket_id or f"{agent_role}-{os.getpid()}",
+                base=hooks_settings or {},
+                unattended=strict,
+            )
+        except (OSError, ValueError) as e:
+            reason = f"could not write sandbox settings: {e}"
+        else:
+            emit("security.sandbox_enabled", {
+                "ticket_id": ticket_id,
+                "agent_role": agent_role,
+                "strict": strict,
+                "domains": len(sandbox_domains()),
+                "settings_path": str(path),
+            })
+            return ["--settings", str(path)]
+
+    if not _warned_sandbox_skipped:
+        _warned_sandbox_skipped = True
+        emit("security.sandbox_skipped", {"reason": reason, "cli_version": cli_version})
+    return build_guardrail_hook_args(root)
 
 
 def _check_claude_thinking_support() -> bool:
@@ -1491,6 +1947,53 @@ def _check_claude_json_schema_support() -> bool:
     except Exception:
         _claude_json_schema_supported = False
     return _claude_json_schema_supported
+
+
+_claude_stream_json_schema_ok: Optional[bool] = None
+_stream_reports_enabled = True  # cmd_delegate sets False for --no-stream (no stream result event to read)
+_last_structured_output: Optional[dict] = None  # structured_output from the stream-json 'result' event
+
+
+def _claude_stream_json_schema_supported() -> bool:
+    """True if `claude -p --output-format stream-json --json-schema` delivers
+    `structured_output` on the final result event. Runs a tiny live probe once
+    and caches the answer; any failure means "no" (regex fallback stays in
+    charge). Opt out with CTO_STRUCTURED_REPORT=0."""
+    global _claude_stream_json_schema_ok
+    if os.environ.get("CTO_STRUCTURED_REPORT") == "0":
+        return False
+    if _claude_stream_json_schema_ok is not None:
+        return _claude_stream_json_schema_ok
+    ok = False
+    try:
+        if _check_claude_json_schema_support():
+            probe_schema = {
+                "type": "object",
+                "properties": {"ok": {"type": "boolean"}},
+                "required": ["ok"],
+            }
+            r = subprocess.run(
+                ["claude", "-p", "--output-format", "stream-json", "--verbose",
+                 "--json-schema", json.dumps(probe_schema), "--", "say ok"],
+                capture_output=True, text=True, timeout=90, env=_clean_subprocess_env(),
+            )
+            for line in reversed(r.stdout.splitlines()):
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(event, dict) and event.get("type") == "result":
+                    ok = isinstance(event.get("structured_output"), dict)
+                    break
+    except Exception:
+        ok = False
+    _claude_stream_json_schema_ok = ok
+    return ok
+
+
+def _structured_report_active() -> bool:
+    """Whether Morty reports go through --json-schema/StructuredOutput."""
+    return _stream_reports_enabled and _claude_stream_json_schema_supported()
 
 
 _claude_help_flags_cache: Optional[set] = None
@@ -1559,10 +2062,12 @@ def _probe_claude_flag(flag: str) -> bool:
 def _reset_claude_flag_caches() -> None:
     """Forget every cached CLI-capability probe (tests, or after a CLI upgrade
     mid-process)."""
-    global _claude_help_flags_cache
+    global _claude_help_flags_cache, _claude_hook_fail_closed_supported, _claude_version_string
     global _claude_append_subagent_prompt_file_supported, _claude_append_subagent_prompt_inline_supported
     global _claude_append_system_prompt_file_supported, _claude_exclude_dynamic_system_prompt_sections_supported
     _claude_help_flags_cache = None
+    _claude_hook_fail_closed_supported = None
+    _claude_version_string = None
     _claude_flag_support_cache.clear()
     _claude_append_subagent_prompt_file_supported = None
     _claude_append_subagent_prompt_inline_supported = None
@@ -1628,6 +2133,99 @@ def build_subagent_guardrail_args(root: Path, agent_role: str) -> list:
     if _check_claude_append_subagent_prompt_inline_support():
         return ["--append-subagent-system-prompt", guardrails]
     return []
+
+
+# ── Per-Morty --agents definitions ──────────────────────────────────────────
+# CLI >= 2.1.296 lets us pass a JSON agent spec via --agents and select it with
+# --agent <role>, carrying prompt, tools, disallowedTools, effort and an
+# autoCompactWindow so long tickets compact earlier than the main window.
+# NOTE: autoCompactWindow is not covered by the public sub-agents docs
+# (units/range undocumented); values below are token counts and can be
+# overridden via the "agent_definitions.auto_compact_window" config key.
+
+_AGENTS_FLAG_MIN_CLI = (2, 1, 296)
+_claude_agents_flag_supported: Optional[bool] = None
+_AUTO_COMPACT_WINDOW_BY_COMPLEXITY = {"XL": 60_000, "L": 90_000}
+_AUTO_COMPACT_WINDOW_DEFAULT = 150_000
+
+
+def _check_claude_agents_flag_support() -> bool:
+    """Return True if the installed claude CLI (>= 2.1.296) accepts --agents <json>.
+    Cached per process, like the other capability probes."""
+    global _claude_agents_flag_supported
+    if _claude_agents_flag_supported is not None:
+        return _claude_agents_flag_supported
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", _get_claude_version())
+    _claude_agents_flag_supported = bool(
+        match and tuple(int(g) for g in match.groups()) >= _AGENTS_FLAG_MIN_CLI
+    )
+    return _claude_agents_flag_supported
+
+
+def resolve_role_allowed_tools(root: Path, agent_role: str, team_id: Optional[str] = None) -> list:
+    """Return the tool allowlist enforced for agent_role (shared by the --allowedTools
+    and --agents paths). Prefers AGENT_PROFILES, then ROLE_TOOL_ALLOWLISTS, then the
+    global default; narrows the MCP wildcard to the role's mcp_tools allowlist."""
+    _profile = AGENT_PROFILES.get(agent_role, {})
+    allowed = _profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
+    # Narrow the blanket MCP wildcard down to this role's actual
+    # mcp_tools allowlist (agents/{role}.json, via resolve_mcp_tools)
+    # so unused MCP tool definitions stop entering the subprocess
+    # context window — mirrors the block build_prompt() renders.
+    if "mcp__cto-orchestrator__*" in allowed:
+        _role_card = load_agent_card(agent_role, root=root)
+        _role_mcp_tools = resolve_mcp_tools(_role_card, team_id)
+        allowed = [t for t in allowed if t != "mcp__cto-orchestrator__*"] + [
+            f"mcp__cto-orchestrator__{name}" for name in _role_mcp_tools
+        ]
+    return list(allowed)
+
+
+def build_agent_definition(role: str, ticket: Optional[dict] = None, root: Optional[Path] = None,
+                           team_id: Optional[str] = None, effort: Optional[str] = None) -> dict:
+    """Return the JSON-serialisable --agents spec ({role: definition}) for a Morty.
+
+    Tools mirror the flag-enforced allowlist exactly; autoCompactWindow is lower
+    for L/XL/epic tickets so long runs compact before exhausting context.
+    """
+    root = root or find_cto_root()
+    ticket = ticket or {}
+    complexity = (ticket.get("estimated_complexity") or "").upper()
+    is_epic = ticket.get("type") == "epic"
+    window = _AUTO_COMPACT_WINDOW_BY_COMPLEXITY.get(complexity, _AUTO_COMPACT_WINDOW_DEFAULT)
+    if is_epic:
+        window = min(window, _AUTO_COMPACT_WINDOW_BY_COMPLEXITY["XL"])
+    try:
+        overrides = load_config(root).get("agent_definitions", {}).get("auto_compact_window", {})
+        if isinstance(overrides, dict):
+            window = int(overrides.get("epic" if is_epic else complexity, overrides.get("default", window)))
+    except Exception:
+        pass
+    definition = {
+        "description": f"{role} working on {ticket.get('id', 'a ticket')}",
+        "prompt": build_subagent_guardrails(role),
+        "tools": resolve_role_allowed_tools(root, role, team_id),
+        "disallowedTools": list(AGENT_PROFILES.get(role, {}).get("disallowedTools", [])),
+        "autoCompactWindow": window,
+    }
+    if effort and effort in _EFFORT_LEVELS:
+        definition["effort"] = effort
+    return {role: definition}
+
+
+def agents_flag_args(root: Path, role: str, ticket_id: Optional[str] = None,
+                     team_id: Optional[str] = None, effort: Optional[str] = None) -> list:
+    """Return ["--agents", <json>, "--agent", role], or [] when the CLI is too old."""
+    if not _check_claude_agents_flag_support():
+        return []
+    ticket: dict = {}
+    if ticket_id:
+        try:
+            ticket = load_ticket(root, ticket_id)
+        except Exception:
+            ticket = {}
+    spec = build_agent_definition(role, ticket, root=root, team_id=team_id, effort=effort)
+    return ["--agents", json.dumps(spec), "--agent", role]
 
 
 # ── Native Subagent Support ─────────────────────────────────────────────────
@@ -2050,7 +2648,7 @@ After EXECUTE and before emitting the JSON report, perform a structured self-che
   - "criterion": the criterion text (verbatim or paraphrased)
   - "verdict": "pass", "fail", or "unknown"
   - "evidence": a single pointer (file:line number, test name, or "no evidence found")
-- If ANY verdict is "fail" or "unknown", you MUST set status="needs_review" in the JSON report.
+- If ANY verdict is "fail" or "unknown", set status="needs_review" in the JSON report, since the report is what Rick uses to decide whether to merge.
 - Include the full list as "criteria_check" in the JSON output.
 - Do NOT mark status="completed" unless every criterion has verdict="pass" with concrete evidence.
 </self_critique>
@@ -2080,8 +2678,8 @@ End your work with a JSON report inside EXACTLY these XML tags — no other summ
 }
 </result_json>
 
-IMPORTANT: The `files_changed` and `description` fields are MANDATORY. Never leave them empty.
-The `criteria_check` array is REQUIRED when acceptance criteria are present — include one entry per criterion.
+Fill in `files_changed` and `description`; the reviewer and ticket ledger rely on them to verify your work.
+Include a `criteria_check` entry per acceptance criterion when criteria are present, so each one can be checked individually.
 As a backup, also emit a `## Files changed` markdown block listing every file you touched:
 
 ## Files changed
@@ -2089,7 +2687,7 @@ As a backup, also emit a `## Files changed` markdown block listing every file yo
 - path/to/file2.py
 </output_format>
 
-<common_mistakes>NEVER do any of these — Rick has seen enough Jerry behavior:
+<common_mistakes>Avoid these patterns — Rick has seen enough Jerry behavior:
 
 ❌ WRONG: "I recommend creating a file at src/auth.py with the following content..." (describing instead of doing)
 ✅ RIGHT: Actually create src/auth.py with the implementation.
@@ -2099,8 +2697,21 @@ As a backup, also emit a `## Files changed` markdown block listing every file yo
 
 ❌ WRONG: Adding logging, refactoring, or extra features not in the ticket (scope creep)
 ✅ RIGHT: Complete exactly what the ticket asks — nothing more, nothing less.
+
+❌ WRONG: Creating or editing files under node_modules (e.g. writing a handwritten type stub because a package "isn't hoisted") — this silently corrupts typechecking and can damage the shared pnpm store.
+✅ RIGHT: Leave node_modules untouched, because edits there are not tracked and can damage the shared store. If an import cannot resolve, note it in your scratchpad and write the code as if the package exists.
+
+❌ WRONG: Retrying or working around a command that was denied (nobody can approve permission prompts here).
+✅ RIGHT: If a command is denied, do not retry it; record what you needed in your summary.
 </common_mistakes>
 """
+    if _structured_report_active():
+        stable_prefix = re.sub(
+            r"<output_format>.*?</output_format>",
+            "<output_format>\nWhen finished, submit your report via the StructuredOutput tool; "
+            "set status to needs_review if any acceptance criterion is fail or unknown.\n</output_format>",
+            stable_prefix, count=1, flags=re.DOTALL,
+        )
     return stable_prefix
 
 
@@ -2198,20 +2809,19 @@ def build_task_prompt(root: Path, ticket: dict, agent_role: str, team_id: Option
     contract_note = ""
     if team_id:
         team_delegation_note = (
-            "\n\n**TEAM MODE — DELEGATION REQUIRED**: You MUST delegate subtasks to teammates "
-            "via send_team_message — do NOT attempt to complete all work yourself. "
-            "Spawn teammate work explicitly for every subtask that falls outside your specialty. "
-            "Doing everything yourself when teammates are available is Jerry behavior."
+            "\n\n<constraints>\nYou're in team mode: hand off subtasks that fall in a teammate's "
+            "specialty via send_team_message so work runs in parallel; do small cross-cutting "
+            "fixes yourself.\n</constraints>"
         )
         contract_fp = _team_contract_path(root, team_id)
         if _team_contract_exists(root, team_id):
             contract_note = (
-                f"\n\n**INTEGRATION CONTRACT — MANDATORY FIRST READ**: Before writing a single "
-                f"line of code, read `{contract_fp}`. "
-                f"Do NOT create API endpoints, env vars, file paths, queue names, or TypeScript "
-                f"interfaces that contradict the signatures defined in that file. "
-                f"If you need to deviate, broadcast a `decision` message to `@*` FIRST, then "
-                f"update the contract."
+                f"\n\n<constraints>\nRead `{contract_fp}` before writing code. "
+                f"Keep API endpoints, env vars, file paths, queue names, and TypeScript "
+                f"interfaces consistent with the signatures defined there, because teammates "
+                f"build against them in parallel. "
+                f"If you need to deviate, broadcast a `decision` message to `@*` first, then "
+                f"update the contract.\n</constraints>"
             )
 
     budget_section = ""
@@ -2242,7 +2852,12 @@ def build_task_prompt(root: Path, ticket: dict, agent_role: str, team_id: Option
                     f"</resumed_progress>\n"
                 )
 
-    volatile_suffix = f"""{budget_section}{task_boundaries_block}{review_feedback_block}{resumed_progress_block}
+    # The contract is per-ticket (sibling ownership changes constantly), so it
+    # lives in the volatile suffix — putting it in the role-stable prefix
+    # (_build_agent_prompt) would break use_cache_optimized_prompt() caching.
+    task_contract_block = _build_task_contract(root, ticket, agent_role, team_id=team_id)
+
+    volatile_suffix = f"""{budget_section}{task_contract_block}{task_boundaries_block}{review_feedback_block}{resumed_progress_block}
 ## Your Mission, Morty
 
 **Ticket {ticket['id']}**: {ticket['title']}
@@ -2450,7 +3065,7 @@ def _extract_json_from_output(output: str) -> Optional[dict]:
     return None
 
 
-def parse_agent_output(output: str) -> dict:
+def parse_agent_output(output: str, structured: Optional[dict] = None) -> dict:
     """Parse the agent's summary section from output.
 
     Tries structured JSON extraction first (from ```json fences),
@@ -2458,8 +3073,17 @@ def parse_agent_output(output: str) -> dict:
     a strict schema before acting on it (OWASP LLM09).
     """
     # ── Try inline JSON extraction first ──
-    json_data = _extract_json_from_output(output)
+    if structured is None:
+        structured = _last_structured_output
+    json_data = structured if isinstance(structured, dict) else None
+    report_source = "structured" if json_data is not None else "regex"
+    if json_data is None:
+        json_data = _extract_json_from_output(output)
     if json_data is not None:
+        try:
+            emit("cto.morty.report", {"report_source": report_source})
+        except Exception:
+            pass
         is_valid, schema_errors = validate_agent_output_schema(json_data, "delegate")
         if not is_valid:
             audit_log_security_event(
@@ -2641,6 +3265,86 @@ def _collect_git_changed_files(cwd: str) -> list[str]:
         return []
 
 
+def _git_lines(cwd: str, args: list[str]) -> Optional[list[str]]:
+    """Run a git command and return stdout lines, or None when git fails."""
+    try:
+        result = subprocess.run(
+            ["git"] + args, capture_output=True, text=True, timeout=15, cwd=cwd,
+        )
+    except Exception:
+        return None
+    if result.returncode != 0:
+        return None
+    return [ln for ln in result.stdout.splitlines() if ln.strip()]
+
+
+def _normalize_rel_path(path: str, cwd: str) -> str:
+    """Normalize an agent-claimed or git-reported path to cwd-relative form."""
+    p = os.path.normpath(str(path).strip())
+    if os.path.isabs(p):
+        try:
+            p = os.path.relpath(p, cwd)
+        except ValueError:
+            pass
+    return p
+
+
+def _git_dirty_state(cwd: str, base: str) -> Optional[dict]:
+    """Map every path differing from `base` (plus untracked files) to a content hash.
+
+    Hash is "<deleted>" for files missing from the working tree. Returns None
+    when cwd is not a usable git work tree.
+    """
+    changed = _git_lines(cwd, ["diff", "--name-only", "--relative", base])
+    untracked = _git_lines(cwd, ["ls-files", "--others", "--exclude-standard"])
+    if changed is None or untracked is None:
+        return None
+    state = {}
+    for path in set(changed) | set(untracked):
+        full = Path(cwd) / path
+        digest = "<deleted>"
+        if full.is_file():
+            out = _git_lines(cwd, ["hash-object", "--", path])
+            digest = out[0] if out else "<unhashable>"
+        state[_normalize_rel_path(path, cwd)] = digest
+    return state
+
+
+def _snapshot_pre_delegation(cwd: str) -> Optional[dict]:
+    """Record HEAD sha and the dirty-file set before spawning an agent."""
+    head = _git_lines(cwd, ["rev-parse", "HEAD"])
+    if not head:
+        return None
+    dirty = _git_dirty_state(cwd, head[0])
+    if dirty is None:
+        return None
+    return {"sha": head[0], "dirty": dirty}
+
+
+def _verify_files_changed(cwd: str, snapshot: Optional[dict], claimed: list) -> Optional[dict]:
+    """Compare an agent's claimed files_changed against the working tree.
+
+    Files already dirty before delegation count only if their content changed.
+    Returns {actual_files, claimed_not_touched, touched_not_claimed}, or None
+    when verification is unavailable (no git / no snapshot).
+    """
+    if not snapshot:
+        return None
+    post = _git_dirty_state(cwd, snapshot["sha"])
+    if post is None:
+        return None
+    pre = snapshot["dirty"]
+    actual = {p for p, digest in post.items() if pre.get(p) != digest}
+    # Files that were dirty before and are now clean again were also modified
+    actual |= {p for p in pre if p not in post}
+    claimed_set = {_normalize_rel_path(f, cwd) for f in claimed if f}
+    return {
+        "actual_files": sorted(actual),
+        "claimed_not_touched": sorted(claimed_set - actual),
+        "touched_not_claimed": sorted(actual - claimed_set),
+    }
+
+
 # ── Reviewer-Morty Reflection Gate ──────────────────────────────────────────
 
 _REVIEW_DIFF_MAX_CHARS = 6000
@@ -2700,6 +3404,18 @@ Do not raise this as a confident candidate — if raised at all, confidence shou
 """
 
 
+def _test_tamper_instruction(ticket: dict) -> str:
+    """Mandatory reviewer instruction when the orchestrator flagged weakened tests."""
+    tamper = (ticket.get("verification") or {}).get("test_tamper") or []
+    if not tamper:
+        return ""
+    return (
+        "MANDATORY: the orchestrator flagged possible test tampering. Inspect these hunks "
+        "and raise a blocker candidate if a test was weakened to make checks pass:\n"
+        + "\n".join(f"- {t}" for t in tamper[:10]) + "\n\n"
+    )
+
+
 def _build_gate1_review_prompt(ticket: dict, criteria_text: str, diff_block: str) -> str:
     """Build the GATE 1 (detect, cold-start) prompt.
 
@@ -2720,6 +3436,7 @@ def _build_gate1_review_prompt(ticket: dict, criteria_text: str, diff_block: str
         f"{_REVIEW_FEWSHOT_EXAMPLES}\n"
         f"Ticket: {ticket.get('id', '?')} — {ticket.get('title', '')}\n\n"
         f"Acceptance criteria:\n{criteria_text}\n\n"
+        f"{_test_tamper_instruction(ticket)}"
         f"Diff:\n{diff_block}\n\n"
         "Respond with ONLY a JSON object matching EXACTLY this schema, no other text:\n"
         f"{json.dumps(REVIEW_CANDIDATE_SCHEMA)}"
@@ -2956,7 +3673,75 @@ def _render_status_rows(rows: list, prior_count: int) -> int:
     return 0
 
 
-def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None, agent_role: str = "rick", team_id: Optional[str] = None, task_budget: Optional[int] = None, effort: Optional[str] = None, stream: bool = True, session_id: Optional[str] = None, ticket_id: Optional[str] = None, verbose: bool = False) -> str:
+def _summarize_denied_tool(tool_name: str, tool_input) -> str:
+    """One-line, secret-redacted, length-capped summary of a denied tool call."""
+    if isinstance(tool_input, dict):
+        raw = (tool_input.get("command") or tool_input.get("file_path")
+               or tool_input.get("url") or json.dumps(tool_input, default=str))
+    else:
+        raw = str(tool_input or "")
+    return redact_secrets(str(raw)).replace("\n", " ")[:200]
+
+
+def _record_permission_denial(tool_name: str, tool_input, agent_role: str, team_id: Optional[str], emit_event: bool = True):
+    """Track a denied tool call (dedup by tool+summary) and optionally emit a roro event."""
+    summary = _summarize_denied_tool(tool_name, tool_input)
+    entry = {"tool_name": tool_name or "unknown", "input_summary": summary}
+    if entry in _last_permission_denials:
+        return
+    _last_permission_denials.append(entry)
+    if emit_event:
+        try:
+            emit_permission_denied(entry["tool_name"], summary, role=agent_role, team_id=team_id)
+        except Exception:
+            pass
+
+
+def _blocked_actions_note() -> str:
+    lines = [f"- {d['tool_name']}: {d['input_summary']}" for d in _last_permission_denials[:20]]
+    return "\n\n**Blocked actions**:\n" + "\n".join(lines)
+
+
+def _denied_tools_label() -> str:
+    return ", ".join(sorted({d["tool_name"] for d in _last_permission_denials}))
+
+
+# Advisor routing: a cheaper main model consults a stronger advisor model.
+# Override via delegation.advisor in the project's CTO config (dict, or false to disable).
+_DEFAULT_ADVISOR_ROUTING = {
+    "roles": ["backend-morty", "frontend-morty", "fullstack-morty", "tester-morty"],
+    "complexities": ["M", "L"],
+    "model": "sonnet",
+    "advisor": "opus",
+}
+
+
+def resolve_advisor_routing(root: Path, agent: str, complexity: str, card_model: str) -> tuple[str, Optional[str]]:
+    """Return (model, advisor) for a delegation; advisor is None when not applicable.
+
+    S/XL tickets and roles outside the configured list keep the card model with
+    no advisor. An invalid pairing drops the advisor rather than launching a CLI
+    that would exit.
+    """
+    if os.environ.get("CTO_DISABLE_ADVISOR") == "1":
+        return card_model, None
+    try:
+        cfg = (load_config(root).get("delegation") or {}).get("advisor", {})
+    except Exception:
+        cfg = {}
+    if cfg is False:
+        return card_model, None
+    routing = {**_DEFAULT_ADVISOR_ROUTING, **(cfg if isinstance(cfg, dict) else {})}
+    if agent not in routing["roles"] or (complexity or "").upper() not in routing["complexities"]:
+        return card_model, None
+    model, advisor = routing["model"], routing["advisor"]
+    if not advisor_is_valid(model, advisor):
+        console.print(f"[yellow]Advisor '{advisor}' invalid for model '{model}' — running without advisor.[/yellow]")
+        return card_model, None
+    return model, advisor
+
+
+def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, skip_permissions: bool = False, thinking_budget: int = None, agent_role: str = "rick", team_id: Optional[str] = None, task_budget: Optional[int] = None, effort: Optional[str] = None, stream: bool = True, session_id: Optional[str] = None, ticket_id: Optional[str] = None, verbose: bool = False, advisor: Optional[str] = None) -> str:
     """Call a claude sub-agent with a specific prompt.
 
     SECURITY NOTE: The --dangerously-skip-permissions flag is only enabled when
@@ -2989,9 +3774,11 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     Raises:
         RuntimeError: If agent fails or times out
     """
-    global _last_session_id, _last_stream_usage, _last_model_used, _last_model_requested
+    global _last_session_id, _last_stream_usage, _last_model_used, _last_model_requested, _last_permission_denials, _last_structured_output
     _last_session_id = None
     _last_stream_usage = {}
+    _last_permission_denials = []
+    _last_structured_output = None
     _last_model_used = None
     _last_model_requested = model
 
@@ -3014,7 +3801,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             "Event logged and prompt quarantined."
         )
 
-    cmd = ["claude", "--resume", session_id] if session_id else ["claude", "-p"]
+    _check_claude_version()
+    cmd = ["claude", "-p", "--resume", session_id] if session_id else ["claude", "-p"]
 
     # Resolve the CTO root once — reused below for status rendering.
     delegate_root = find_cto_root()
@@ -3032,27 +3820,33 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             # no need to pass --allowedTools separately.
             cmd.extend(["--agent", agent_role])
         else:
-            # Prefer AGENT_PROFILES (persona.py) as the authoritative tool scope;
-            # fall back to ROLE_TOOL_ALLOWLISTS (security_utils) then the global default.
-            _profile = AGENT_PROFILES.get(agent_role, {})
-            allowed = _profile.get("allowedTools") or ROLE_TOOL_ALLOWLISTS.get(agent_role, _DEFAULT_TOOL_ALLOWLIST)
-            # Narrow the blanket MCP wildcard down to this role's actual
-            # mcp_tools allowlist (agents/{role}.json, via resolve_mcp_tools)
-            # so unused MCP tool definitions stop entering the subprocess
-            # context window — mirrors the block build_prompt() renders.
-            if "mcp__cto-orchestrator__*" in allowed:
-                _role_card = load_agent_card(agent_role, root=delegate_root)
-                _role_mcp_tools = resolve_mcp_tools(_role_card, team_id)
-                allowed = [t for t in allowed if t != "mcp__cto-orchestrator__*"] + [
-                    f"mcp__cto-orchestrator__{name}" for name in _role_mcp_tools
-                ]
-            cmd.extend(["--allowedTools", ",".join(allowed)])
+            # CLI >= 2.1.296: per-Morty --agents spec (same allowlist + early
+            # autoCompactWindow). Not on --resume: the session keeps its
+            # original definition.
+            agents_args = [] if session_id else agents_flag_args(
+                delegate_root, agent_role, ticket_id, team_id, effort)
+            if agents_args:
+                cmd.extend(agents_args)
+            else:
+                allowed = resolve_role_allowed_tools(delegate_root, agent_role, team_id)
+                cmd.extend(["--allowedTools", ",".join(allowed)])
+
+    # Nobody can answer a permission prompt in -p: tell Claude so (no retries,
+    # human-only tools like AskUserQuestion removed). Denials then surface as
+    # 'permission_denied' stream events + result.permission_denials.
+    if _check_claude_flag_support("--permission-prompts"):
+        cmd.extend(["--permission-prompts", "none"])
 
     # Propagate this role's guardrails (tool scope, never touch node_modules/
     # lockfiles/.cto state, never git push, report file paths, don't close
     # tickets) into any Task subagent this Morty spawns — closes the gap where
     # nested agents inherited none of the persona contract (PROM-163).
     cmd.extend(build_subagent_guardrail_args(delegate_root, agent_role))
+
+    # Single --settings file: OS-level native sandbox (network allowlist +
+    # filesystem write scope, PROM-192) merged with the fail-closed guardrail
+    # hooks (CLI >= 2.1.295). Strict allowlist when CTO_UNATTENDED=1.
+    cmd.extend(build_settings_args(delegate_root, ticket_id, agent_role))
 
     # Attach MCP server so agents can query/update CTO state during execution
     mcp_server = Path(__file__).parent / "mcp_server.py"
@@ -3086,6 +3880,8 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         cmd.extend(["--model", _resolve_model_for_cli(model)])
         if not session_id:  # resume path: keep the original session's model, no fallback
             cmd.extend(fallback_args(model, agent_role))
+            if advisor and advisor_is_valid(model, advisor) and _check_claude_flag_support("--advisor"):
+                cmd.extend(["--advisor", advisor])
     # Enable extended thinking when the caller has allocated a budget for it.
     # Budget is set for: architect/security roles (M+) or any role on L/XL tickets.
     # Requires Opus model and CLI --thinking support.
@@ -3100,6 +3896,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             safe_prompt = f"## EFFORT LEVEL: {effort} — reason accordingly.\n\n{safe_prompt}"
     if stream:
         cmd.extend(["--output-format", "stream-json", "--verbose", "--include-partial-messages"])
+        if _structured_report_active():
+            from schemas import AGENT_REPORT_JSON_SCHEMA
+            cmd.extend(["--json-schema", json.dumps(AGENT_REPORT_JSON_SCHEMA)])
 
     # Cache-optimized system prompt: move the stable persona/role/effort-guidance
     # prefix out of the `-p` user message into an actual system prompt, so it no
@@ -3130,6 +3929,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
     env["CTO_AGENT_ROLE"] = agent_role
     if team_id:
         env["CTO_TEAM_ID"] = team_id
+    if session_id:
+        # Continue the cut-off turn of a timed-out Morty instead of starting a fresh one.
+        env["CLAUDE_CODE_RESUME_INTERRUPTED_TURN"] = "1"
     if ticket_id:
         # Bind role+ticket into a signed token so mcp_server.py can reject a
         # spoofed CTO_AGENT_ROLE on state-mutating tools (OWASP LLM06).
@@ -3153,9 +3955,11 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             text=True,
             cwd=os.getcwd(),
             env=env,
+            start_new_session=True,  # own process group so _graceful_stop reaches Bash children
         )
     except Exception as e:
         raise RuntimeError(f"Failed to start agent process: {e}")
+    _ACTIVE_PROCS.append(proc)
 
     try:
         while True:
@@ -3181,6 +3985,14 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                                     tool_name = block.get("name", "unknown")
                                     current_step = f"Using {tool_name}"
                                     detected = current_step
+                                    if "advisor" in tool_name.lower():
+                                        try:
+                                            emit("morty.advisor_consulted", {
+                                                "ticket_id": ticket_id,
+                                                "advisor": advisor,
+                                            }, role=agent_role, team_id=team_id)
+                                        except Exception:
+                                            pass
                                     try:
                                         emit_stream_progress(
                                             "tool_use",
@@ -3257,13 +4069,22 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                                 stream_result = result_text
                             if event.get("is_error") and result_text:
                                 stream_errors.append(result_text)
+                            if isinstance(event.get("structured_output"), dict):
+                                _last_structured_output = event["structured_output"]
                             _usage = event.get("usage", {})
                             _cli_cost = event.get("total_cost_usd")
                             if _usage or _cli_cost is not None:
                                 _last_stream_usage = {
                                     "usage": _usage,
                                     "total_cost_usd": _cli_cost or 0.0,
+                                    "model_usage": event.get("modelUsage"),
                                 }
+                            for _d in event.get("permission_denials") or []:
+                                if isinstance(_d, dict):
+                                    _record_permission_denial(
+                                        _d.get("tool_name", ""), _d.get("tool_input"),
+                                        agent_role, team_id, emit_event=False,
+                                    )
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
@@ -3289,6 +4110,38 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
                             if err_text:
                                 stream_errors.append(err_text)
                         elif etype == "system":
+                            if event.get("subtype") == "init" and ticket_id and event.get("session_id"):
+                                _persist_session_id(ticket_id, event["session_id"])
+                            if event.get("subtype") == "api_retry":
+                                try:
+                                    _err = event.get("error")
+                                    emit_morty_api_retry(
+                                        ticket_id=ticket_id,
+                                        attempt=event.get("attempt"),
+                                        max_retries=event.get("max_retries"),
+                                        retry_delay_ms=event.get("retry_delay_ms"),
+                                        error=_err.get("category") if isinstance(_err, dict) else (event.get("error_category") or _err),
+                                        role=agent_role,
+                                        team_id=team_id,
+                                    )
+                                except Exception:
+                                    pass
+                            if event.get("subtype") == "compact_boundary":
+                                try:
+                                    _cm = event.get("compactMetadata") or event.get("compact_metadata") or {}
+                                    emit("morty.compacted", {
+                                        "ticket_id": ticket_id,
+                                        "trigger": _cm.get("trigger"),
+                                        "pre_tokens": _cm.get("preTokens", _cm.get("pre_tokens")),
+                                    }, role=agent_role, team_id=team_id)
+                                except Exception:
+                                    pass
+                            if event.get("subtype") == "permission_denied":
+                                _record_permission_denial(
+                                    event.get("tool_name") or event.get("tool", ""),
+                                    event.get("tool_input", event.get("input")),
+                                    agent_role, team_id,
+                                )
                             sid = event.get("session_id")
                             if sid:
                                 _last_session_id = sid
@@ -3311,7 +4164,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
 
                 # Hard timeout check
                 if elapsed > timeout:
-                    proc.kill()
+                    _graceful_stop(proc)
                     raise subprocess.TimeoutExpired(cmd, timeout)
 
                 # Emit progress on phase change or every N lines
@@ -3387,7 +4240,7 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
             pass
         return full_output
     except subprocess.TimeoutExpired:
-        proc.kill()
+        _graceful_stop(proc)
         try:
             _render_status_rows(
                 [format_status_row(agent_role, agent_role, ticket_id or "-", "failed", time.time() - start_time)],
@@ -3422,6 +4275,10 @@ def cmd_delegate(args):
     else:
         agent = args.agent or match_agent_cards(ticket, root=root)
     model = args.model or load_agent_card(agent, root=root).get("model", "sonnet")
+    advisor = None
+    if not args.model:
+        model, advisor = resolve_advisor_routing(
+            root, agent, ticket.get("estimated_complexity", ""), model)
 
     # Sanitize team ID if provided
     team_id = None
@@ -3486,6 +4343,8 @@ def cmd_delegate(args):
     preview_tools = agent_card_preview.get("allowed_tools", ["Read", "Write", "Edit", "Bash", "Grep", "Glob"])
     console.print(f"[dim]Allowed tools: {', '.join(preview_tools)}[/dim]")
 
+    global _stream_reports_enabled
+    _stream_reports_enabled = not getattr(args, 'no_stream', False)
     prompt = build_prompt(root, ticket, agent, team_id=team_id, task_budget=task_budget)
 
     # Handle --resume: replace full prompt with a short continuation instruction
@@ -3495,6 +4354,12 @@ def cmd_delegate(args):
             resume_session_id = ticket["session_id"]
             prompt = "Continue working on this ticket. Pick up where you left off."
             console.print(f"[dim]Resuming session {resume_session_id} for {safe_ticket_id}...[/dim]")
+            ticket.setdefault("progress_ledger", []).append({
+                "timestamp": now_iso(),
+                "event": "resume_interrupted_turn",
+                "session_id": resume_session_id,
+                "env": {"CLAUDE_CODE_RESUME_INTERRUPTED_TURN": "1"},
+            })
         else:
             err_console.print(f"[yellow]No session_id stored for {safe_ticket_id} — starting fresh.[/yellow]")
 
@@ -3568,14 +4433,19 @@ def cmd_delegate(args):
 
     # Execute
     run_hooks("pre_delegate", ticket, agent, root=root)
+    _pre_snapshot = _snapshot_pre_delegation(str(root))
     try:
-        output = delegate_to_agent(prompt, model=model, timeout=timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id, ticket_id=ticket["id"], verbose=getattr(args, 'verbose', False))
+        output = delegate_to_agent(prompt, model=model, timeout=timeout, skip_permissions=True, thinking_budget=thinking_budget, agent_role=agent, team_id=team_id, task_budget=task_budget, effort=effort, stream=not getattr(args, 'no_stream', False), session_id=resume_session_id, ticket_id=ticket["id"], verbose=getattr(args, 'verbose', False), advisor=advisor)
     except RuntimeError as e:
         error_msg = str(e)
         run_hooks("on_failure", ticket, agent, root=root)
         console.print(f"[red]Ugh, {agent} screwed up: {error_msg}[/red]")
         ticket["status"] = "blocked"
         ticket["review_notes"] = f"AGENT FAILURE: {error_msg}"
+        if _last_permission_denials:
+            ticket["review_notes"] += _blocked_actions_note()
+            ticket["block_reason"] = f"needs_permission: {_denied_tools_label()}"
+            console.print(f"[yellow]{ticket['block_reason']}[/yellow]")
         ticket["updated_at"] = now_iso()
         save_ticket(root, ticket)
 
@@ -3604,6 +4474,7 @@ def cmd_delegate(args):
         # Emit cto.morty.delegation.failed or cto.morty.delegation.timeout event
         if "timed out" in error_msg.lower():
             ticket["status"] = "interrupted"
+            ticket["resume_interrupted"] = True
             if _last_session_id:
                 ticket["session_id"] = _last_session_id
                 console.print(f"[dim]Session ID saved: {_last_session_id}. Resume with: python delegate.py --resume {ticket['id']}[/dim]")
@@ -3717,6 +4588,8 @@ def cmd_delegate(args):
         except RuntimeError as handoff_err:
             console.print(f"[yellow]Handoff re-delegation to @{handoff.target_role} failed: {handoff_err}[/yellow]")
 
+    _claimed_files = list(parsed.get("files_changed") or [])  # agent self-report, pre-backfill
+
     # Backfill files_changed from git when agent didn't self-report — derive from
     # filesystem reality so reviewer-morty quality-gate never rejects on missing metadata.
     if not parsed.get("files_changed"):
@@ -3729,18 +4602,15 @@ def cmd_delegate(args):
     _cost_tracker = CostTracker()
     model_requested = _last_model_requested or model
     model_used = _last_model_used or model_requested
-    # Pricing table only knows aliases/known ids; map unknown full API ids back to a safe key.
-    if model_used in _MODEL_PRICING_USD_PER_1M:
-        _price_model = model_used
-    else:
-        _fam = next((f for f in ("opus", "sonnet", "haiku") if f in model_used.lower()), None)
-        _price_model = _fam if _fam in _MODEL_PRICING_USD_PER_1M else model_requested
+    # Price by concrete model ID (resolved from the init event), never by alias.
+    _price_model = _resolve_pricing_model(model_used) or _resolve_pricing_model(model_requested) or model_used
     if _last_stream_usage:
         cost_breakdown = _cost_tracker.record_actual(
             ticket["id"], agent,
             _last_stream_usage.get("usage", {}),
             _last_stream_usage.get("total_cost_usd", 0.0),
             model_used,
+            _last_stream_usage.get("model_usage"),
         )
     else:
         cost_breakdown = _cost_tracker.record(ticket["id"], agent, prompt, output, _price_model)
@@ -3872,12 +4742,72 @@ def cmd_delegate(args):
                             severity="critical",
                         )
                     parsed = parse_agent_output(output)
+                    _claimed_files = list(parsed.get("files_changed") or [])
                     reflection_summary += " [retried]"
                     console.print("[dim]Reflection retry complete.[/dim]")
                 except RuntimeError as retry_err:
                     console.print(f"[yellow]Reflection retry failed: {retry_err}[/yellow]")
             else:
                 console.print(f"[dim]{reflection_summary}[/dim]")
+
+    # ── Orchestrator-side verification: check files_changed against the working tree ──
+    verification = _verify_files_changed(str(root), _pre_snapshot, _claimed_files)
+    if verification is not None:
+        ticket["verification"] = verification
+        parsed["files_changed"] = verification["actual_files"]
+        if verification["claimed_not_touched"] or verification["touched_not_claimed"]:
+            console.print(
+                f"[yellow]files_changed mismatch: {len(verification['claimed_not_touched'])} claimed but untouched, "
+                f"{len(verification['touched_not_claimed'])} touched but unclaimed[/yellow]"
+            )
+        try:
+            for _v in _boundary_violations(root, ticket, agent, team_id, verification["touched_not_claimed"]):
+                emit("delegation.boundary_violation", {
+                    "ticket_id": ticket["id"],
+                    "agent": agent,
+                    "owner_ticket": _v["owner_ticket"],
+                    "owner_role": _v["owner_role"],
+                    "files": _v["files"],
+                    "team_id": team_id,
+                }, role=agent, team_id=team_id)
+                console.print(
+                    f"[yellow]Boundary violation: touched {', '.join(_v['files'])} owned by {_v['owner_ticket']}[/yellow]"
+                )
+        except Exception:
+            pass  # Boundary reporting is best-effort — never block delegation
+        _exempt = ticket.get("type") in ("spike", "review") or agent == "reviewer-morty"
+        if parsed.get("status") == "completed" and not verification["actual_files"] and not _exempt:
+            parsed["status"] = "needs_review"
+            emit("delegation.verification_failed", {
+                "ticket_id": ticket["id"],
+                "agent": agent,
+                "reason": "status=completed but no files changed in working tree",
+                "claimed_not_touched": verification["claimed_not_touched"],
+                "team_id": team_id,
+            }, role=agent, team_id=team_id)
+            console.print("[yellow]Agent claimed 'completed' but touched nothing — downgraded to needs_review.[/yellow]")
+
+    # ── Test-tamper check: flag diffs that weaken tests touched by the agent ──
+    if verification is not None and agent in ("backend-morty", "frontend-morty", "fullstack-morty", "devops-morty"):
+        try:
+            _touched_tests = [f for f in verification["actual_files"] if is_test_path(f)]
+            if _touched_tests:
+                _tdiff = subprocess.run(
+                    ["git", "diff", "HEAD", "--"] + _touched_tests,
+                    capture_output=True, text=True, timeout=15, cwd=str(root),
+                ).stdout
+                _tamper = diff_weakens_tests(_tdiff)
+                if _tamper:
+                    ticket["verification"]["test_tamper"] = _tamper
+                    emit("delegation.test_tamper", {
+                        "ticket_id": ticket["id"],
+                        "agent": agent,
+                        "findings": _tamper[:10],
+                        "team_id": team_id,
+                    }, role=agent, team_id=team_id)
+                    console.print(f"[yellow]Test tamper suspected: {'; '.join(_tamper[:3])}[/yellow]")
+        except Exception:
+            pass  # Tamper detection is best-effort — never block delegation
 
     # Extract and persist memory entry after successful delegation
     if parsed["status"] in ("completed", "needs_review"):
@@ -3916,6 +4846,7 @@ def cmd_delegate(args):
             save_json(team_fp, team)
 
     # Update ticket
+    ticket.pop("resume_interrupted", None)  # run finished; no cut-off turn left to resume
     agent_status = parsed["status"]
     if agent_output_flagged and agent_status == "completed":
         # Never let a flagged output auto-advance — force human review instead.
@@ -3941,6 +4872,11 @@ def cmd_delegate(args):
         )
     ticket["agent_output"] = agent_output_text
     ticket["files_touched"] = parsed["files_changed"]
+    if _last_permission_denials:
+        ticket["review_notes"] = (ticket.get("review_notes") or "") + _blocked_actions_note()
+        if agent_status == "blocked":
+            ticket["block_reason"] = f"needs_permission: {_denied_tools_label()}"
+            console.print(f"[yellow]{ticket['block_reason']}[/yellow]")
     ticket["updated_at"] = now_iso()
     if _last_session_id:
         ticket["session_id"] = _last_session_id
@@ -3967,7 +4903,13 @@ def cmd_delegate(args):
     }, role=agent, team_id=team_id)
 
     console.print(f"\n[green]{agent} actually got something done.[/green] Status: [yellow]{agent_status}[/yellow]")
-    console.print(f"[dim]Files changed:[/dim] {', '.join(parsed['files_changed']) or '(none detected)'}")
+    try:
+        from visual import rich_link
+        _files_md = ", ".join(rich_link(f, root / f) for f in parsed["files_changed"])
+    except ImportError:
+        from rich.markup import escape
+        _files_md = ", ".join(escape(f) for f in parsed["files_changed"])
+    console.print(f"[dim]Files changed:[/dim] {_files_md or '(none detected)'}")
     console.print(f"[dim]Description:[/dim] {parsed['description'][:300]}")
     if parsed["open_questions"] and parsed["open_questions"].lower() != "none":
         console.print(f"[dim]Open questions:[/dim] {parsed['open_questions']}")
@@ -4020,9 +4962,39 @@ def build_parser():
     return p
 
 
+_ACTIVE_PROCS: list = []
+_CANCEL_TICKET_ID: Optional[str] = None
+
+
+def _handle_sigterm(signum, frame):
+    """Graceful stop (MCP tasks/cancel): park the ticket as `interrupted`, kill the agent, exit.
+
+    `interrupted` is the status orchestrate's loop-top requeue already recovers.
+    """
+    for proc in _ACTIVE_PROCS:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    if _CANCEL_TICKET_ID:
+        try:
+            root = find_cto_root()
+            ticket = load_ticket(root, _CANCEL_TICKET_ID)
+            if ticket.get("status") == "in_progress":
+                ticket["status"] = "interrupted"
+                ticket["updated_at"] = now_iso()
+                save_ticket(root, ticket)
+        except Exception:
+            pass
+    sys.exit(128 + signum)
+
+
 def main():
+    global _CANCEL_TICKET_ID
     parser = build_parser()
     args = parser.parse_args()
+    _CANCEL_TICKET_ID = args.ticket_id
+    signal.signal(signal.SIGTERM, _handle_sigterm)
     cmd_delegate(args)
 
 

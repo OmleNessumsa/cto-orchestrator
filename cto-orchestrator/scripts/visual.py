@@ -14,9 +14,12 @@ Features:
 import io
 import json
 import os
+import re
+import socket
 import sys
 import time
 import unicodedata
+import urllib.parse
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -24,6 +27,7 @@ from typing import Optional, Union
 
 from rich.console import Console
 from rich.live import Live
+from rich.markup import escape as _rich_escape
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
@@ -32,10 +36,16 @@ from rich.tree import Tree
 
 # ── Unicode Display Width Helpers ─────────────────────────────────────────────
 
+_OSC8_RE = re.compile(r"\x1b\]8;;.*?\x1b\\")
+
+
 def display_width(s: str) -> int:
-    """Return the terminal display width of *s*, counting emoji as 2 columns."""
+    """Return the terminal display width of *s*, counting emoji as 2 columns.
+
+    OSC 8 hyperlink sequences are zero-width and ignored.
+    """
     width = 0
-    for ch in s:
+    for ch in _OSC8_RE.sub("", s):
         eaw = unicodedata.east_asian_width(ch)
         # W (wide) and F (fullwidth) occupy 2 columns; everything else 1.
         width += 2 if eaw in ("W", "F") else 1
@@ -48,6 +58,50 @@ def pad_to_width(s: str, width: int) -> str:
     if current >= width:
         return s
     return s + " " * (width - current)
+
+
+# ── OSC 8 Hyperlinks ──────────────────────────────────────────────────────────
+
+_HYPERLINK_TERM_PROGRAMS = ("ghostty", "iTerm.app", "WezTerm", "vscode")
+
+
+def supports_hyperlinks() -> bool:
+    """Return True when the terminal is known to render OSC 8 hyperlinks."""
+    if os.environ.get("NO_COLOR") or os.environ.get("RICK_NO_HYPERLINKS"):
+        return False
+    if not sys.stdout.isatty():
+        return False
+    term_program = os.environ.get("TERM_PROGRAM", "")
+    term = os.environ.get("TERM", "")
+    if term_program == "Apple_Terminal" or term == "dumb":
+        return False
+    if term_program in _HYPERLINK_TERM_PROGRAMS:
+        return True
+    if term == "xterm-kitty" or term == "xterm-ghostty" or os.environ.get("KITTY_WINDOW_ID"):
+        return True
+    return bool(os.environ.get("WT_SESSION"))
+
+
+def _file_uri(target: Union[str, Path]) -> str:
+    abs_path = os.path.abspath(str(target))
+    return f"file://{socket.gethostname()}{urllib.parse.quote(abs_path)}"
+
+
+def hyperlink(text: str, target: Union[str, Path]) -> str:
+    """Wrap *text* in an OSC 8 hyperlink to the file at *target*."""
+    return f"\033]8;;{_file_uri(target)}\033\\{text}\033]8;;\033\\"
+
+
+def rich_link(text: str, target: Union[str, Path]) -> str:
+    """Return Rich markup for *text* linked to *target* (plain escaped text if unsupported)."""
+    safe = _rich_escape(text)
+    if not supports_hyperlinks():
+        return safe
+    return f"[link={_file_uri(target)}]{safe}[/link]"
+
+
+def _ticket_path(ticket_id: str) -> Path:
+    return find_cto_root() / ".cto" / "tickets" / f"{ticket_id}.json"
 
 
 # ── Terminal Color Capabilities ───────────────────────────────────────────────
@@ -465,6 +519,7 @@ def render_morty_box(
     focus: Optional[str] = None,
     progress: Optional[int] = None,
     compact: bool = False,
+    files: Optional[list] = None,
 ) -> str:
     """Render a single Morty status box.
 
@@ -474,6 +529,7 @@ def render_morty_box(
         focus: Optional focus description
         progress: Optional progress percentage (0-100)
         compact: Use compact single-line rendering (returns string)
+        files: Optional changed file paths, shown as clickable links in full mode
 
     Returns:
         String for compact mode; prints via Rich console for full mode.
@@ -504,6 +560,12 @@ def render_morty_box(
         empty = 20 - filled
         bar_color = _progress_color(progress)
         content.append(f"\n[{bar_color}]{'█' * filled}[/{bar_color}]{'░' * empty} {progress}%")
+
+    if files:
+        root = find_cto_root()
+        links = ", ".join(rich_link(f, root / f) for f in files[:5])
+        content.append("\nFiles: ", style="dim")
+        content.append_text(Text.from_markup(links))
 
     console.print(Panel(content, border_style=bs))
     return ""
@@ -568,7 +630,7 @@ def _render_team_board_impl(team: dict, con: Console) -> None:
 
     con.print(Panel(
         f"Team: [bold]{team_id}[/bold]  "
-        f"Ticket: [yellow]{parent_ticket}[/yellow]  "
+        f"Ticket: [yellow]{rich_link(parent_ticket, _ticket_path(parent_ticket))}[/yellow]  "
         f"Status: {STATUS_ICONS.get(status, '❓')} [cyan]{status}[/cyan]  "
         f"Mode: [green]{mode}[/green]  "
         f"Lead: [magenta]{lead}[/magenta]",
@@ -710,8 +772,9 @@ def _render_sprint_dashboard_impl(
         for col in columns:
             col_tickets = [t for t in tickets if t.get("status") == col]
             if row < len(col_tickets):
-                tid = col_tickets[row].get("id", "???")[-6:]
-                row_data.append(f"[dim]{tid}[/dim]")
+                full_id = col_tickets[row].get("id", "???")
+                tid = full_id[-6:]
+                row_data.append(f"[dim]{rich_link(tid, _ticket_path(full_id))}[/dim]")
             else:
                 row_data.append("")
         table.add_row(*row_data)
