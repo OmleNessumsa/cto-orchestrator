@@ -2145,7 +2145,9 @@ def build_subagent_guardrail_args(root: Path, agent_role: str) -> list:
 
 _AGENTS_FLAG_MIN_CLI = (2, 1, 296)
 _claude_agents_flag_supported: Optional[bool] = None
-_AUTO_COMPACT_WINDOW_BY_COMPLEXITY = {"XL": 60_000, "L": 90_000}
+# The CLI rejects autoCompactWindow < 100_000 ("Too small: expected number to be >=100000").
+_AUTO_COMPACT_WINDOW_MIN = 100_000
+_AUTO_COMPACT_WINDOW_BY_COMPLEXITY = {"XL": 100_000, "L": 120_000}
 _AUTO_COMPACT_WINDOW_DEFAULT = 150_000
 
 
@@ -2201,6 +2203,7 @@ def build_agent_definition(role: str, ticket: Optional[dict] = None, root: Optio
             window = int(overrides.get("epic" if is_epic else complexity, overrides.get("default", window)))
     except Exception:
         pass
+    window = max(window, _AUTO_COMPACT_WINDOW_MIN)
     definition = {
         "description": f"{role} working on {ticket.get('id', 'a ticket')}",
         "prompt": build_subagent_guardrails(role),
@@ -3854,7 +3857,9 @@ def delegate_to_agent(prompt: str, model: str = "sonnet", timeout: int = 600, sk
         mcp_config = {
             "mcpServers": {
                 "cto-orchestrator": {
-                    "command": "python3",
+                    # Same interpreter as delegate.py: a bare "python3" can resolve
+                    # to an interpreter without the mcp package installed.
+                    "command": sys.executable,
                     "args": [str(mcp_server)],
                 }
             }
