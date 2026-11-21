@@ -24,6 +24,7 @@ from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Callable, Optional
+from urllib.parse import parse_qs, urlparse
 
 # Try to import urllib.request for HTTP without external dependencies
 import urllib.error
@@ -37,8 +38,10 @@ except ImportError:
 
 try:
     from schemas import RoroEvent as _RoroEvent
+    from schemas import RORO_SCHEMA_VERSION as _RORO_SCHEMA_VERSION
 except ImportError:
     _RoroEvent = None  # graceful degradation; falls back to legacy payload shape
+    _RORO_SCHEMA_VERSION = 1
 
 
 # ── Thread Tracking (prevents SIGSEGV on exit) ────────────────────────────────
@@ -56,6 +59,8 @@ def flush(timeout: float = 1.0):
     Args:
         timeout: Max seconds to wait per thread (default: 1.0)
     """
+    _flush_all_tokens()
+
     with _threads_lock:
         threads = _pending_threads.copy()
         _pending_threads.clear()
@@ -233,27 +238,50 @@ _sse_server_instance: Optional["_SSEServerWrapper"] = None
 _sse_server_start_lock = threading.Lock()
 
 
-def _format_sse_event(event_id: int, payload: dict) -> bytes:
-    """Format a payload dict as an SSE message frame."""
+_SSE_RETRY_MS = 3000
+_SSE_PING_EVERY = 50
+_SSE_PING = "ping"  # queue marker: heartbeat comment for typed clients only
+
+
+def _format_sse_event(event_id: int, payload: dict, typed: bool = False) -> bytes:
+    """Format a payload dict as an SSE message frame.
+
+    Untyped frames carry only ``id:`` and ``data:`` (the original wire format).
+    Typed frames add an ``event:`` line with the payload's event type.
+    """
     data = json.dumps(payload)
+    if typed:
+        name = str(payload.get("type") or payload.get("eventType") or "").replace("\r", "").replace("\n", "")
+        if name:
+            return f"id: {event_id}\nevent: {name}\ndata: {data}\n\n".encode("utf-8")
     return f"id: {event_id}\ndata: {data}\n\n".encode("utf-8")
 
 
+def _format_sse_ping() -> bytes:
+    """Comment frame letting typed clients detect stale connections."""
+    return f": ping {datetime.now(timezone.utc).isoformat()}\n\n".encode("utf-8")
+
+
 def _push_to_sse(payload: dict):
-    """Add event to ring buffer and deliver to all connected SSE clients."""
+    """Add event to ring buffer and deliver to all connected SSE clients.
+
+    The ring buffer and client queues hold (event_id, payload) so each client
+    can be served the frame format it opted into.
+    """
     global _sse_event_counter
 
     with _sse_buffer_lock:
         _sse_event_counter += 1
         event_id = _sse_event_counter
-        formatted = _format_sse_event(event_id, payload)
-        _sse_event_buffer.append((event_id, formatted))
+        _sse_event_buffer.append((event_id, payload))
 
     with _sse_clients_lock:
         dead = []
         for q in _sse_clients:
             try:
-                q.put_nowait(formatted)
+                q.put_nowait((event_id, payload))
+                if event_id % _SSE_PING_EVERY == 0:
+                    q.put_nowait(_SSE_PING)
             except queue.Full:
                 dead.append(q)
         for q in dead:
@@ -268,7 +296,8 @@ class _SSEHandler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.path != "/events":
+        parsed = urlparse(self.path)
+        if parsed.path != "/events":
             self.send_response(404)
             self.end_headers()
             return
@@ -280,16 +309,26 @@ class _SSEHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
+        # Typed frames (event: line) are opt-in: EventSource only fires
+        # onmessage for unnamed events.
+        typed = parse_qs(parsed.query).get("typed", [""])[0] == "1"
+
+        if typed:
+            try:
+                self.wfile.write(f"retry: {_SSE_RETRY_MS}\n\n".encode("utf-8"))
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                return
+
         # Replay events missed since Last-Event-ID
         last_id_str = self.headers.get("Last-Event-ID", "")
         last_id = int(last_id_str) if last_id_str.isdigit() else 0
 
         with _sse_buffer_lock:
-            missed = [(eid, fmt) for eid, fmt in _sse_event_buffer if eid > last_id]
+            missed = [(eid, p) for eid, p in _sse_event_buffer if eid > last_id]
 
         try:
-            for _, fmt in missed:
-                self.wfile.write(fmt)
+            for eid, p in missed:
+                self.wfile.write(_format_sse_event(eid, p, typed))
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
@@ -301,7 +340,13 @@ class _SSEHandler(BaseHTTPRequestHandler):
         try:
             while True:
                 try:
-                    data = client_q.get(timeout=15.0)
+                    item = client_q.get(timeout=15.0)
+                    if item is _SSE_PING:
+                        if not typed:
+                            continue
+                        data = _format_sse_ping()
+                    else:
+                        data = _format_sse_event(item[0], item[1], typed)
                     self.wfile.write(data)
                     self.wfile.flush()
                 except queue.Empty:
@@ -447,6 +492,10 @@ def emit(
     Example:
         emit("cto.ticket.created", {"ticket_id": "PROJ-001", "title": "Build API"})
     """
+    # Keep ordering: buffered tokens go out before any other event of this agent
+    if event_type != _TOKEN_EVENT:
+        _flush_tokens(agent_id or get_agent_id(role, team_id))
+
     config = get_config()
 
     # Check if roro is enabled
@@ -493,6 +542,7 @@ def emit(
             "timestamp": ts,
             "data": data,
         }
+    payload.setdefault("schema_version", _RORO_SCHEMA_VERSION)
 
     # Push to SSE stream if enabled (opt-in)
     if config.get("sse_enabled"):
@@ -602,6 +652,84 @@ def emit_progress(
     )
 
 
+# ── Token Coalescing ──────────────────────────────────────────────────────────
+# One cto.morty.token event per content_block_delta floods Rick Terminal's
+# SwiftUI feed. Buffer per agent and flush as one event every
+# RICK_TOKEN_COALESCE_MS (default 100, 0 disables) or once the buffer
+# exceeds _TOKEN_BUFFER_MAX bytes.
+
+_TOKEN_EVENT = "cto.morty.token"
+_TOKEN_COALESCE_DEFAULT_MS = 100
+_TOKEN_BUFFER_MAX = 2048
+
+
+class _TokenBuffer:
+    __slots__ = ("text", "chunks", "first_ts", "timer", "role", "team_id")
+
+    def __init__(self, role: str, team_id: Optional[str]):
+        self.text = ""
+        self.chunks = 0
+        self.first_ts = time.time()
+        self.timer: Optional[threading.Timer] = None
+        self.role = role
+        self.team_id = team_id
+
+
+# agent_id → buffer
+_token_buffers: dict[str, _TokenBuffer] = {}
+_token_lock = threading.Lock()
+
+
+def _token_coalesce_ms() -> int:
+    try:
+        return max(0, int(os.environ.get("RICK_TOKEN_COALESCE_MS", _TOKEN_COALESCE_DEFAULT_MS)))
+    except ValueError:
+        return _TOKEN_COALESCE_DEFAULT_MS
+
+
+def _flush_tokens(agent_id: str):
+    """Emit and clear the buffered token text for one agent (no-op if empty)."""
+    with _token_lock:
+        buf = _token_buffers.pop(agent_id, None)
+    if buf is None:
+        return
+    if buf.timer is not None:
+        buf.timer.cancel()
+    if buf.text:
+        emit(
+            _TOKEN_EVENT,
+            {"kind": "morty.token", "text": buf.text, "chunks": buf.chunks},
+            agent_id=agent_id,
+            role=buf.role,
+            team_id=buf.team_id,
+        )
+
+
+def _flush_all_tokens():
+    with _token_lock:
+        agent_ids = list(_token_buffers)
+    for agent_id in agent_ids:
+        _flush_tokens(agent_id)
+
+
+def _buffer_token(text: str, role: str, team_id: Optional[str], interval_ms: int):
+    agent_id = get_agent_id(role, team_id)
+    with _token_lock:
+        buf = _token_buffers.get(agent_id)
+        if buf is None:
+            buf = _token_buffers[agent_id] = _TokenBuffer(role, team_id)
+        buf.text += text
+        buf.chunks += 1
+        overflow = len(buf.text) > _TOKEN_BUFFER_MAX
+        if buf.timer is None and not overflow:
+            buf.timer = threading.Timer(interval_ms / 1000.0, _flush_tokens, args=(agent_id,))
+            buf.timer.daemon = True
+            _track_thread(buf.timer)
+            buf.timer.start()
+    if overflow:
+        _flush_tokens(agent_id)
+
+
 _STREAM_KIND_TO_EVENT: dict = {
     "tool_use": "cto.morty.tool",
     "tool_result": "cto.morty.tool_result",
@@ -619,7 +747,8 @@ def emit_stream_progress(
 
     Maps stream-json event kinds to specific roro event types:
     - tool_use       → cto.morty.tool
-    - morty.token    → cto.morty.token  (content_block_delta text)
+    - morty.token    → cto.morty.token  (content_block_delta text, coalesced
+                       per agent; see RICK_TOKEN_COALESCE_MS)
     - anything else  → cto.morty.progress
 
     Args:
@@ -629,6 +758,12 @@ def emit_stream_progress(
         team_id: Optional team session ID
     """
     event_type = _STREAM_KIND_TO_EVENT.get(event_kind, "cto.morty.progress")
+    if event_type == _TOKEN_EVENT:
+        interval_ms = _token_coalesce_ms()
+        text = event_data.get("text")
+        if interval_ms > 0 and isinstance(text, str):
+            _buffer_token(text, role, team_id, interval_ms)
+            return
     emit(
         event_type,
         {"kind": event_kind, **event_data},
@@ -660,6 +795,28 @@ def emit_review_event(
     emit(f"cto.ticket.review_{status}", data, role=role, team_id=team_id)
 
 
+def emit_permission_denied(
+    tool_name: str,
+    input_summary: str = "",
+    role: str = "rick",
+    team_id: Optional[str] = None,
+):
+    """Emit a cto.morty.permission_denied event for a tool call the CLI denied.
+
+    Args:
+        tool_name: Name of the denied tool (e.g. "Bash")
+        input_summary: Short, already-redacted summary of the tool input
+        role: Agent role for ID generation
+        team_id: Optional team session ID
+    """
+    emit(
+        "cto.morty.permission_denied",
+        {"tool_name": tool_name, "input_summary": input_summary},
+        role=role,
+        team_id=team_id,
+    )
+
+
 def emit_morty_done(
     total_cost_usd: Optional[float] = None,
     duration_ms: Optional[int] = None,
@@ -688,6 +845,58 @@ def emit_morty_done(
         },
         role=role,
         team_id=team_id,
+    )
+
+
+def emit_morty_api_retry(
+    ticket_id: Optional[str] = None,
+    attempt: Optional[int] = None,
+    max_retries: Optional[int] = None,
+    retry_delay_ms: Optional[int] = None,
+    error: Optional[str] = None,
+    role: str = "rick",
+    team_id: Optional[str] = None,
+):
+    """Emit morty.api_retry for a system/api_retry stream event (overload / rate-limit backoff).
+
+    Makes API retries visible so a backing-off Morty doesn't look hung.
+    """
+    emit(
+        "morty.api_retry",
+        {
+            "ticket_id": ticket_id,
+            "attempt": attempt,
+            "max_retries": max_retries,
+            "retry_delay_ms": retry_delay_ms,
+            "error": error,
+        },
+        role=role,
+        team_id=team_id,
+    )
+
+
+def emit_task_event(
+    event: str,
+    task_id: str,
+    kind: str,
+    status: str,
+    ticket_id: Optional[str] = None,
+    role: str = "rick",
+):
+    """Emit a cto.task.created / cto.task.updated event for the MCP task lifecycle.
+
+    Args:
+        event: "created" or "updated"
+        task_id: MCP task handle (.cto/tasks/<task_id>.json)
+        kind: Tool that spawned the task (delegate, meeseeks, prometheus_scan, unity_scan)
+        status: working / input_required / completed / failed / cancelled
+        ticket_id: Ticket the task works on, if any
+        role: Agent role for ID generation
+    """
+    emit(
+        f"cto.task.{event}",
+        {"task_id": task_id, "kind": kind, "status": status, "ticket_id": ticket_id},
+        role=role,
     )
 
 

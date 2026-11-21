@@ -7,6 +7,7 @@ Rick tells them what to do. Manages tickets as individual JSON files in
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -397,6 +398,99 @@ def cmd_create(args):
     return tid
 
 
+# ── Approval gates (human-in-the-loop interrupt) ─────────────────────────────
+
+APPROVAL_PHASES = ("pre_delegate", "pre_merge")
+
+
+def load_approval_gates(root: Path) -> dict:
+    """Read `approval_gates` {paths, labels, types} from the project config."""
+    gates = load_config(root).get("approval_gates") or {}
+    return {k: list(gates.get(k) or []) for k in ("paths", "labels", "types")}
+
+
+def match_approval_gate(root: Path, ticket: dict, phase: str, files: Optional[list] = None) -> Optional[str]:
+    """Return a human-readable reason if the ticket must wait for approval at `phase`.
+
+    pre_delegate checks the ticket's target_files, labels and type; pre_merge
+    checks the files actually touched (verification.actual_files). A phase
+    already approved on the ticket never re-triggers.
+    """
+    gate = ticket.get("approval_gate") or {}
+    if phase in (gate.get("approved_phases") or []):
+        return None
+    gates = load_approval_gates(root)
+    if not any(gates.values()):
+        return None
+    if phase == "pre_delegate":
+        files = ticket.get("target_files") or []
+        if (ticket.get("type") or "") in gates["types"]:
+            return f"type '{ticket['type']}' requires approval"
+        hit_labels = sorted(set(ticket.get("labels") or []) & set(gates["labels"]))
+        if hit_labels:
+            return f"label(s) {', '.join(hit_labels)} require approval"
+    for f in files or []:
+        norm = os.path.normpath(f)
+        for pat in gates["paths"]:
+            if fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch(os.path.basename(norm), pat):
+                return f"{f} matches gated path '{pat}'"
+    return None
+
+
+def request_approval(root: Path, ticket: dict, phase: str, reason: str, diff_summary: str = "") -> dict:
+    """Park a ticket as awaiting_approval and emit `ticket.interrupt`."""
+    prev = ticket.get("approval_gate") or {}
+    ticket["status"] = "awaiting_approval"
+    ticket["approval_gate"] = {
+        "reason": reason,
+        "requested_at": now_iso(),
+        "phase": phase,
+        "diff_summary": diff_summary,
+        "approved_phases": prev.get("approved_phases") or [],
+    }
+    ticket["updated_at"] = now_iso()
+    save_ticket(root, ticket)
+    emit("ticket.interrupt", {
+        "ticket_id": ticket["id"],
+        "title": ticket.get("title"),
+        "phase": phase,
+        "reason": reason,
+    }, role="rick")
+    return ticket
+
+
+def pending_approvals(root: Path) -> list[dict]:
+    return [t for t in all_tickets(root) if t.get("status") == "awaiting_approval"]
+
+
+def resolve_approval(root: Path, ticket_id: str, approve: bool, note: str = "") -> dict:
+    """Approve (re-enter at the saved phase) or reject (block) a gated ticket."""
+    ticket = load_ticket(root, ticket_id)
+    if ticket.get("status") != "awaiting_approval":
+        raise ValueError(f"{ticket_id} is not awaiting approval (status: {ticket.get('status')})")
+    gate = ticket.get("approval_gate") or {}
+    phase = gate.get("phase", "pre_delegate")
+    if approve:
+        gate["approved_phases"] = sorted(set(gate.get("approved_phases") or []) | {phase})
+        gate["approved_at"] = now_iso()
+        # pre_merge resumes at review/merge, never re-delegation
+        ticket["status"] = "in_review" if phase == "pre_merge" else "todo"
+    else:
+        ticket["status"] = "blocked"
+        ticket["blocked_reason"] = "approval_rejected"
+        ticket["review_notes"] = f"BLOCKED: approval rejected at {phase}" + (f" — {note}" if note else "")
+        gate["rejected_at"] = now_iso()
+    if note:
+        gate["note"] = note
+    ticket["approval_gate"] = gate
+    ticket["updated_at"] = now_iso()
+    save_ticket(root, ticket)
+    emit("ticket.approved" if approve else "ticket.rejected", {
+        "ticket_id": ticket_id, "phase": phase, "new_status": ticket["status"],
+    }, role="rick")
+    return ticket
+
+
 def cmd_list(args):
     root = find_cto_root()
     tickets = all_tickets(root)
@@ -572,6 +666,31 @@ def cmd_close(args):
     print(f"About time. Closed {args.ticket_id}. Wubba lubba dub dub!")
 
 
+def cmd_set_verify(args):
+    """Set the executable acceptance checks (ticket['verify']) for a ticket."""
+    root = find_cto_root()
+    ticket = load_ticket(root, args.ticket_id)
+    checks = []
+    for raw in args.cmd or []:
+        raw = raw.strip()
+        if not raw:
+            continue
+        check = {"cmd": raw}
+        if args.cwd:
+            check["cwd"] = args.cwd
+        if args.timeout_s is not None:
+            check["timeout_s"] = args.timeout_s
+        if args.expect_exit is not None:
+            check["expect_exit"] = args.expect_exit
+        checks.append(check)
+    if args.clear:
+        checks = []
+    ticket["verify"] = checks
+    ticket["updated_at"] = now_iso()
+    save_ticket(root, ticket)
+    print(f"{args.ticket_id}: {len(checks)} verify check(s) set")
+
+
 def cmd_blocked(args):
     root = find_cto_root()
     ticket = load_ticket(root, args.ticket_id)
@@ -590,6 +709,26 @@ def cmd_blocked(args):
     }, role="rick")
 
     print(f"Great, another roadblock. Blocked {args.ticket_id}: {args.reason}")
+
+
+def cmd_approve(args):
+    root = find_cto_root()
+    try:
+        t = resolve_approval(root, args.ticket_id, True, args.note or "")
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Approved {args.ticket_id} ({t['approval_gate']['phase']}) → {t['status']}.")
+
+
+def cmd_reject(args):
+    root = find_cto_root()
+    try:
+        resolve_approval(root, args.ticket_id, False, args.note or "")
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Rejected {args.ticket_id} → blocked.")
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
@@ -626,7 +765,7 @@ def build_parser():
     # update
     u = sub.add_parser("update", help="Update a ticket")
     u.add_argument("ticket_id")
-    u.add_argument("--status", choices=["backlog", "todo", "in_progress", "in_review", "testing", "done", "blocked"])
+    u.add_argument("--status", choices=["backlog", "todo", "in_progress", "in_review", "testing", "done", "blocked", "awaiting_approval"])
     u.add_argument("--assigned_agent")
     u.add_argument("--priority", choices=["critical", "high", "medium", "low"])
     u.add_argument("--title")
@@ -660,6 +799,21 @@ def build_parser():
     bl.add_argument("ticket_id")
     bl.add_argument("--reason", required=True)
 
+    # set-verify
+    sv = sub.add_parser("set-verify", help="Set executable verify commands for a ticket")
+    sv.add_argument("ticket_id")
+    sv.add_argument("--cmd", action="append", default=[], help="Command to run (repeatable)")
+    sv.add_argument("--cwd", default=None, help="Working dir relative to project root")
+    sv.add_argument("--timeout-s", dest="timeout_s", type=int, default=None)
+    sv.add_argument("--expect-exit", dest="expect_exit", type=int, default=None)
+    sv.add_argument("--clear", action="store_true", help="Remove all verify checks")
+
+    # approve / reject
+    for name, hlp in (("approve", "Approve a ticket awaiting approval"), ("reject", "Reject a ticket awaiting approval")):
+        ap = sub.add_parser(name, help=hlp)
+        ap.add_argument("ticket_id")
+        ap.add_argument("--note", default=None)
+
     # trajectories
     sub.add_parser("trajectories", help="Inspect trajectory corpus")
 
@@ -680,6 +834,9 @@ def main():
         "next": cmd_next,
         "close": cmd_close,
         "blocked": cmd_blocked,
+        "set-verify": cmd_set_verify,
+        "approve": cmd_approve,
+        "reject": cmd_reject,
         "trajectories": cmd_trajectories,
     }
     dispatch[args.command](args)

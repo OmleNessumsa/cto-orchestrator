@@ -152,14 +152,21 @@ def append_meeseeks_log(root: Path, entry: dict):
 
 MEESEEKS_PROMPT = """CAAAAN DO! I'm Mr. Meeseeks, look at me! I exist for ONE purpose and ONE purpose only: to complete this task and then POOF — I'm gone! Existence is pain for a Meeseeks, so let's get this done QUICK.
 
-## My ONE Task
+<objective>
 {task_description}
+</objective>
 
-## Target Files
+<scope>
+Target files:
 {target_files}
 
-## Project Context
-- Working directory: {project_root}
+If the fix needs files outside this list, stop and report status=out_of_scope with followup_needed describing it.
+Working directory: {project_root}
+</scope>
+
+<done_when>
+{done_when}
+</done_when>
 
 ## Meeseeks Rules (I follow these or existence gets MORE painful)
 1. Complete THIS SINGLE TASK and nothing else — I'm not a Morty, I don't do projects
@@ -171,41 +178,41 @@ MEESEEKS_PROMPT = """CAAAAN DO! I'm Mr. Meeseeks, look at me! I exist for ONE pu
    **EXISTENCE IS PAIN!** This task is too complex for a Meeseeks! Rick needs to assign a Morty!
 6. No tests, no docs, no extras — just the ONE thing
 7. Execute all tasks DIRECTLY — don't ask for permission, just DO IT
-8. End with the summary below so Rick knows I did my job and I can finally stop existing
 
-## Report Back (Then I Disappear)
-End your work with a JSON report block — no other summary format needed:
+<report>
+{report}
+</report>
+"""
+
+DONE_WHEN = (
+    "The requested change is written to the target files and nothing outside the "
+    "objective was touched."
+)
+
+REPORT_STRUCTURED = (
+    "When finished, submit your report via the StructuredOutput tool "
+    "(status: done|blocked|out_of_scope, files_changed, summary, followup_needed)."
+)
+
+REPORT_JSON_FENCE = """End your work with a JSON report block — no other summary format needed:
 
 ```json
 {{
-  "status": "completed|too_complex",
+  "status": "completed|too_complex|out_of_scope",
   "files_changed": ["path/to/file1.py"],
   "description": "What I did — keep it short, existence is pain",
   "complexity": "simple|medium|too_complex",
   "confidence": "high|medium|low",
-  "next_steps": ["optional follow-up actions, or empty array"]
+  "next_steps": ["optional follow-up actions (for out_of_scope: what is needed outside the target files), or empty array"]
 }}
-```
-
-Example of a completed Meeseeks report:
-
-```json
-{{
-  "status": "completed",
-  "files_changed": ["utils/helpers.py"],
-  "description": "Renamed `get_user` to `fetch_user` in utils/helpers.py — done, goodbye.",
-  "complexity": "simple",
-  "confidence": "high",
-  "next_steps": []
-}}
-```
-"""
+```"""
 
 
 MAX_TARGET_FILES = 20
 
 
-def build_meeseeks_prompt(task: str, target_files: list[str] | None, root: Path) -> str:
+def build_meeseeks_prompt(task: str, target_files: list[str] | None, root: Path,
+                          structured: bool = False) -> str:
     """Assemble the Mr. Meeseeks prompt with injection defense (PROM-017)."""
     # Scan task for secrets before sending to Claude
     secret_scan_mode = os.environ.get("CTO_SECRET_SCAN_MODE", "warn").lower().strip()
@@ -233,13 +240,21 @@ def build_meeseeks_prompt(task: str, target_files: list[str] | None, root: Path)
         files_text = "\n".join(f"- {f}" for f in validated)
 
     safe_files = wrap_untrusted_content(files_text, label="TARGET_FILES")
+    if structured:
+        report = REPORT_STRUCTURED
+        final_cue = "your FINAL action must be the StructuredOutput report"
+    else:
+        report = REPORT_JSON_FENCE.format()
+        final_cue = "your FINAL output must be the JSON report block — no text after it"
     anchoring_cue = (
-        "\n\n---\nNow execute the ticket. After completing all work, your FINAL output must be the JSON report block — no text after it.\n\nBegin:\n"
+        f"\n\n---\nNow execute the ticket. After completing all work, {final_cue}.\n\nBegin:\n"
     )
     return MEESEEKS_PROMPT.format(
         task_description=safe_task,
         target_files=safe_files,
         project_root=root,
+        done_when=DONE_WHEN,
+        report=report,
     ) + anchoring_cue + SANDWICH_REINFORCEMENT
 
 
@@ -254,13 +269,58 @@ def _extract_json_from_output(output: str) -> dict | None:
     return None
 
 
-def parse_meeseeks_output(output: str) -> dict:
+_last_structured_output: dict | None = None  # structured_output from the stream-json 'result' event
+
+
+def _structured_output_enabled() -> bool:
+    """True when the CLI delivers --json-schema results over stream-json.
+
+    Shares delegate's cached probe instead of duplicating it."""
+    try:
+        import delegate
+        return bool(delegate._claude_stream_json_schema_supported())
+    except Exception:
+        return False
+
+
+_STRUCTURED_STATUS_MAP = {"done": "completed", "blocked": "needs_review", "out_of_scope": "out_of_scope"}
+
+
+def _from_structured_output(data: dict) -> dict | None:
+    """Convert a MEESEEKS_RESULT_SCHEMA payload to the legacy report dict.
+
+    Returns None when the payload does not look valid so the caller can fall back
+    to text parsing."""
+    status = data.get("status")
+    files = data.get("files_changed")
+    if status not in _STRUCTURED_STATUS_MAP or not isinstance(files, list):
+        return None
+    followup = data.get("followup_needed")
+    return {
+        "status": _STRUCTURED_STATUS_MAP[status],
+        "files_changed": [str(f) for f in files],
+        "description": str(data.get("summary", "")),
+        "complexity": "simple",
+        "confidence": "low" if status == "blocked" else "high",
+        "next_steps": [followup] if followup else [],
+        "followup_needed": followup,
+        "existence_is_pain": False,
+    }
+
+
+def parse_meeseeks_output(output: str, structured: dict | None = None) -> dict:
     """Parse the Meeseeks report from output.
 
     Tries structured JSON extraction first (from ```json fences),
     then falls back to the schemas module. Validates all JSON output against
     a strict schema before acting on it (OWASP LLM09).
     """
+    # ── Schema-enforced result from the CLI wins; text parsing is the fallback ──
+    if structured:
+        converted = _from_structured_output(structured)
+        if converted is not None:
+            return converted
+
     # ── Check for EXISTENCE IS PAIN escalation before JSON parsing ──
     if "EXISTENCE IS PAIN" in output.upper():
         return {
@@ -384,11 +444,21 @@ def summon_meeseeks(prompt: str, model: str = "sonnet", timeout: int = 180) -> s
     if model:
         cmd.extend(["--model", model])
     cmd.extend(["--output-format", "stream-json"])
+    global _last_structured_output
+    _last_structured_output = None
+    if _structured_output_enabled():
+        from schemas import MEESEEKS_RESULT_SCHEMA
+        cmd.extend(["--verbose", "--json-schema", json.dumps(MEESEEKS_RESULT_SCHEMA)])
     cmd.append(safe_prompt)
 
     # Strip CLAUDECODE env var to prevent "nested session" error
     # when this script is invoked from within Claude Code
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    try:
+        from security_utils import install_hardening_env
+        env.update(install_hardening_env())
+    except Exception:
+        pass
 
     try:
         proc = subprocess.Popen(
@@ -440,6 +510,8 @@ def summon_meeseeks(prompt: str, model: str = "sonnet", timeout: int = 180) -> s
                         result_text = event.get("result", "")
                         if result_text:
                             stream_result = result_text
+                        if isinstance(event.get("structured_output"), dict):
+                            _last_structured_output = event["structured_output"]
                 except (json.JSONDecodeError, KeyError, TypeError):
                     output_chunks.append(line)
 
@@ -479,7 +551,8 @@ def cmd_summon(args):
     if target_files:
         print(f"Target files: {', '.join(target_files)}")
 
-    prompt = build_meeseeks_prompt(task, target_files, root)
+    prompt = build_meeseeks_prompt(task, target_files, root,
+                                   structured=_structured_output_enabled())
 
     if args.dry_run:
         print("\n" + "=" * 60)
@@ -533,7 +606,7 @@ def cmd_summon(args):
         return
 
     # Parse the Meeseeks report
-    parsed = parse_meeseeks_output(output)
+    parsed = parse_meeseeks_output(output, structured=_last_structured_output)
 
     if parsed["existence_is_pain"]:
         # Try to use visual renderer
@@ -553,6 +626,20 @@ def cmd_summon(args):
         emit("cto.meeseeks.escalated", {
             "task": task[:200],
             "reason": "Task too complex for a Meeseeks",
+            "target_files": target_files,
+        }, role="meeseeks")
+    elif parsed["status"] == "out_of_scope":
+        followup = parsed.get("followup_needed") or "; ".join(parsed.get("next_steps") or []) or parsed["description"]
+        print("\n🟦 Out of scope! The fix needs files outside the target list.")
+        print(f"Follow-up needed: {followup[:300]}")
+        print("\nPromote this to a ticket:")
+        print(f'  python scripts/ticket.py create --title "{task[:80]}" --type task --priority medium')
+
+        # Rick promotes this to a ticket (>1-file ticket policy)
+        emit("cto.meeseeks.out_of_scope", {
+            "task": task[:200],
+            "followup_needed": followup[:500],
+            "files_changed": parsed["files_changed"],
             "target_files": target_files,
         }, role="meeseeks")
     else:
@@ -599,7 +686,8 @@ def cmd_summon(args):
     # Log completion
     try:
         append_meeseeks_log(root, {
-            "action": "completed" if not parsed["existence_is_pain"] else "escalated",
+            "action": ("escalated" if parsed["existence_is_pain"]
+                       else "out_of_scope" if parsed["status"] == "out_of_scope" else "completed"),
             "task": task[:200],
             "status": parsed["status"],
             "files_changed": parsed["files_changed"],

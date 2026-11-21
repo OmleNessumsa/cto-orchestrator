@@ -114,6 +114,39 @@ Deze agent namen worden correct herkend en krijgen eigen iconen:
 
 Andere namen worden weergegeven als "Worker Morty".
 
+## Client rendering guidance
+
+`cto.morty.token` events are coalesced on the Python side: tokens are buffered per agent and sent as one event with `{"text": "...", "chunks": n}` every 100ms (or when the buffer exceeds 2KB). Tune with `RICK_TOKEN_COALESCE_MS` (`0` disables batching). Any other event from the same agent flushes the buffer first, so ordering is preserved.
+
+Matching client patterns for the SwiftUI feed:
+
+- Use `List` rather than `LazyVStack` for the event and log feed.
+- Cap the feed to a ring buffer of about 5k rows; drop the oldest rows first.
+- Use `@Observable` per-agent models so one Morty's tokens don't re-render the whole board.
+- Append coalesced token text to the last row instead of adding a new row per event.
+- Avoid `scrollPosition(id:)` on long dynamic stacks.
+
+## SSE stream: typed frames, retry en schema_version
+
+Alle events (webhook en SSE) dragen `schema_version` (`RORO_SCHEMA_VERSION` in `schemas.py`, nu `1`). Het wordt gebumpt bij een wijziging van de envelope-vorm, niet bij nieuwe event types.
+
+**Typed frames (opt-in).** Verbind met `GET /events?typed=1` om per frame een `event:` regel te krijgen, zodat de client kan routeren zonder eerst JSON te decoden:
+
+```
+id: 42
+event: cto.morty.done
+data: {"schema_version":1,"type":"cto.morty.done",...}
+```
+
+Zonder `?typed=1` is het frame byte-voor-byte ongewijzigd (`id:` + `data:`). Dit moet opt-in blijven: standaard `EventSource`-clients vuren `onmessage` alleen voor ongenaamde events; benoemde events vereisen `addEventListener(type, ...)`. De ring buffer bewaart payloads, dus replay via `Last-Event-ID` gebruikt het formaat dat de verbonden client heeft gekozen.
+
+**Alleen voor typed clients:**
+
+- Bij connect eenmalig `retry: 3000` (vóór de `Last-Event-ID` replay): reconnect-interval in ms.
+- Elke 50 events een comment `: ping <iso-timestamp>`. Toon een "stale connection"-indicator als er te lang geen frame of ping binnenkomt (de algemene `: keepalive` komt elke 15s).
+
+**Version-mismatch banner.** Vergelijk `schema_version` van binnenkomende events met de versie die de app kent. Is die hoger, toon dan een banner "orchestrator newer than app — update Rick Terminal" en val terug op de `unknown`-weergave voor velden/events die niet te decoden zijn, in plaats van stil te falen.
+
 ## Upgrade Instructie
 
 Als Rick zichzelf moet upgraden om beter met Rick Terminal te integreren:

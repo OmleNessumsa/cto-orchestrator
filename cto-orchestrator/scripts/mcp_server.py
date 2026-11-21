@@ -9,10 +9,14 @@ Usage: claude -p --mcp-config '{"mcpServers":{"cto-orchestrator":{"command":"pyt
 """
 
 import functools
+import hashlib
+import inspect
 import json
 import os
+import signal
 import subprocess
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -31,6 +35,9 @@ try:
         audit_log_security_event,
         verify_module_integrity,
         verify_agent_token,
+        detect_injection_patterns,
+        wrap_untrusted_content,
+        SecurityViolationError,
         ROLE_TOOL_ALLOWLISTS,
         SAFE_ID_PATTERN,
     )
@@ -46,6 +53,23 @@ except ImportError:
     def verify_module_integrity(**kwargs):  # type: ignore[misc]
         return {"status": "degraded", "mismatches": [], "missing": [], "hashes": {}}
     def verify_agent_token(role, ticket_id, token): return True  # type: ignore[misc]
+    def detect_injection_patterns(text): return []  # type: ignore[misc]
+    def wrap_untrusted_content(content, label="USER_INPUT"): return content  # type: ignore[misc]
+    class SecurityViolationError(Exception):  # type: ignore[no-redef]
+        patterns: list = []
+
+from schemas import (
+    BoardView,
+    FileReservation,
+    PendingApprovals,
+    PrometheusStatus,
+    ProjectStatus,
+    SleepyQueue,
+    SleepyStatus,
+    TeamContext,
+    TicketList,
+    TicketView,
+)
 
 
 def _plugin_version() -> str:
@@ -88,6 +112,21 @@ def _save_json(fp: Path, data: dict):
         json.dump(data, f, indent=2)
 
 
+def _wrap_peer_text(text):
+    """Wrap free text written by another agent so it is read as data, not instructions."""
+    if not text or not isinstance(text, str):
+        return text
+    try:
+        return wrap_untrusted_content(text, label="PEER_AGENT_CONTENT")
+    except SecurityViolationError:
+        audit_log_security_event(
+            "peer_content_quarantined",
+            "High-confidence injection pattern in peer-agent content; withheld from tool output",
+            severity="critical",
+        )
+        return "[QUARANTINED: peer-agent content matched a prompt-injection pattern and was withheld]"
+
+
 def _require_agent_token(fn):
     """Reject state-mutating tool calls whose CTO_AGENT_TOKEN doesn't verify.
 
@@ -114,25 +153,31 @@ def _require_agent_token(fn):
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Get Ticket", readOnlyHint=True))
-def get_ticket(ticket_id: str) -> str:
+def get_ticket(ticket_id: str) -> TicketView:
     """Read ticket state and dependencies.
+
+    Use when you need one ticket's full detail (description, acceptance
+    criteria, agent output, dependency summaries). Not for browsing: use
+    list_tickets or board to find IDs first.
 
     Args:
         ticket_id: The ticket ID (e.g. ZEAS-001)
 
     Returns:
-        JSON string with ticket data including status, description,
-        acceptance criteria, and resolved dependency summaries.
+        Structured ticket object with status, description, acceptance
+        criteria, and resolved_dependencies. Free-text fields (description,
+        agent_output) are wrapped as untrusted data. Unknown or invalid IDs
+        return {"error": "..."}.
     """
     root = _find_cto_root()
 
     # Basic validation
     if not ticket_id or len(ticket_id) > 20:
-        return json.dumps({"error": f"Invalid ticket ID: {ticket_id}"})
+        return {"error": f"Invalid ticket ID: {ticket_id}"}
 
     fp = root / ".cto" / "tickets" / f"{ticket_id}.json"
     if not fp.exists():
-        return json.dumps({"error": f"Ticket {ticket_id} not found"})
+        return {"error": f"Ticket {ticket_id} not found"}
 
     ticket = _load_json(fp)
 
@@ -146,12 +191,15 @@ def get_ticket(ticket_id: str) -> str:
                 "id": dep_id,
                 "title": dep.get("title"),
                 "status": dep.get("status"),
-                "agent_output": (dep.get("agent_output") or "")[:300],
+                "agent_output": _wrap_peer_text((dep.get("agent_output") or "")[:300]),
             })
 
     result = dict(ticket)
+    for field in ("description", "agent_output"):
+        if result.get(field):
+            result[field] = _wrap_peer_text(result[field])
     result["resolved_dependencies"] = deps
-    return json.dumps(result, indent=2)
+    return result
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Update Ticket Status", idempotentHint=True))
@@ -220,6 +268,27 @@ def send_team_message(team_id: str, to: str, message: str, msg_type: str = "info
     msg_dir = root / ".cto" / "teams" / "messages" / team_id
     msg_dir.mkdir(parents=True, exist_ok=True)
 
+    try:
+        injection_hits = detect_injection_patterns(message)
+    except SecurityViolationError as e:
+        injection_hits = list(getattr(e, "patterns", None) or [str(e)])
+    if injection_hits:
+        sender = os.environ.get("CTO_AGENT_ROLE", "unknown")
+        audit_log_security_event(
+            "team_message_quarantined",
+            f"team={team_id} from={sender} to={to}: {len(injection_hits)} injection pattern(s)",
+            severity="critical",
+        )
+        # Subdirectory is outside the msg-*.json glob, so readers never see it
+        qdir = msg_dir / "quarantine"
+        qdir.mkdir(exist_ok=True)
+        _save_json(qdir / f"q-{len(list(qdir.glob('q-*.json'))) + 1:03d}.json", {
+            "team_id": team_id, "from": sender, "to": to,
+            "message": message[:2000], "patterns": injection_hits,
+            "timestamp": _now_iso(),
+        })
+        return json.dumps({"error": "Message rejected: matched prompt-injection patterns (quarantined)"})
+
     existing = list(msg_dir.glob("msg-*.json"))
     msg_num = len(existing) + 1
     msg_id = f"msg-{msg_num:03d}"
@@ -242,23 +311,28 @@ def send_team_message(team_id: str, to: str, message: str, msg_type: str = "info
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Get Team Context"))
-def get_team_context(team_id: str) -> str:
+def get_team_context(team_id: str) -> TeamContext:
     """Read shared team decisions and interfaces for a team session.
+
+    Use at the start of teamwork and before relying on a teammate's
+    interface. Not for sending messages: use send_team_message. Example
+    argument: team_id="TEAM-001".
 
     Args:
         team_id: The team session ID
 
     Returns:
-        JSON string with team members, shared decisions, interfaces, and notes.
+        Structured object with team members, shared decisions, interfaces,
+        and recent_messages (message text wrapped as untrusted peer content).
     """
     root = _find_cto_root()
 
     if not team_id or len(team_id) > 20:
-        return json.dumps({"error": f"Invalid team ID: {team_id}"})
+        return {"error": f"Invalid team ID: {team_id}"}
 
     team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
     if not team_fp.exists():
-        return json.dumps({"error": f"Team session {team_id} not found"})
+        return {"error": f"Team session {team_id} not found"}
 
     team = _load_json(team_fp)
 
@@ -273,9 +347,11 @@ def get_team_context(team_id: str) -> str:
         for fp in sorted(msg_dir.glob("msg-*.json"))[-10:]:
             msg = _load_json(fp)
             if msg["to"] == "@*" or msg["to"] == agent_role or msg["from"] == agent_role:
+                msg = dict(msg)
+                msg["message"] = _wrap_peer_text(msg.get("message", ""))
                 messages.append(msg)
 
-    return json.dumps({
+    return {
         "team_id": team_id,
         "parent_ticket": team.get("parent_ticket"),
         "status": team.get("status"),
@@ -284,40 +360,42 @@ def get_team_context(team_id: str) -> str:
         "decisions": (ctx.get("decisions") or [])[-10:],
         "interfaces": (ctx.get("interfaces") or [])[-5:],
         "recent_messages": messages,
-    }, indent=2)
+    }
 
 
 @mcp.tool(annotations=ToolAnnotations(title="List Files Reserved"))
-def list_files_reserved(team_id: str) -> str:
+def list_files_reserved(team_id: str) -> FileReservation:
     """List file reservations for a team session to check ownership.
 
-    Use this before modifying files to avoid conflicts with teammates.
+    Use this before modifying files to avoid conflicts with teammates. To
+    claim files, use reserve_files instead. Example argument: team_id="TEAM-001".
 
     Args:
         team_id: The team session ID
 
     Returns:
-        JSON string mapping agent roles to their reserved file lists.
+        Structured object with your_role, your_files, and all_reservations
+        (agent role -> reserved file list).
     """
     root = _find_cto_root()
 
     if not team_id or len(team_id) > 20:
-        return json.dumps({"error": f"Invalid team ID: {team_id}"})
+        return {"error": f"Invalid team ID: {team_id}"}
 
     team_fp = root / ".cto" / "teams" / "active" / f"{team_id}.json"
     if not team_fp.exists():
-        return json.dumps({"error": f"Team session {team_id} not found"})
+        return {"error": f"Team session {team_id} not found"}
 
     team = _load_json(team_fp)
     reserved = team.get("files_reserved", {})
     agent_role = os.environ.get("CTO_AGENT_ROLE", "")
 
-    return json.dumps({
+    return {
         "team_id": team_id,
         "your_role": agent_role,
         "your_files": reserved.get(agent_role, []),
         "all_reservations": reserved,
-    }, indent=2)
+    }
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Reserve Files", idempotentHint=True))
@@ -478,6 +556,193 @@ def _spawn_detached(script: str, args: list[str], log_name: str) -> dict:
     }
 
 
+# -------------------- MCP Tasks (io.modelcontextprotocol/tasks, 2026-07-28) --------------------
+#
+# When the client negotiated protocol 2026-07-28 with the tasks extension, the
+# four long-running spawns return a task handle instead of a bare pid+log, and
+# the caller drives it with tasks/get, tasks/update and tasks/cancel (the
+# task_get / task_update / task_cancel functions below). Legacy clients — or
+# MCP_PROTOCOL_NEGOTIATION=legacy — keep the plain detached JSON response.
+# The pinned mcp SDK (1.x) cannot speak 2026-07-28 yet, so until the SDK is
+# upgraded _tasks_negotiated() is False and the legacy path is always taken.
+
+_TASKS_PROTOCOL = "2026-07-28"
+_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
+_TASK_TERMINAL = ("completed", "failed", "cancelled")
+_TICKET_FAILED = ("blocked", "interrupted", "in_progress")
+
+
+def _tasks_negotiated() -> bool:
+    """True when the current client negotiated 2026-07-28 and the tasks extension."""
+    if os.environ.get("MCP_PROTOCOL_NEGOTIATION", "").lower() == "legacy":
+        return False
+    try:
+        params = mcp.get_context().request_context.session.client_params
+        if str(params.protocolVersion) < _TASKS_PROTOCOL:
+            return False
+        caps = params.capabilities.model_dump()
+        return _TASKS_EXTENSION in (caps.get("extensions") or {})
+    except Exception:
+        return False
+
+
+def _tasks_dir() -> Path:
+    return _find_cto_root() / ".cto" / "tasks"
+
+
+def _task_path(task_id: str) -> Path:
+    return _tasks_dir() / f"{sanitize_path_component(task_id)}.json"
+
+
+def _emit_task_event(event: str, rec: dict):
+    try:
+        from roro_events import emit_task_event
+        emit_task_event(event, rec["task_id"], rec["kind"], rec["status"], rec.get("ticket_id"))
+    except Exception:
+        pass
+
+
+def _task_save(rec: dict, event: str = "updated"):
+    rec["updated_at"] = _now_iso()
+    _tasks_dir().mkdir(parents=True, exist_ok=True)
+    _save_json(_task_path(rec["task_id"]), rec)
+    _emit_task_event(event, rec)
+
+
+def _pid_exit(pid: int) -> tuple[bool, int | None]:
+    """Return (alive, exit_code); exit_code is only known for our own reaped children."""
+    try:
+        done, status = os.waitpid(pid, os.WNOHANG)
+        if done:
+            return False, os.waitstatus_to_exitcode(status)
+        return True, None
+    except ChildProcessError:
+        pass
+    try:
+        os.kill(pid, 0)
+        return True, None
+    except ProcessLookupError:
+        return False, None
+    except PermissionError:
+        return True, None
+
+
+def _spawn_task(script: str, args: list[str], log_name: str, kind: str, ticket_id: str | None = None) -> dict:
+    """Spawn detached; wrap in a task handle when the client negotiated Tasks."""
+    spawned = _spawn_detached(script, args, log_name)
+    if not spawned.get("ok") or not _tasks_negotiated():
+        return spawned
+    rec = {
+        "task_id": uuid.uuid4().hex,
+        "kind": kind,
+        "status": "working",
+        "pid": spawned["pid"],
+        "log": spawned["log"],
+        "ticket_id": ticket_id,
+        "created_at": _now_iso(),
+    }
+    _task_save(rec, "created")
+    return {"ok": True, "task": {"taskId": rec["task_id"], "status": "working"}, **spawned}
+
+
+def _task_load(task_id: str) -> dict | None:
+    try:
+        fp = _task_path(task_id)
+    except ValueError:
+        return None
+    return _load_json(fp) if fp.exists() else None
+
+
+def _task_result(rec: dict, ticket: dict | None) -> str:
+    """Morty report for ticket-backed tasks, else the tail of the log."""
+    if ticket:
+        return ticket.get("agent_output") or ticket.get("review_notes") or ""
+    try:
+        return (_find_cto_root() / rec["log"]).read_text(errors="replace")[-4000:]
+    except OSError:
+        return ""
+
+
+def task_get(task_id: str) -> dict:
+    """tasks/get — refresh and return the task: status, plus result or elicitation."""
+    rec = _task_load(task_id)
+    if rec is None:
+        return {"error": f"unknown task: {task_id}"}
+    ticket = None
+    if rec.get("ticket_id"):
+        try:
+            tfp = _tickets_dir() / f"{sanitize_ticket_id(rec['ticket_id'])}.json"
+            ticket = _load_json(tfp) if tfp.exists() else None
+        except ValueError:
+            ticket = None
+    prev = rec["status"]
+    if prev not in _TASK_TERMINAL:
+        alive, code = _pid_exit(rec["pid"])
+        tstatus = (ticket or {}).get("status")
+        if tstatus == "awaiting_approval":
+            rec["status"] = "input_required"
+        elif alive:
+            rec["status"] = "working"
+        elif rec.get("cancel_requested"):
+            rec["status"] = "cancelled"
+        elif rec.get("resolution"):
+            rec["status"] = "completed" if rec["resolution"] == "approved" else "failed"
+        elif (ticket and tstatus in _TICKET_FAILED) or code:
+            rec["status"] = "failed"
+        else:
+            rec["status"] = "completed"
+        if rec["status"] != prev:
+            _task_save(rec)
+    out = {"taskId": rec["task_id"], "status": rec["status"], "kind": rec["kind"], "ticket_id": rec.get("ticket_id")}
+    if rec["status"] == "input_required" and ticket:
+        gate = ticket.get("approval_gate") or {}
+        out["elicitation"] = {
+            "message": f"Approve {ticket['id']} at {gate.get('phase')}? {gate.get('reason') or ''}".strip(),
+            "requestedSchema": {
+                "type": "object",
+                "properties": {"approve": {"type": "boolean"}, "note": {"type": "string"}},
+                "required": ["approve"],
+            },
+        }
+    elif rec["status"] in _TASK_TERMINAL:
+        out["result"] = _task_result(rec, ticket)
+    return out
+
+
+def task_update(task_id: str, answer: dict) -> dict:
+    """tasks/update — map an elicitation answer ({approve, note}) onto approve_ticket()."""
+    rec = _task_load(task_id)
+    if rec is None:
+        return {"error": f"unknown task: {task_id}"}
+    if rec["status"] != "input_required" or not rec.get("ticket_id"):
+        return {"error": f"task {task_id} is not awaiting input"}
+    approve = bool((answer or {}).get("approve"))
+    res = json.loads(approve_ticket(rec["ticket_id"], approve, str((answer or {}).get("note", ""))))
+    if "error" in res:
+        return res
+    rec["resolution"] = "approved" if approve else "rejected"
+    rec["status"] = "working"
+    _task_save(rec)
+    return task_get(task_id)
+
+
+def task_cancel(task_id: str) -> dict:
+    """tasks/cancel — SIGTERM the recorded pid; delegate.py parks the ticket as interrupted for requeue."""
+    rec = _task_load(task_id)
+    if rec is None:
+        return {"error": f"unknown task: {task_id}"}
+    if rec["status"] in _TASK_TERMINAL:
+        return {"taskId": rec["task_id"], "status": rec["status"]}
+    rec["cancel_requested"] = True
+    try:
+        os.kill(rec["pid"], signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    rec["status"] = "cancelled"
+    _task_save(rec)
+    return {"taskId": rec["task_id"], "status": "cancelled"}
+
+
 def _tickets_dir() -> Path:
     return _find_cto_root() / ".cto" / "tickets"
 
@@ -496,7 +761,7 @@ def list_tickets(
     limit: int = 50,
     offset: int = 0,
     response_format: Literal["concise", "detailed"] = "concise",
-) -> str:
+) -> TicketList:
     """List tickets in the current project, optionally filtered.
 
     Args:
@@ -508,12 +773,16 @@ def list_tickets(
                          'detailed' returns all fields including priority, type, complexity, dependencies.
 
     Returns:
-        JSON object with count, total, offset, and tickets array.
+        Structured object with count, total, offset, and a tickets array.
+
+    Use to find ticket IDs or filter by status/agent; for one ticket's full
+    detail call get_ticket, for a grouped overview call board. Example
+    arguments: status="blocked", limit=20.
     """
     td = _tickets_dir()
     if not td.exists():
-        return json.dumps({"tickets": [], "total": 0, "count": 0, "offset": offset,
-                           "note": "No tickets directory yet. Run init_project.sh."})
+        return {"tickets": [], "total": 0, "count": 0, "offset": offset,
+                "note": "No tickets directory yet. Run init_project.sh."}
     all_rows = []
     for fp in sorted(td.glob("*.json")):
         try:
@@ -550,11 +819,11 @@ def list_tickets(
                 "status": t.get("status"),
                 "assignee": t.get("agent"),
             })
-    return json.dumps({"count": len(rows), "total": total, "offset": offset, "tickets": rows}, indent=2)
+    return {"count": len(rows), "total": total, "offset": offset, "tickets": rows}
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Board", readOnlyHint=True))
-def board(response_format: Literal["concise", "detailed"] = "concise") -> str:
+def board(response_format: Literal["concise", "detailed"] = "concise") -> BoardView:
     """Kanban board view — tickets grouped by status.
 
     Args:
@@ -562,7 +831,11 @@ def board(response_format: Literal["concise", "detailed"] = "concise") -> str:
                          'detailed' returns totals + full card objects {id, title, agent, priority}.
 
     Returns:
-        JSON with totals and either ids (concise) or columns with card objects (detailed).
+        Structured object with totals and either ids (concise) or columns
+        with card objects (detailed).
+
+    Use for a quick who-is-doing-what overview; not for ticket detail
+    (get_ticket). Example argument: response_format="detailed".
     """
     td = _tickets_dir()
     col_names = ("todo", "in_progress", "needs_review", "blocked", "completed")
@@ -585,8 +858,8 @@ def board(response_format: Literal["concise", "detailed"] = "concise") -> str:
                 })
     totals = {k: len(v) for k, v in columns.items()}
     if response_format == "detailed":
-        return json.dumps({"totals": totals, "columns": columns}, indent=2)
-    return json.dumps({"totals": totals, "ids": ids}, indent=2)
+        return {"totals": totals, "columns": columns}
+    return {"totals": totals, "ids": ids}
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Create Ticket"))
@@ -677,16 +950,77 @@ def close_ticket(ticket_id: str, output: str = "") -> str:
     return json.dumps({"ok": True, "ticket_id": ticket_id, "status": "completed"})
 
 
+@mcp.tool(annotations=ToolAnnotations(title="List Pending Approvals", readOnlyHint=True))
+def list_pending_approvals() -> PendingApprovals:
+    """List tickets parked at an approval gate, waiting for a human decision.
+
+    Use before approve_ticket to see what is waiting. Takes no arguments.
+
+    Returns:
+        Structured object with count and a pending array of {ticket_id,
+        title, phase, reason, requested_at, diff_summary}.
+    """
+    from ticket import pending_approvals
+    items = []
+    for t in pending_approvals(_find_cto_root()):
+        gate = t.get("approval_gate") or {}
+        items.append({
+            "ticket_id": t["id"],
+            "title": t.get("title"),
+            "phase": gate.get("phase"),
+            "reason": gate.get("reason"),
+            "requested_at": gate.get("requested_at"),
+            "diff_summary": gate.get("diff_summary"),
+        })
+    return {"count": len(items), "pending": items}
+
+
+@mcp.tool(annotations=ToolAnnotations(title="Approve Ticket", destructiveHint=True))
+def approve_ticket(ticket_id: str, approve: bool = True, note: str = "") -> str:
+    """Approve or reject a ticket waiting at an approval gate (human only).
+
+    Approving a pre_delegate gate requeues the ticket as todo; approving a
+    pre_merge gate resumes it at review/merge. Rejecting blocks the ticket.
+    Refused when called from inside a delegated agent session.
+
+    Args:
+        ticket_id: Ticket awaiting approval.
+        approve: True to approve, False to reject.
+        note: Optional comment stored on the approval gate.
+
+    Returns:
+        JSON with the ticket's new status, or an error.
+    """
+    if os.environ.get("CTO_AGENT_ROLE") or os.environ.get("CTO_AGENT_TOKEN"):
+        audit_log_security_event(
+            "mcp_authz_fail",
+            f"Rejected approve_ticket({ticket_id}) — agents cannot approve gated tickets",
+            severity="critical",
+        )
+        return json.dumps({"error": "unauthorized: delegated agents cannot approve tickets"})
+    if not ticket_id or len(ticket_id) > 20:
+        return json.dumps({"error": f"invalid ticket id: {ticket_id}"})
+    from ticket import resolve_approval
+    try:
+        t = resolve_approval(_find_cto_root(), ticket_id, approve, note[:1000])
+    except (ValueError, SystemExit) as e:
+        return json.dumps({"error": str(e)})
+    return json.dumps({"ok": True, "ticket_id": ticket_id, "status": t["status"]})
+
+
 @mcp.tool(annotations=ToolAnnotations(title="Project Status", readOnlyHint=True))
-def project_status(response_format: Literal["concise", "detailed"] = "concise") -> str:
+def project_status(response_format: Literal["concise", "detailed"] = "concise") -> ProjectStatus:
     """Overall project dashboard — config, ticket counts by status, sprint.
 
     Args:
         response_format: 'concise' returns project_name, ticket_prefix, and ticket_counts only (default);
                          'detailed' adds current_sprint, default_model, next_ticket_number, last_activity.
 
+    Use for a one-call health check; for per-ticket rows use list_tickets.
+    Example argument: response_format="detailed".
+
     Returns:
-        JSON snapshot of project state at the requested detail level.
+        Structured snapshot of project state at the requested detail level.
     """
     cfg = _load_config()
     td = _tickets_dir()
@@ -705,7 +1039,7 @@ def project_status(response_format: Literal["concise", "detailed"] = "concise") 
             if upd and (last_updated is None or upd > last_updated):
                 last_updated = upd
     if response_format == "detailed":
-        return json.dumps({
+        return {
             "project_name": cfg.get("project_name"),
             "ticket_prefix": cfg.get("ticket_prefix"),
             "current_sprint": cfg.get("current_sprint"),
@@ -713,12 +1047,12 @@ def project_status(response_format: Literal["concise", "detailed"] = "concise") 
             "next_ticket_number": cfg.get("next_ticket_number"),
             "ticket_counts": counts,
             "last_activity": last_updated,
-        }, indent=2)
-    return json.dumps({
+        }
+    return {
         "project_name": cfg.get("project_name"),
         "ticket_prefix": cfg.get("ticket_prefix"),
         "ticket_counts": counts,
-    }, indent=2)
+    }
 
 
 @mcp.tool(annotations=ToolAnnotations(title="List Active Teams"))
@@ -750,17 +1084,20 @@ def list_active_teams() -> str:
 # -------------------- Sleepy Mode --------------------
 
 @mcp.tool(annotations=ToolAnnotations(title="Sleepy Status", readOnlyHint=True))
-def sleepy_status() -> str:
+def sleepy_status() -> SleepyStatus:
     """Sleepy Mode dashboard — budget, iteration count, queue depth, state.
 
+    Use to check whether an unattended run is active; for the branches
+    awaiting review use sleepy_queue. Takes no arguments.
+
     Returns:
-        JSON with sleepy state (running/idle), budget usage, iterations,
-        current ticket, review queue depth.
+        Structured object with initialized, state (running/idle, budget
+        usage, iterations, current ticket) and queue_depth.
     """
     root = _find_cto_root()
     sdir = root / ".cto" / "sleepy"
     if not sdir.exists():
-        return json.dumps({"initialized": False, "hint": "Run sleepy.py init to scaffold .cto/sleepy/"})
+        return {"initialized": False, "hint": "Run sleepy.py init to scaffold .cto/sleepy/"}
 
     state_fp = sdir / "state.json"
     state = _load_json(state_fp) if state_fp.exists() else {}
@@ -772,35 +1109,42 @@ def sleepy_status() -> str:
             if ln.strip().startswith("- [ ]") or ln.strip().startswith("- sleepy/"):
                 queue_depth += 1
 
-    return json.dumps({
+    return {
         "initialized": True,
         "state": state,
         "queue_depth": queue_depth,
-    }, indent=2)
+    }
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Sleepy Queue"))
-def sleepy_queue() -> str:
+def sleepy_queue() -> SleepyQueue:
     """Pending sleepy review branches awaiting apply/discard.
 
+    Use after sleepy_status shows queue_depth > 0. Takes no arguments.
+
     Returns:
-        Markdown contents of .cto/sleepy/QUEUE.md (or empty note).
+        Structured object whose queue field holds the Markdown contents of
+        .cto/sleepy/QUEUE.md (truncated to 8000 chars), or an empty queue with a note.
     """
     root = _find_cto_root()
     q = root / ".cto" / "sleepy" / "QUEUE.md"
     if not q.exists():
-        return json.dumps({"queue": "", "note": "no sleepy queue yet"})
-    return json.dumps({"queue": q.read_text()[:8000]})
+        return {"queue": "", "note": "no sleepy queue yet"}
+    return {"queue": q.read_text()[:8000]}
 
 
 # -------------------- Prometheus self-evolution --------------------
 
 @mcp.tool(annotations=ToolAnnotations(title="Prometheus Status", readOnlyHint=True))
-def prometheus_status() -> str:
+def prometheus_status() -> PrometheusStatus:
     """Prometheus dashboard — pending/applied/rejected proposals + ledger tail.
 
+    Use to see self-evolution progress; starting a scan is prometheus_scan.
+    Takes no arguments.
+
     Returns:
-        JSON with counts per status and the most recent 10 ledger entries.
+        Structured object with counts per status and the most recent 10
+        ledger entries (ledger_tail).
     """
     root = _find_cto_root()
     pdir = root / ".cto" / "prometheus"
@@ -808,7 +1152,7 @@ def prometheus_status() -> str:
         # Fall back to the orchestrator's own prometheus dir if project has none.
         pdir = _scripts_dir().parent / ".cto" / "prometheus"
     if not pdir.exists():
-        return json.dumps({"initialized": False})
+        return {"initialized": False}
 
     counts = {"pending": 0, "applied": 0, "rejected": 0, "rolled_back": 0}
     proposals_dir = pdir / "proposals"
@@ -833,11 +1177,11 @@ def prometheus_status() -> str:
         except Exception:
             pass
 
-    return json.dumps({
+    return {
         "initialized": True,
         "counts": counts,
         "ledger_tail": tail,
-    }, indent=2)
+    }
 
 
 # -------------------- Unity security --------------------
@@ -861,7 +1205,7 @@ def delegate(ticket_id: str, agent: str, model: str = "", detached: bool = True)
     Args:
         ticket_id: Ticket to work on.
         agent: Morty role (architect-morty, backend-morty, etc.).
-        model: Override model (default comes from config).
+        model: Model to use instead of the config default.
         detached: If true, fire-and-return with PID + log path.
 
     Returns:
@@ -890,7 +1234,7 @@ def delegate(ticket_id: str, agent: str, model: str = "", detached: bool = True)
     if model:
         args.extend(["--model", model])
     if detached:
-        return json.dumps(_spawn_detached("delegate.py", args, f"delegate-{safe_ticket}-{_now_iso().replace(':', '-')}.log"))
+        return json.dumps(_spawn_task("delegate.py", args, f"delegate-{safe_ticket}-{_now_iso().replace(':', '-')}.log", "delegate", ticket_id))
     return json.dumps(_run_script("delegate.py", args, timeout=600))
 
 
@@ -912,7 +1256,7 @@ def meeseeks(task: str, files: list[str] | None = None, detached: bool = True) -
     if files:
         args.extend(["--files", *files])
     if detached:
-        return json.dumps(_spawn_detached("meeseeks.py", args, f"meeseeks-{_now_iso().replace(':', '-')}.log"))
+        return json.dumps(_spawn_task("meeseeks.py", args, f"meeseeks-{_now_iso().replace(':', '-')}.log", "meeseeks"))
     return json.dumps(_run_script("meeseeks.py", args, timeout=600))
 
 
@@ -930,7 +1274,7 @@ def prometheus_scan(categories: str = "") -> str:
     args = ["scan"]
     if categories:
         args.extend(["--categories", categories])
-    return json.dumps(_spawn_detached("prometheus.py", args, f"prometheus-scan-{_now_iso().replace(':', '-')}.log"))
+    return json.dumps(_spawn_task("prometheus.py", args, f"prometheus-scan-{_now_iso().replace(':', '-')}.log", "prometheus_scan"))
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Unity Scan", openWorldHint=True))
@@ -948,7 +1292,7 @@ def unity_scan(repo_path: str = ".", url: str = "") -> str:
         args = ["scan", "--url", url]
     else:
         args = ["scan", "--repo", repo_path]
-    return json.dumps(_spawn_detached("unity.py", args, f"unity-scan-{_now_iso().replace(':', '-')}.log"))
+    return json.dumps(_spawn_task("unity.py", args, f"unity-scan-{_now_iso().replace(':', '-')}.log", "unity_scan"))
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Explain Code"))
@@ -1118,6 +1462,81 @@ def _run_integrity_check():
         )
 
 
+def _tool_definitions() -> dict:
+    """Map each registered tool name to (sha256, docstring) over name + docstring + signature."""
+    defs = {}
+    for tool in mcp._tool_manager.list_tools():
+        doc = inspect.getdoc(tool.fn) or ""
+        sig = str(inspect.signature(tool.fn))
+        digest = hashlib.sha256(
+            json.dumps({"name": tool.name, "docstring": doc, "signature": sig}, sort_keys=True).encode()
+        ).hexdigest()
+        defs[tool.name] = (digest, doc)
+    return defs
+
+
+def _manifest_path() -> Path:
+    return _find_cto_root() / ".cto" / "security" / "mcp_tool_manifest.json"
+
+
+def _emit_drift_event(details: dict):
+    try:
+        from roro_events import emit
+        emit("security.mcp_tool_drift", details, role="security")
+    except Exception:
+        pass
+
+
+def _verify_tool_manifest(repin: bool = False):
+    """Pin tool metadata hashes; abort on drift or poisoned docstrings unless overridden."""
+    defs = _tool_definitions()
+    current = {name: d for name, (d, _) in defs.items()}
+    fp = _manifest_path()
+
+    if repin or not fp.exists():
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        _save_json(fp, {"generated_at": _now_iso(), "tools": current})
+        print(f"[SECURITY] MCP tool manifest pinned: {fp} ({len(current)} tools)", file=sys.stderr)
+        if repin:
+            return
+
+    problems = {}
+    pinned = _load_json(fp).get("tools", {})
+    drift = {
+        "added": sorted(set(current) - set(pinned)),
+        "removed": sorted(set(pinned) - set(current)),
+        "changed": sorted(n for n in set(current) & set(pinned) if current[n] != pinned[n]),
+    }
+    if any(drift.values()):
+        problems["drift"] = drift
+
+    poisoned = {}
+    for name, (_, doc) in defs.items():
+        try:
+            hits = detect_injection_patterns(doc)
+        except SecurityViolationError as e:
+            hits = list(getattr(e, "patterns", None) or [str(e)])
+        if hits:
+            poisoned[name] = hits
+    if poisoned:
+        problems["poisoned_docstrings"] = sorted(poisoned)
+
+    if not problems:
+        return
+    details = json.dumps(problems)
+    audit_log_security_event("mcp_tool_drift", details, severity="critical")
+    _emit_drift_event(problems)
+    print(f"[SECURITY-WARNING] cto-orchestrator MCP tool metadata check failed — {details}", file=sys.stderr)
+    if os.environ.get("CTO_ACCEPT_MCP_DRIFT") != "1":
+        print(
+            "[SECURITY-CRITICAL] Aborting MCP server startup. Review the tool changes, then run "
+            "`python3 scripts/mcp_server.py --repin` or set CTO_ACCEPT_MCP_DRIFT=1.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print("[SECURITY-WARNING] CTO_ACCEPT_MCP_DRIFT=1 — starting despite drift.", file=sys.stderr)
+
+
 @mcp.tool(annotations=ToolAnnotations(title="Plugin Info"))
 def plugin_info() -> dict:
     """Return plugin name and semver version from .claude-plugin/plugin.json."""
@@ -1126,4 +1545,7 @@ def plugin_info() -> dict:
 
 if __name__ == "__main__":
     _run_integrity_check()
+    _verify_tool_manifest(repin="--repin" in sys.argv[1:])
+    if "--repin" in sys.argv[1:]:
+        sys.exit(0)
     mcp.run()

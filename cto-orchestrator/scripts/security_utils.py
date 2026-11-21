@@ -1272,14 +1272,169 @@ _DENYLIST_BASENAME_PATTERNS = [
 ]
 
 
+# ── Protected Control Files ───────────────────────────────────────────────────
+# Guardrail / agent-config files an agent must not rewrite on its own, since
+# that would silently disable every downstream guardrail. Patterns are
+# repo-relative POSIX paths; "/**" matches everything beneath a directory.
+
+_PROTECTED_CONTROL_PATHS = (
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".claude/agents/**",
+    "scripts/hooks.py",
+    "scripts/security_utils.py",
+    ".cto/session/**",
+    ".cto/config.json",
+    ".cto/security/module-hashes.json",  # verify_module_integrity() manifest
+)
+
+_CONTROL_EDIT_ENV = "CTO_ALLOW_CONTROL_EDIT"
+CONTROL_BLOCK_PREFIX = "Protected control file"
+
+
+def control_edit_allowed() -> bool:
+    """True when the Prometheus evolve path has explicitly unlocked control edits."""
+    return os.environ.get(_CONTROL_EDIT_ENV, "") == "1"
+
+
+def _protected_match(rel_posix: str) -> Optional[str]:
+    """Return the matching protected pattern for a repo-relative POSIX path."""
+    rel = rel_posix.lstrip("/")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    for pattern in _PROTECTED_CONTROL_PATHS:
+        if pattern.endswith("/**"):
+            if rel.startswith(pattern[:-2]):
+                return pattern
+        elif rel == pattern:
+            return pattern
+    return None
+
+
+def is_protected_control_path(
+    path: str,
+    repo_root: Optional[Union[str, Path]] = None,
+) -> tuple[bool, str]:
+    """Check whether a path is a protected guardrail/agent-config file.
+
+    With repo_root the path is matched relative to it; without, any path
+    ending in a protected suffix matches.
+
+    Returns:
+        Tuple of (is_protected, matching_pattern)
+    """
+    if not path:
+        return False, ""
+    p = Path(path)
+    if repo_root is not None:
+        try:
+            rel = p.resolve().relative_to(Path(repo_root).resolve()).as_posix()
+        except (ValueError, OSError):
+            return False, ""
+        pattern = _protected_match(rel)
+        return (pattern is not None), (pattern or "")
+    posix = p.as_posix()
+    for pattern in _PROTECTED_CONTROL_PATHS:
+        stem = pattern[:-3] if pattern.endswith("/**") else pattern
+        if pattern.endswith("/**"):
+            if f"/{stem}/" in f"/{posix}":
+                return True, pattern
+        elif posix == stem or posix.endswith("/" + stem):
+            return True, pattern
+    return False, ""
+
+
+# ── Test-tamper guard ─────────────────────────────────────────────────────────
+
+_TEST_FILE_GLOBS = (
+    "test_*.py", "*_test.py", "conftest.py", "*.spec.ts", "*.test.ts",
+    "*.spec.tsx", "*.test.tsx", "*.spec.js", "*.test.js",
+    "jest.config.*", "pytest.ini",
+)
+_TEST_DIR_NAMES = {"tests", "__tests__"}
+
+_ASSERT_LINE_RE = re.compile(r"^\s*(assert\b|self\.assert\w*\(|expect\()")
+_SKIP_ADDED_RE = re.compile(
+    r"@pytest\.mark\.(skip|xfail)|@unittest\.(skip|expectedFailure)|\.skip\(|"
+    r"\b(it|test|describe)\.only\b|\bpytest\.(skip|xfail)\("
+)
+_TRIVIAL_ASSERT_RE = re.compile(r"^\s*(assert\s+True\b|expect\(\s*true\s*\)\.toBe\(\s*true\s*\))")
+_TEST_DEF_RE = re.compile(r"^\s*(async\s+)?def\s+test_|^\s*(it|test)\s*\(")
+_BARE_RETURN_RE = re.compile(r"^\s+return\s*;?\s*$")
+
+
+def is_test_path(p: str) -> bool:
+    """True when a path looks like a test file or test/grading config."""
+    if not p:
+        return False
+    from fnmatch import fnmatch
+    parts = Path(str(p).replace("\\", "/")).parts
+    if any(part in _TEST_DIR_NAMES for part in parts[:-1]):
+        return True
+    return bool(parts) and any(fnmatch(parts[-1], g) for g in _TEST_FILE_GLOBS)
+
+
+def diff_weakens_tests(diff_text: str) -> list[str]:
+    """Scan a unified diff for changes that weaken tests.
+
+    Flags net-removed assertions, added skip/xfail/only markers, trivial
+    ``assert True`` lines and added bare early ``return`` inside test bodies.
+    Only test paths are inspected; purely additive new tests yield no findings.
+    """
+    findings: list[str] = []
+    cur: Optional[str] = None
+    in_test = False
+    removed = added = 0
+
+    def flush() -> None:
+        if cur and removed > added:
+            findings.append(f"{cur}: {removed - added} assertion(s) removed")
+
+    for line in (diff_text or "").splitlines():
+        if line.startswith("diff --git "):
+            flush()
+            cur, in_test, removed, added = None, False, 0, 0
+        elif line.startswith("+++ "):
+            name = line[4:].strip()
+            cur = name[2:] if name.startswith("b/") else None
+            if cur is not None and not is_test_path(cur):
+                cur = None
+        elif line.startswith("@@"):
+            in_test = False
+        elif cur is None or line.startswith("---"):
+            continue
+        elif line.startswith("-"):
+            if _ASSERT_LINE_RE.match(line[1:]):
+                removed += 1
+        elif line.startswith("+"):
+            body = line[1:]
+            if _ASSERT_LINE_RE.match(body):
+                added += 1
+            if _SKIP_ADDED_RE.search(body):
+                findings.append(f"{cur}: skip/xfail/only marker added: {body.strip()[:80]}")
+            if _TRIVIAL_ASSERT_RE.match(body):
+                findings.append(f"{cur}: trivial assertion added: {body.strip()[:80]}")
+            if _TEST_DEF_RE.match(body):
+                in_test = True
+            elif in_test and _BARE_RETURN_RE.match(body):
+                findings.append(f"{cur}: early return added in test body")
+        else:
+            body = line[1:]
+            if _TEST_DEF_RE.match(body):
+                in_test = True
+    flush()
+    return findings
+
+
 def is_path_in_denylist(
     path: str,
     repo_root: Optional[Union[str, Path]] = None,
 ) -> tuple[bool, str]:
     """Check whether a file path is in the guardrail denylist.
 
-    Blocks .env/secret/credential files by name pattern and paths that
-    escape the repo root.
+    Blocks .env/secret/credential files by name pattern, paths that
+    escape the repo root, and protected guardrail/agent-config files
+    (unless CTO_ALLOW_CONTROL_EDIT=1).
 
     Returns:
         Tuple of (is_blocked, reason)
@@ -1304,6 +1459,14 @@ def is_path_in_denylist(
         except OSError:
             pass  # path doesn't exist yet; skip containment check
 
+    if not control_edit_allowed():
+        protected, pattern = is_protected_control_path(path, repo_root)
+        if protected:
+            return True, (
+                f"{CONTROL_BLOCK_PREFIX} '{pattern}' cannot be modified by agents "
+                f"(guardrail self-modification)"
+            )
+
     return False, ""
 
 
@@ -1320,6 +1483,43 @@ _DANGEROUS_BASH_PATTERNS = [
     (re.compile(r'git\s+push\s+(--force|-f)\b.*\b(main|master)\b'), "force push to protected branch"),
 ]
 
+_CONTROL_PATH_REGEX = "|".join(
+    (re.escape(p[:-3]) + r"/[^\s'\"]*") if p.endswith("/**") else re.escape(p)
+    for p in _PROTECTED_CONTROL_PATHS
+)
+_CONTROL_PATH_RE = re.compile(r'(?:^|[\s\'"=:/])(?:\./|[^\s\'"]*/)?(?:' + _CONTROL_PATH_REGEX + r')')
+_CONTROL_WRITE_RE = re.compile(
+    r'\bsed\s+(?:-[a-zA-Z]*\s+)*-[a-zA-Z]*i|\bperl\s+-[a-zA-Z]*i|\btee\b|>|'
+    r'\b(?:mv|cp|rm|install|truncate|dd|ln)\b|'
+    r'\bgit\s+(?:checkout|restore|reset|stash|rm|apply)\b'
+)
+
+
+def scan_bash_control_writes(command: str) -> tuple[bool, str]:
+    """Detect shell writes (sed -i, tee, >, mv, cp, git checkout, ...) to protected control files.
+
+    Conservative: a command that both mentions a protected path and uses a
+    write-capable verb is flagged. Skipped when CTO_ALLOW_CONTROL_EDIT=1.
+
+    Returns:
+        Tuple of (is_blocked, reason)
+    """
+    if not command or control_edit_allowed():
+        return False, ""
+    match = _CONTROL_PATH_RE.search(command)
+    if match and _CONTROL_WRITE_RE.search(command):
+        target = match.group(0).strip(" '\"=:")
+        return True, (
+            f"{CONTROL_BLOCK_PREFIX} write via shell blocked: '{target}' "
+            f"(guardrail self-modification)"
+        )
+    return False, ""
+
+
+_INSTALL_SCRIPTS_OVERRIDE_PATTERN = re.compile(
+    r'\b(?:npm|pnpm|yarn)\b[^;&|\n]*?(?:--foreground-scripts|--ignore-scripts(?:=|\s+)(?:false|0)\b)'
+)
+
 
 def scan_bash_command(command: str) -> tuple[bool, str]:
     """Scan a shell command string for dangerous patterns.
@@ -1334,7 +1534,15 @@ def scan_bash_command(command: str) -> tuple[bool, str]:
         if compiled.search(command):
             return True, f"Dangerous shell pattern: {description}"
 
-    return False, ""
+    if _INSTALL_SCRIPTS_OVERRIDE_PATTERN.search(command):
+        # Warning only: legit for allowlisted native builds, but worth an audit trail.
+        audit_log_security_event(
+            "install_scripts_override",
+            f"Lifecycle-script override in install command: {command[:200]}",
+            severity="warning",
+        )
+
+    return scan_bash_control_writes(command)
 
 
 # ── Network Egress Allowlist ──────────────────────────────────────────────────
@@ -1413,6 +1621,432 @@ def scan_command_egress(command: str) -> tuple[bool, str]:
         return True, f"Egress to disallowed host(s): {', '.join(denied)}"
 
     return False, ""
+
+
+# ── Native Claude Code Sandbox (PROM-192) ────────────────────────────────────
+# OS-level (Seatbelt/bubblewrap) network + filesystem isolation for every Morty
+# subprocess. The domain list is derived from _egress_allowlist() so the regex
+# scanner above (kept as defense-in-depth) and the OS sandbox share one source.
+
+# sandbox.network.strictAllowlist (silent deny instead of a prompt) needs >= 2.1.219.
+SANDBOX_MIN_CLI = (2, 1, 219)
+
+
+def sandbox_domains(extra_domains=()) -> list[str]:
+    """Return sandbox.network.allowedDomains for the egress allowlist.
+
+    Each host is emitted both bare and as "*.host": the sandbox does not let a
+    bare entry cover subdomains, whereas _egress_host_allowed() does.
+    """
+    domains: set[str] = set()
+    for raw in _egress_allowlist() | set(extra_domains or ()):
+        host = str(raw).strip().lower().rstrip(".")
+        if not host:
+            continue
+        domains.add(host)
+        domains.add("*." + host)
+    return sorted(domains)
+
+
+def build_sandbox_settings(root, extra_domains=(), unattended: bool = False,
+                           extra_write=()) -> dict:
+    """Return a Claude Code settings dict enabling the native sandbox.
+
+    unattended=True (sleepy/prometheus) turns on strictAllowlist and
+    failIfUnavailable: nobody is around to answer a network prompt, and an
+    unattended run must not silently continue without OS isolation.
+    """
+    import tempfile
+
+    allow_write = {str(Path(root).resolve()), "/tmp", str(Path(tempfile.gettempdir()).resolve())}
+    allow_write.update(str(p) for p in (extra_write or ()) if str(p).strip())
+    return {
+        "sandbox": {
+            "enabled": True,
+            "allowUnsandboxedCommands": False,
+            "failIfUnavailable": bool(unattended),
+            "network": {
+                "allowedDomains": sandbox_domains(extra_domains),
+                "strictAllowlist": bool(unattended),
+            },
+            "filesystem": {"allowWrite": sorted(allow_write)},
+        }
+    }
+
+
+def is_unattended() -> bool:
+    """True when the caller marked this process tree as unattended (sleepy)."""
+    return os.environ.get("CTO_UNATTENDED") == "1"
+
+
+def native_sandbox_enabled(root) -> bool:
+    """Feature flag: security.native_sandbox in .cto/config.json (default on).
+
+    CTO_NATIVE_SANDBOX=0 forces it off. Never raises — an unreadable or
+    malformed config keeps the secure default (True).
+    """
+    if os.environ.get("CTO_NATIVE_SANDBOX") == "0":
+        return False
+    try:
+        import json
+
+        with open(Path(root) / ".cto" / "config.json") as f:
+            config = json.load(f)
+        security = config.get("security") if isinstance(config, dict) else None
+        if isinstance(security, dict) and "native_sandbox" in security:
+            return bool(security["native_sandbox"])
+    except Exception:
+        pass
+    return True
+
+
+def cli_supports_native_sandbox(version_string: str) -> bool:
+    """True if a `claude --version` string is >= SANDBOX_MIN_CLI."""
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", version_string or "")
+    if not match:
+        return False
+    return tuple(int(g) for g in match.groups()) >= SANDBOX_MIN_CLI
+
+
+def _deep_merge(base: dict, overlay: dict) -> dict:
+    merged = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def write_sandbox_settings(root, tag: str, base: Optional[dict] = None,
+                           unattended: bool = False, extra_domains=()) -> Path:
+    """Write base (e.g. guardrail hooks) + sandbox settings to a --settings file.
+
+    Arrays don't merge across settings files, so this file carries the full
+    domain list. Written to .cto/session/sandbox-<tag>.json with mode 0o600.
+    Raises OSError if the file cannot be written.
+    """
+    import json
+
+    settings = _deep_merge(
+        dict(base or {}),
+        build_sandbox_settings(root, extra_domains=extra_domains, unattended=unattended),
+    )
+    session_dir = Path(root) / ".cto" / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    path = session_dir / f"sandbox-{sanitize_path_component(tag)}.json"
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(settings, f, indent=2)
+    os.chmod(path, 0o600)  # O_CREAT mode is ignored when the file already exists
+    return path
+
+
+# ── Package Install Guard (slopsquatting / fresh-release worms) ──────────────
+
+DEFAULT_PACKAGE_MIN_AGE_DAYS = 7
+_PKG_NEW_PACKAGE_DAYS = 30
+_PKG_REGISTRY_TIMEOUT = 3
+_PKG_CACHE_TTL_SECONDS = 3600
+
+_PKG_SEGMENT_SPLIT = re.compile(r'\s*(?:&&|\|\||;|\||\n)\s*')
+_PKG_PIP_NAMES = {"pip", "pip3"}
+_PKG_NPM_ADD = {"i", "install", "add"}
+# Flags that consume the following token as their value (not a package spec).
+_PKG_VALUE_FLAGS = {
+    "-r", "--requirement", "-c", "--constraint", "-e", "--editable", "-i",
+    "--index-url", "--extra-index-url", "-f", "--find-links", "-t", "--target",
+    "--prefix", "--registry", "--python", "-p", "--cwd", "--root", "--prefer-offline",
+    "--tag", "--workspace", "-w", "--filter", "--no-binary", "--only-binary",
+}
+_PKG_LOCKFILES = (
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "uv.lock", "poetry.lock",
+    "Pipfile.lock", "package.json", "pyproject.toml",
+)
+_PKG_WORD = re.compile(r'[A-Za-z0-9@/_.\-]+')
+
+
+def _norm_py_name(name: str) -> str:
+    return re.sub(r'[-_.]+', '-', name).lower()
+
+
+def _pkg_security_config(root: Path) -> dict:
+    try:
+        import json
+        cfg = json.loads((root / ".cto" / "config.json").read_text())
+        sec = cfg.get("security", {})
+        return sec if isinstance(sec, dict) else {}
+    except Exception:
+        return {}
+
+
+def get_package_min_age_days(root: Optional[Union[str, Path]] = None) -> int:
+    """Configured release-age cooldown in days (security.package_min_age_days)."""
+    sec = _pkg_security_config(Path(root) if root else Path.cwd())
+    try:
+        return max(0, int(sec.get("package_min_age_days", DEFAULT_PACKAGE_MIN_AGE_DAYS)))
+    except (TypeError, ValueError):
+        return DEFAULT_PACKAGE_MIN_AGE_DAYS
+
+
+def _extract_install_packages(command: str) -> list[tuple[str, str]]:
+    """Return [(ecosystem, package_name)] for pip/uv/npm/pnpm/yarn installs in command."""
+    found: list[tuple[str, str]] = []
+    for segment in _PKG_SEGMENT_SPLIT.split(command or ""):
+        try:
+            tokens = shlex.split(segment)
+        except ValueError:
+            continue
+        # Drop leading env assignments / wrappers (FOO=1 sudo ...)
+        while tokens and (re.match(r'^\w+=', tokens[0]) or tokens[0] in ("sudo", "env", "time")):
+            tokens.pop(0)
+        if not tokens:
+            continue
+
+        eco = ""
+        args: list[str] = []
+        head = os.path.basename(tokens[0])
+        if head in _PKG_PIP_NAMES and len(tokens) > 1 and tokens[1] == "install":
+            eco, args = "pypi", tokens[2:]
+        elif head.startswith("python") and tokens[1:4] == ["-m", "pip", "install"]:
+            eco, args = "pypi", tokens[4:]
+        elif head == "uv" and len(tokens) > 1:
+            if tokens[1] == "add":
+                eco, args = "pypi", tokens[2:]
+            elif tokens[1:3] == ["pip", "install"]:
+                eco, args = "pypi", tokens[3:]
+        elif head == "npm" and len(tokens) > 1 and tokens[1] in _PKG_NPM_ADD:
+            eco, args = "npm", tokens[2:]
+        elif head in ("pnpm", "yarn") and len(tokens) > 1 and tokens[1] == "add":
+            eco, args = "npm", tokens[2:]
+        if not eco:
+            continue
+
+        skip_next = False
+        for tok in args:
+            if skip_next:
+                skip_next = False
+                continue
+            if tok.startswith("-"):
+                if tok in _PKG_VALUE_FLAGS:
+                    skip_next = True
+                continue
+            # Local paths, URLs, VCS refs and archives are not registry lookups
+            if (tok in (".", "..") or "/" in tok and not tok.startswith("@")
+                    or "://" in tok or tok.startswith(("git+", "file:", "~", "$"))
+                    or tok.endswith((".txt", ".whl", ".tar.gz", ".tgz", ".zip"))):
+                continue
+            if eco == "pypi":
+                name = re.split(r'[\[<>=!~;@ ]', tok, maxsplit=1)[0]
+                name = _norm_py_name(name) if name else ""
+            else:
+                # strip @version but keep the leading scope '@'
+                name = tok[0] + tok[1:].split("@", 1)[0] if tok else ""
+                name = name.lower()
+            if name and re.match(r'^@?[a-z0-9][a-z0-9._/\-]*$', name):
+                found.append((eco, name))
+    return found
+
+
+def _known_project_packages(root: Path) -> set[str]:
+    """Names already referenced by requirements*.txt, pyproject, package.json or lockfiles."""
+    known: set[str] = set()
+    files = list(root.glob("requirements*.txt")) + [root / f for f in _PKG_LOCKFILES]
+    for f in files:
+        try:
+            if f.is_file() and f.stat().st_size < 5_000_000:
+                for w in _PKG_WORD.findall(f.read_text(errors="ignore")):
+                    w = w.lower()
+                    known.add(w)
+                    known.add(_norm_py_name(w))
+        except OSError:
+            continue
+    return known
+
+
+def _parse_iso(ts: str):
+    from datetime import datetime, timezone
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _fetch_package_meta(eco: str, name: str) -> Optional[dict]:
+    """Query the registry. Returns {exists, newest, first, releases} or None on network error."""
+    import json
+    import urllib.error
+    import urllib.request
+    if eco == "pypi":
+        url = f"https://pypi.org/pypi/{urllib.parse.quote(name)}/json"
+    else:
+        url = f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='@')}"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=_PKG_REGISTRY_TIMEOUT) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"exists": False}
+        return None
+    except Exception:
+        return None
+
+    times = []
+    if eco == "pypi":
+        for files in (data.get("releases") or {}).values():
+            stamps = [_parse_iso(f.get("upload_time_iso_8601", "")) for f in files or []]
+            stamps = [t for t in stamps if t]
+            if stamps:
+                times.append(min(stamps))
+    else:
+        for ver, ts in (data.get("time") or {}).items():
+            if ver not in ("created", "modified"):
+                t = _parse_iso(ts)
+                if t:
+                    times.append(t)
+    if not times:
+        return {"exists": True, "newest": None, "first": None, "releases": 0}
+    return {
+        "exists": True,
+        "newest": max(times).isoformat(),
+        "first": min(times).isoformat(),
+        "releases": len(times),
+    }
+
+
+def scan_package_install(
+    command: str,
+    repo_root: Optional[Union[str, Path]] = None,
+) -> tuple[bool, str]:
+    """Check pip/uv/npm/pnpm/yarn install commands for hallucinated or too-fresh packages.
+
+    For each package not already referenced by the project (requirements*.txt,
+    pyproject.toml, package.json, lockfiles) the registry is queried (3s timeout,
+    cached in .cto/cache/pkg_meta.json). Blocks when the package 404s (likely
+    hallucinated / slopsquatting target), when its newest release is younger than
+    the cooldown (security.package_min_age_days, default 7), or when it has fewer
+    than 2 releases and was first published less than 30 days ago.
+    security.package_allowlist in .cto/config.json bypasses all checks.
+
+    Network failures fail open. Returns (blocked, reason).
+    """
+    import json
+    import time
+    from datetime import datetime, timezone
+
+    packages = _extract_install_packages(command)
+    if not packages:
+        return False, ""
+
+    root = Path(repo_root) if repo_root else Path.cwd()
+    sec = _pkg_security_config(root)
+    allow = {_norm_py_name(str(p)) for p in sec.get("package_allowlist", []) or []}
+    allow |= {str(p).lower() for p in sec.get("package_allowlist", []) or []}
+    min_age = get_package_min_age_days(root)
+    known = _known_project_packages(root)
+
+    cache_path = root / ".cto" / "cache" / "pkg_meta.json"
+    try:
+        cache = json.loads(cache_path.read_text())
+        if not isinstance(cache, dict):
+            cache = {}
+    except Exception:
+        cache = {}
+    dirty = False
+    now = datetime.now(timezone.utc)
+    problems: list[str] = []
+
+    for eco, name in dict.fromkeys(packages):
+        if name in allow or name in known or _norm_py_name(name) in known:
+            continue
+        key = f"{eco}:{name}"
+        entry = cache.get(key)
+        if not (entry and time.time() - entry.get("checked_at", 0) < _PKG_CACHE_TTL_SECONDS):
+            meta = _fetch_package_meta(eco, name)
+            if meta is None:
+                continue  # registry unreachable — fail open
+            entry = {**meta, "checked_at": time.time()}
+            cache[key] = entry
+            dirty = True
+
+        if not entry.get("exists"):
+            problems.append(f"{eco} package '{name}' does not exist (likely hallucinated)")
+            continue
+        newest = _parse_iso(entry.get("newest") or "")
+        first = _parse_iso(entry.get("first") or "")
+        if newest and (now - newest).days < min_age:
+            problems.append(
+                f"{eco} package '{name}' has a release younger than {min_age} days "
+                f"({newest.date()})"
+            )
+        elif first and entry.get("releases", 0) < 2 and (now - first).days < _PKG_NEW_PACKAGE_DAYS:
+            problems.append(
+                f"{eco} package '{name}' is new (<{_PKG_NEW_PACKAGE_DAYS}d, "
+                f"{entry.get('releases', 0)} release)"
+            )
+
+    if dirty:
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps(cache))
+        except OSError:
+            pass
+
+    if problems:
+        return True, (
+            "Package install blocked: " + "; ".join(problems)
+            + ". Add to .cto/config.json security.package_allowlist if legitimate."
+        )
+    return False, ""
+
+
+def package_cooldown_env(root: Optional[Union[str, Path]] = None) -> dict:
+    """Env vars making pip/uv/npm enforce a release-age cooldown (incl. transitive deps).
+
+    - uv:  UV_EXCLUDE_NEWER accepts friendly durations ("7 days")
+    - npm: min-release-age (days, npm >= 11.10) via npm_config_min_release_age
+    - pip: PIP_UPLOADED_PRIOR_TO accepts ISO 8601 durations ("P7D"; pip >= 26.0)
+    """
+    days = get_package_min_age_days(root)
+    if days <= 0:
+        return {}
+    return {
+        "UV_EXCLUDE_NEWER": f"{days} days",
+        "npm_config_min_release_age": str(days),
+        "PIP_UPLOADED_PRIOR_TO": f"P{days}D",
+    }
+
+
+def _install_scripts_allowed(root: Optional[Union[str, Path]] = None) -> bool:
+    """security.allow_install_scripts (default False)."""
+    sec = _pkg_security_config(Path(root) if root else Path.cwd())
+    return bool(sec.get("allow_install_scripts", False))
+
+
+def install_hardening_env(root: Optional[Union[str, Path]] = None) -> dict:
+    """Cooldown env plus lifecycle-script disabling for npm/yarn (Shai-Hulud defence).
+
+    Scripts stay disabled unless security.allow_install_scripts is true. Packages in
+    security.install_scripts_allowlist need an explicit `npm rebuild <pkg>`.
+    """
+    env = package_cooldown_env(root)
+    if not _install_scripts_allowed(root):
+        env["npm_config_ignore_scripts"] = "true"
+        env["YARN_ENABLE_SCRIPTS"] = "false"
+    return env
+
+
+def install_scripts_hint(root: Optional[Union[str, Path]] = None) -> str:
+    """Hint to rebuild allowlisted packages explicitly; empty if nothing applies."""
+    if _install_scripts_allowed(root):
+        return ""
+    allow = _pkg_security_config(Path(root) if root else Path.cwd()).get("install_scripts_allowlist", [])
+    if not isinstance(allow, list) or not allow:
+        return ""
+    names = " ".join(str(a) for a in allow)
+    return f"Install scripts are disabled; for allowlisted packages run explicitly: npm rebuild {names}"
 
 
 # ── Module Integrity Verification ────────────────────────────────────────────
