@@ -17,6 +17,7 @@ import schemas  # noqa: E402
 def _ticket(root, tid="PL-001", agent="backend-morty"):
     d = root / ".cto" / "tickets"
     d.mkdir(parents=True, exist_ok=True)
+    (root / ".cto" / "config.json").write_text(json.dumps({"project_name": "t", "ticket_prefix": "PL"}))
     t = {"id": tid, "title": "t", "status": "in_review", "priority": "high", "type": "task",
          "dependencies": [], "files_touched": ["a.py"], "agent_output": "done", "assigned_agent": agent}
     (d / f"{tid}.json").write_text(json.dumps(t))

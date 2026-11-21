@@ -666,6 +666,31 @@ def cmd_close(args):
     print(f"About time. Closed {args.ticket_id}. Wubba lubba dub dub!")
 
 
+def cmd_set_verify(args):
+    """Set the executable acceptance checks (ticket['verify']) for a ticket."""
+    root = find_cto_root()
+    ticket = load_ticket(root, args.ticket_id)
+    checks = []
+    for raw in args.cmd or []:
+        raw = raw.strip()
+        if not raw:
+            continue
+        check = {"cmd": raw}
+        if args.cwd:
+            check["cwd"] = args.cwd
+        if args.timeout_s is not None:
+            check["timeout_s"] = args.timeout_s
+        if args.expect_exit is not None:
+            check["expect_exit"] = args.expect_exit
+        checks.append(check)
+    if args.clear:
+        checks = []
+    ticket["verify"] = checks
+    ticket["updated_at"] = now_iso()
+    save_ticket(root, ticket)
+    print(f"{args.ticket_id}: {len(checks)} verify check(s) set")
+
+
 def cmd_blocked(args):
     root = find_cto_root()
     ticket = load_ticket(root, args.ticket_id)
@@ -774,6 +799,15 @@ def build_parser():
     bl.add_argument("ticket_id")
     bl.add_argument("--reason", required=True)
 
+    # set-verify
+    sv = sub.add_parser("set-verify", help="Set executable verify commands for a ticket")
+    sv.add_argument("ticket_id")
+    sv.add_argument("--cmd", action="append", default=[], help="Command to run (repeatable)")
+    sv.add_argument("--cwd", default=None, help="Working dir relative to project root")
+    sv.add_argument("--timeout-s", dest="timeout_s", type=int, default=None)
+    sv.add_argument("--expect-exit", dest="expect_exit", type=int, default=None)
+    sv.add_argument("--clear", action="store_true", help="Remove all verify checks")
+
     # approve / reject
     for name, hlp in (("approve", "Approve a ticket awaiting approval"), ("reject", "Reject a ticket awaiting approval")):
         ap = sub.add_parser(name, help=hlp)
@@ -800,6 +834,7 @@ def main():
         "next": cmd_next,
         "close": cmd_close,
         "blocked": cmd_blocked,
+        "set-verify": cmd_set_verify,
         "approve": cmd_approve,
         "reject": cmd_reject,
         "trajectories": cmd_trajectories,

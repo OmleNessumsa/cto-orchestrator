@@ -350,7 +350,7 @@ def _passes_quality_gate(ticket: dict) -> bool:
     non-empty description. Tickets that miss any gate stay in_review for manual review.
     """
     status = ticket.get("status", "")
-    if status not in ("in_review", "completed", "needs_review"):
+    if status not in ("in_review", "completed", "needs_review", "needs_rework"):
         return False
     if not (ticket.get("files_touched") or []):
         return False
@@ -419,7 +419,15 @@ def _review_and_close_ticket(root: Path, ticket: dict) -> bool:
             "open_questions": ticket.get("review_notes", ""),
         }
         emit("cto.ticket.review_started", {"ticket_id": ticket["id"], "attempt": attempt + 1}, role="rick")
-        verdict = review_ticket(root, ticket, handoff)
+        failed_checks = [c for c in ((ticket.get("verification") or {}).get("checks") or []) if not c.get("passed")]
+        if ticket.get("status") == "needs_rework" and failed_checks:
+            # Deterministic checks failed — skip the LLM review and retry with the output attached.
+            verdict = {
+                "approved": False,
+                "issues": [f"verify check failed: {c.get('cmd')} (exit {c.get('exit_code')})" for c in failed_checks],
+            }
+        else:
+            verdict = review_ticket(root, ticket, handoff)
 
         if verdict.get("approved", True):
             emit("cto.ticket.review_passed", {"ticket_id": ticket["id"], "attempt": attempt + 1}, role="rick")
@@ -1114,7 +1122,8 @@ def cmd_plan(args):
 5. Assign complexity estimates (from a Morty's perspective, not yours)
 
 ## Output Format
-Return a JSON array of ticket objects. Each ticket must have EXACTLY these fields:
+Return a JSON array of ticket objects. Each ticket must have EXACTLY these fields
+(`verify` is optional: for code tickets, list deterministic shell commands that prove the work, e.g. `pytest scripts/test_x.py -q` or `npm run build`; omit it for non-code tickets):
 ```json
 [
   {{
@@ -1126,6 +1135,7 @@ Return a JSON array of ticket objects. Each ticket must have EXACTLY these field
     "parent_index": null or integer index of parent ticket in this array,
     "dependency_indices": [integer indices of tickets this depends on],
     "acceptance_criteria": ["criterion 1", "criterion 2"],
+    "verify": [{{"cmd": "pytest scripts/test_x.py -q", "timeout_s": 300}}],
     "provides": "string-tag-or-null",
     "requires": ["tag1", "tag2"]
   }}
@@ -1240,6 +1250,13 @@ Output the JSON array now:"""
                 t["provides"] = provides_tag
             if requires_tags:
                 t["requires"] = requires_tags
+            verify_checks = [
+                {k: v for k, v in c.items() if k in ("cmd", "cwd", "timeout_s", "expect_exit")}
+                for c in (item.get("verify") or [])
+                if isinstance(c, dict) and isinstance(c.get("cmd"), str) and c["cmd"].strip()
+            ]
+            if verify_checks:
+                t["verify"] = verify_checks
             save_ticket(root, t)
         except Exception:
             pass

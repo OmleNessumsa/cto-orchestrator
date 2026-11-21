@@ -398,6 +398,19 @@ SPRINT_TICKET_ITEM_SCHEMA: dict = {
         "parent_index": {"type": ["integer", "null"]},
         "dependency_indices": {"type": "array", "items": {"type": "integer"}},
         "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+        "verify": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "cmd": {"type": "string"},
+                    "cwd": {"type": "string"},
+                    "timeout_s": {"type": "integer"},
+                    "expect_exit": {"type": "integer"},
+                },
+                "required": ["cmd"],
+            },
+        },
         "provides": {"type": ["string", "null"]},
         "requires": {"type": "array", "items": {"type": "string"}},
     },
@@ -733,6 +746,7 @@ class TicketView(TypedDict, total=False):
     parent_ticket: Optional[str]
     dependencies: Optional[list[str]]
     acceptance_criteria: Optional[list[Any]]
+    verify: Optional[list[dict[str, Any]]]
     estimated_complexity: Optional[str]
     team_mode: Any
     team_template: Any

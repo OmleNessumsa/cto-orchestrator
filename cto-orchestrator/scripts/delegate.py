@@ -129,6 +129,12 @@ except ImportError:
         return f"{row}  {detail}" if detail else row
 
 try:
+    from security_utils import scan_bash_command
+except ImportError:
+    def scan_bash_command(command):
+        return False, ""
+
+try:
     from security_utils import is_test_path, diff_weakens_tests
 except ImportError:
     def is_test_path(p):
@@ -2763,6 +2769,20 @@ def build_task_prompt(root: Path, ticket: dict, agent_role: str, team_id: Option
     else:
         review_feedback_block = ""
 
+    failed_checks = ticket.get("failed_checks") or []
+    if failed_checks:
+        checks_text = "\n\n".join(
+            f"$ {c.get('cmd')}  (exit {c.get('exit_code')})\n{c.get('output_tail', '')}" for c in failed_checks
+        )
+        safe_checks = wrap_untrusted_content(checks_text, label="PREVIOUS_ATTEMPT_FAILED_CHECKS")
+        review_feedback_block += (
+            f"<previous_attempt_failed_checks>\n"
+            f"PREVIOUS_ATTEMPT_FAILED_CHECKS: the orchestrator ran this ticket's verify commands after your "
+            f"last attempt and they failed. Fix the code so every command below passes.\n"
+            f"{safe_checks}\n"
+            f"</previous_attempt_failed_checks>\n"
+        )
+
     criteria = ticket.get("acceptance_criteria") or []
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "(none specified)"
     structure = get_project_structure(root)
@@ -3322,6 +3342,71 @@ def _snapshot_pre_delegation(cwd: str) -> Optional[dict]:
     if dirty is None:
         return None
     return {"sha": head[0], "dirty": dirty}
+
+
+_VERIFY_OUTPUT_TAIL = 4096
+_VERIFY_DEFAULT_TIMEOUT_S = 300
+
+
+def _run_verify_checks(root: Path, ticket: dict) -> Optional[list]:
+    """Run a ticket's executable acceptance checks (ticket['verify']).
+
+    Each check is {cmd, cwd?, timeout_s?, expect_exit?}. Commands run with
+    shell=False (shlex.split), a cleaned env, a per-command timeout, and the
+    security_utils dangerous-command scan. Results (last 4 KB of output) are
+    stored in ticket['verification']['checks'] and returned. Returns None when
+    the ticket has no verify checks, so such tickets behave as before.
+    """
+    import shlex
+
+    specs = ticket.get("verify") or []
+    if not isinstance(specs, list) or not specs:
+        return None
+    root = Path(root)
+    results = []
+    for spec in specs:
+        if not isinstance(spec, dict) or not str(spec.get("cmd") or "").strip():
+            continue
+        cmd = str(spec["cmd"]).strip()
+        expect = spec.get("expect_exit", 0)
+        try:
+            timeout_s = int(spec.get("timeout_s") or _VERIFY_DEFAULT_TIMEOUT_S)
+        except (TypeError, ValueError):
+            timeout_s = _VERIFY_DEFAULT_TIMEOUT_S
+        entry = {"cmd": cmd, "passed": False, "exit_code": None, "output_tail": "", "timed_out": False}
+        try:
+            dangerous, reason = scan_bash_command(cmd)
+            if dangerous:
+                entry["output_tail"] = f"refused by security policy: {reason}"
+            else:
+                cwd = (root / (spec.get("cwd") or ".")).resolve()
+                if cwd != root.resolve() and root.resolve() not in cwd.parents:
+                    entry["output_tail"] = f"refused: cwd {spec.get('cwd')!r} escapes project root"
+                else:
+                    proc = subprocess.run(
+                        shlex.split(cmd), capture_output=True, text=True, timeout=timeout_s,
+                        cwd=str(cwd), env=_clean_subprocess_env(), shell=False,
+                    )
+                    entry["exit_code"] = proc.returncode
+                    entry["output_tail"] = ((proc.stdout or "") + (proc.stderr or ""))[-_VERIFY_OUTPUT_TAIL:]
+                    entry["passed"] = proc.returncode == expect
+        except subprocess.TimeoutExpired as te:
+            out = te.stdout or b""
+            out = out.decode("utf-8", "replace") if isinstance(out, bytes) else out
+            entry["timed_out"] = True
+            entry["output_tail"] = (f"timed out after {timeout_s}s\n" + out)[-_VERIFY_OUTPUT_TAIL:]
+        except (OSError, ValueError) as e:
+            entry["output_tail"] = f"could not run: {e}"
+        entry["output_tail"] = redact_secrets(entry["output_tail"])
+        results.append(entry)
+    if not results:
+        return None
+    verification = ticket.get("verification")
+    if not isinstance(verification, dict):
+        verification = {}
+        ticket["verification"] = verification
+    verification["checks"] = results
+    return results
 
 
 def _verify_files_changed(cwd: str, snapshot: Optional[dict], claimed: list) -> Optional[dict]:
@@ -4792,6 +4877,40 @@ def cmd_delegate(args):
             }, role=agent, team_id=team_id)
             console.print("[yellow]Agent claimed 'completed' but touched nothing — downgraded to needs_review.[/yellow]")
 
+    # ── Executable acceptance checks: run the ticket's verify commands before review ──
+    ticket.pop("failed_checks", None)
+    if isinstance(ticket.get("verification"), dict):
+        ticket["verification"].pop("checks", None)
+    if parsed.get("status") == "completed" and ticket.get("verify"):
+        try:
+            _checks = _run_verify_checks(root, ticket)
+        except Exception as _verr:
+            _checks = None
+            console.print(f"[yellow]verify checks errored (ignored): {_verr}[/yellow]")
+        if _checks:
+            emit("delegation.checks", {
+                "ticket_id": ticket["id"],
+                "agent": agent,
+                "checks": [
+                    {"cmd": c["cmd"], "passed": c["passed"], "exit_code": c["exit_code"]}
+                    for c in _checks
+                ],
+                "team_id": team_id,
+            }, role=agent, team_id=team_id)
+            _failed = [c for c in _checks if not c["passed"]]
+            if _failed:
+                parsed["status"] = "needs_rework"
+                ticket["failed_checks"] = [
+                    {"cmd": c["cmd"], "exit_code": c["exit_code"], "output_tail": c["output_tail"]}
+                    for c in _failed
+                ]
+                console.print(
+                    f"[yellow]{len(_failed)}/{len(_checks)} verify check(s) failed — "
+                    f"needs_rework, skipping LLM review.[/yellow]"
+                )
+            else:
+                console.print(f"[green]{len(_checks)} verify check(s) passed.[/green]")
+
     # ── Test-tamper check: flag diffs that weaken tests touched by the agent ──
     if verification is not None and agent in ("backend-morty", "frontend-morty", "fullstack-morty", "devops-morty"):
         try:
@@ -4861,6 +4980,8 @@ def cmd_delegate(args):
         ticket["status"] = "in_review"
     elif agent_status == "blocked":
         ticket["status"] = "blocked"
+    elif agent_status == "needs_rework":
+        ticket["status"] = "needs_rework"
     elif agent_status == "needs_review":
         ticket["status"] = "in_review"
         run_hooks("on_review", ticket, agent, output=output, root=root)
