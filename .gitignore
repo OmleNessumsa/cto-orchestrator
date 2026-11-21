@@ -30,3 +30,6 @@ rick-terminal/
 
 # Old rick-terminal archived on 2026-04-23
 rick-terminal.archived-*/
+
+# Orchestrator secrets (HMAC session key, per machine)
+**/.cto/security/session.key
